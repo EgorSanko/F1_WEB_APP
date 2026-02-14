@@ -61,7 +61,7 @@ PREDICTION_POINTS = {
     "safety_car": {"correct": 20},
 }
 
-# ============ TEAM COLORS 2025 ============
+# ============ TEAM COLORS ============
 TEAM_COLORS = {
     "Red Bull Racing": "#3671C6",
     "Mercedes": "#27F4D2",
@@ -73,6 +73,21 @@ TEAM_COLORS = {
     "Haas F1 Team": "#B6BABD",
     "Racing Bulls": "#6692FF",
     "Kick Sauber": "#52E252",
+}
+TEAM_COLORS_2025 = TEAM_COLORS
+
+TEAM_COLORS_2026 = {
+    "McLaren": "#FF8000",
+    "Mercedes": "#27F4D2",
+    "Red Bull Racing": "#3671C6",
+    "Ferrari": "#E8002D",
+    "Williams": "#64C4FF",
+    "Racing Bulls": "#6692FF",
+    "Aston Martin": "#229971",
+    "Alpine": "#FF87BC",
+    "Haas": "#B6BABD",
+    "Audi": "#00594F",
+    "Cadillac": "#1E3D2F",
 }
 
 # ============ DRIVERS 2025 ============
@@ -129,6 +144,73 @@ DRIVERS = {
     5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Kick Sauber", "country": "BR",
          "photo_url": _dp("bortoleto"), "photo_url_large": _dp("bortoleto", "4col")},
 }
+DRIVERS_2025 = DRIVERS
+
+# ============ DRIVERS 2026 ============
+_PB26 = "https://media.formula1.com/content/dam/fom-website/drivers/2026Drivers"
+
+def _dp26(slug, size="1col"):
+    return f"{_PB26}/{slug}.png.transform/{size}/image.png"
+
+DRIVERS_2026 = {
+    1:  {"name": "Lando Norris",      "code": "NOR", "team": "McLaren",        "country": "GB",
+         "photo_url": _dp("norris"), "photo_url_large": _dp("norris", "4col")},
+    81: {"name": "Oscar Piastri",     "code": "PIA", "team": "McLaren",        "country": "AU",
+         "photo_url": _dp("piastri"), "photo_url_large": _dp("piastri", "4col")},
+    63: {"name": "George Russell",    "code": "RUS", "team": "Mercedes",       "country": "GB",
+         "photo_url": _dp("russell"), "photo_url_large": _dp("russell", "4col")},
+    12: {"name": "Kimi Antonelli",    "code": "ANT", "team": "Mercedes",       "country": "IT",
+         "photo_url": _dp("antonelli"), "photo_url_large": _dp("antonelli", "4col")},
+    3:  {"name": "Max Verstappen",    "code": "VER", "team": "Red Bull Racing","country": "NL",
+         "photo_url": _dp("verstappen"), "photo_url_large": _dp("verstappen", "4col")},
+    6:  {"name": "Isack Hadjar",      "code": "HAD", "team": "Red Bull Racing","country": "FR",
+         "photo_url": _dp("hadjar"), "photo_url_large": _dp("hadjar", "4col")},
+    16: {"name": "Charles Leclerc",   "code": "LEC", "team": "Ferrari",        "country": "MC",
+         "photo_url": _dp("leclerc"), "photo_url_large": _dp("leclerc", "4col")},
+    44: {"name": "Lewis Hamilton",    "code": "HAM", "team": "Ferrari",        "country": "GB",
+         "photo_url": _dp("hamilton"), "photo_url_large": _dp("hamilton", "4col")},
+    23: {"name": "Alex Albon",        "code": "ALB", "team": "Williams",       "country": "TH",
+         "photo_url": _dp("albon"), "photo_url_large": _dp("albon", "4col")},
+    55: {"name": "Carlos Sainz",      "code": "SAI", "team": "Williams",       "country": "ES",
+         "photo_url": _dp("sainz"), "photo_url_large": _dp("sainz", "4col")},
+    30: {"name": "Liam Lawson",       "code": "LAW", "team": "Racing Bulls",   "country": "NZ",
+         "photo_url": _dp("lawson"), "photo_url_large": _dp("lawson", "4col")},
+    41: {"name": "Arvid Lindblad",    "code": "LIN", "team": "Racing Bulls",   "country": "GB",
+         "photo_url": _dp("lindblad"), "photo_url_large": _dp("lindblad", "4col")},
+    14: {"name": "Fernando Alonso",   "code": "ALO", "team": "Aston Martin",   "country": "ES",
+         "photo_url": _dp("alonso"), "photo_url_large": _dp("alonso", "4col")},
+    18: {"name": "Lance Stroll",      "code": "STR", "team": "Aston Martin",   "country": "CA",
+         "photo_url": _dp("stroll"), "photo_url_large": _dp("stroll", "4col")},
+    10: {"name": "Pierre Gasly",      "code": "GAS", "team": "Alpine",         "country": "FR",
+         "photo_url": _dp("gasly"), "photo_url_large": _dp("gasly", "4col")},
+    43: {"name": "Franco Colapinto",  "code": "COL", "team": "Alpine",         "country": "AR",
+         "photo_url": _dp("colapinto", year=2024), "photo_url_large": _dp("colapinto", "4col", year=2024)},
+    31: {"name": "Esteban Ocon",      "code": "OCO", "team": "Haas",           "country": "FR",
+         "photo_url": _dp("ocon"), "photo_url_large": _dp("ocon", "4col")},
+    87: {"name": "Oliver Bearman",    "code": "BEA", "team": "Haas",           "country": "GB",
+         "photo_url": _dp("bearman"), "photo_url_large": _dp("bearman", "4col")},
+    27: {"name": "Nico Hulkenberg",   "code": "HUL", "team": "Audi",           "country": "DE",
+         "photo_url": _dp("hulkenberg"), "photo_url_large": _dp("hulkenberg", "4col")},
+    5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Audi",           "country": "BR",
+         "photo_url": _dp("bortoleto"), "photo_url_large": _dp("bortoleto", "4col")},
+    11: {"name": "Sergio Perez",      "code": "PER", "team": "Cadillac",       "country": "MX",
+         "photo_url": _dp("perez"), "photo_url_large": _dp("perez", "4col")},
+    77: {"name": "Valtteri Bottas",   "code": "BOT", "team": "Cadillac",       "country": "FI",
+         "photo_url": _dp("bottas"), "photo_url_large": _dp("bottas", "4col")},
+}
+
+
+# ============ SEASON HELPERS ============
+CURRENT_SEASON = 2026
+
+def get_drivers(season=2026):
+    """Get drivers dict for a specific season."""
+    return DRIVERS_2026 if season == 2026 else DRIVERS_2025
+
+def get_team_colors(season=2026):
+    """Get team colors for a specific season."""
+    return TEAM_COLORS_2026 if season == 2026 else TEAM_COLORS_2025
+
 
 # ============ CIRCUIT COORDINATES (for weather) ============
 CIRCUITS = {

@@ -27,7 +27,8 @@ from config import (
     DRIVERS, TEAM_COLORS, TYRE_COLORS,
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
     DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY,
-    PAST_RACES_VK, SEASON_2025_RESULTS
+    PAST_RACES_VK, SEASON_2025_RESULTS,
+    get_drivers, get_team_colors, CURRENT_SEASON,
 )
 
 # ============ LOGGING ============
@@ -240,13 +241,13 @@ async def user_achievements(request: Request):
 # ============ SCHEDULE & RESULTS (Ergast) ============
 
 @app.get("/api/schedule")
-async def get_schedule():
-    return await f1_data.get_schedule()
+async def get_schedule(season: int = CURRENT_SEASON):
+    return await f1_data.get_schedule(season=season)
 
 
 @app.get("/api/race/next")
-async def get_next_race():
-    return await f1_data.get_next_race()
+async def get_next_race(season: int = CURRENT_SEASON):
+    return await f1_data.get_next_race(season=season)
 
 
 @app.get("/api/race/{round_num}/results")
@@ -273,9 +274,9 @@ async def get_last_race():
 # ============ COMBINED ENDPOINTS (fewer requests from frontend) ============
 
 @app.get("/api/home")
-async def get_home():
+async def get_home(season: int = CURRENT_SEASON):
     """Combined endpoint: next race + last race + top standings. One call for home screen."""
-    return await f1_data.get_home_data()
+    return await f1_data.get_home_data(season=season)
 
 
 @app.get("/api/live/dashboard")
@@ -324,13 +325,13 @@ async def live_pit_stops():
 # ============ STANDINGS ============
 
 @app.get("/api/standings/drivers")
-async def standings_drivers():
-    return await f1_data.get_driver_standings()
+async def standings_drivers(season: int = CURRENT_SEASON):
+    return await f1_data.get_driver_standings(season=season)
 
 
 @app.get("/api/standings/constructors")
-async def standings_constructors():
-    data = await f1_data.get_constructor_standings()
+async def standings_constructors(season: int = CURRENT_SEASON):
+    data = await f1_data.get_constructor_standings(season=season)
     # Enrich with team assets
     for s in data.get("standings", []):
         assets = TEAM_ASSETS.get(s.get("team", ""), {})
@@ -342,37 +343,41 @@ async def standings_constructors():
 # ============ DRIVERS & TEAMS ============
 
 @app.get("/api/drivers")
-async def get_drivers():
-    drivers = [f1_data.enrich_driver(num) for num in DRIVERS]
-    return {"drivers": drivers}
+async def get_drivers_list(season: int = CURRENT_SEASON):
+    drivers_dict = get_drivers(season)
+    drivers = [f1_data.enrich_driver(num, season=season) for num in drivers_dict]
+    return {"drivers": drivers, "season": season}
 
 
 @app.get("/api/driver/{number}")
-async def get_driver(number: int):
-    result = await f1_data.get_driver_profile(number)
+async def get_driver(number: int, season: int = CURRENT_SEASON):
+    result = await f1_data.get_driver_profile(number, season=season)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
-    name = DRIVERS.get(number, {}).get("name", "")
+    drivers_dict = get_drivers(season)
+    name = drivers_dict.get(number, {}).get("name", "")
     result["photo_url_large"] = f1_data.get_driver_photo_url_large(name)
     return result
 
 
 @app.get("/api/teams")
-async def get_teams():
+async def get_teams_list(season: int = CURRENT_SEASON):
+    drivers_dict = get_drivers(season)
+    colors = get_team_colors(season)
     teams = {}
-    for num, info in DRIVERS.items():
+    for num, info in drivers_dict.items():
         team_name = info["team"]
         if team_name not in teams:
             assets = TEAM_ASSETS.get(team_name, {})
             teams[team_name] = {
                 "name": team_name,
-                "color": TEAM_COLORS.get(team_name, "#888"),
+                "color": colors.get(team_name, "#888"),
                 "logo_url": assets.get("logo", ""),
                 "car_url": assets.get("car", ""),
                 "drivers": [],
             }
-        teams[team_name]["drivers"].append(f1_data.enrich_driver(num))
-    return {"teams": list(teams.values())}
+        teams[team_name]["drivers"].append(f1_data.enrich_driver(num, season=season))
+    return {"teams": list(teams.values()), "season": season}
 
 
 # ============ PREDICTIONS ============
@@ -408,7 +413,7 @@ async def predictions_available(request: Request):
         "available": True,
         "race": next_race,
         "predictions": [{**t, "already_predicted": t["type"] in existing_types} for t in types],
-        "drivers": [f1_data.enrich_driver(num) for num in DRIVERS],
+        "drivers": [f1_data.enrich_driver(num, season=CURRENT_SEASON) for num in get_drivers(CURRENT_SEASON)],
     }
 
 
@@ -792,9 +797,9 @@ async def get_past_races_vk():
 @app.get("/api/season/{season}/results")
 async def get_season_results(season: int):
     """Get full season results with podiums, top-10, VK links."""
-    if season != 2025:
-        raise HTTPException(status_code=404, detail="Only 2025 season available")
-    return f1_data.get_season_results(season)
+    if season == 2025:
+        return f1_data.get_season_results(season)
+    return {"season": season, "races": [], "not_started": True}
 
 
 @app.get("/api/race/{round_num}/tyres")

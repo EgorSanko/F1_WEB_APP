@@ -18,7 +18,9 @@ from config import (
     OPENF1_API, ERGAST_API, DRIVERS, TEAM_COLORS, TYRE_COLORS, CACHE_TTL,
     CIRCUIT_IMAGES, CIRCUIT_IMAGE_BASE, DRIVER_PHOTO_BASE, TEAM_ASSETS,
     STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS,
-    SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025
+    SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025,
+    DRIVERS_2025, DRIVERS_2026, TEAM_COLORS_2025, TEAM_COLORS_2026,
+    get_drivers, get_team_colors, CURRENT_SEASON,
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -337,9 +339,16 @@ async def fetch_ergast(
 
 # ============ DRIVER ENRICHMENT ============
 
-def enrich_driver(driver_number: int, extra: dict = None) -> dict:
+def enrich_driver(driver_number: int, extra: dict = None, season: int = None) -> dict:
     """Build a full driver info dict from config + optional extra data."""
-    info = DRIVERS.get(driver_number, {})
+    s = season or CURRENT_SEASON
+    drivers = get_drivers(s)
+    colors = get_team_colors(s)
+    info = drivers.get(driver_number, {})
+    # Fallback: try other season if not found
+    if not info:
+        other = get_drivers(2025 if s == 2026 else 2026)
+        info = other.get(driver_number, {})
     team = info.get("team", "")
 
     result = {
@@ -349,7 +358,7 @@ def enrich_driver(driver_number: int, extra: dict = None) -> dict:
         "last_name": " ".join(info.get("name", "").split(" ")[1:]) if info.get("name") else "",
         "code": info.get("code", str(driver_number)),
         "team": team,
-        "team_color": TEAM_COLORS.get(team, "#888888"),
+        "team_color": colors.get(team, TEAM_COLORS.get(team, "#888888")),
         "country": info.get("country", ""),
         "photo_url": info.get("photo_url", ""),
         "photo_url_large": info.get("photo_url_large", ""),
@@ -412,11 +421,25 @@ ERGAST_TO_NUMBER = {
     "tsunoda": 22, "lawson": 30, "hulkenberg": 27,
     "bortoleto": 5, "hadjar": 6, "doohan": 7,
 }
+ERGAST_TO_NUMBER_2025 = ERGAST_TO_NUMBER
+
+ERGAST_TO_NUMBER_2026 = {
+    "max_verstappen": 3, "hamilton": 44, "leclerc": 16,
+    "norris": 1, "piastri": 81, "russell": 63,
+    "antonelli": 12, "alonso": 14, "stroll": 18,
+    "gasly": 10, "colapinto": 43, "albon": 23,
+    "sainz": 55, "ocon": 31, "bearman": 87,
+    "lawson": 30, "hulkenberg": 27, "hadjar": 6,
+    "bortoleto": 5, "lindblad": 41,
+    "perez": 11, "bottas": 77,
+}
 
 
-def ergast_driver_id_to_number(driver_id: str) -> Optional[int]:
+def ergast_driver_id_to_number(driver_id: str, season: int = None) -> Optional[int]:
     """Convert Ergast driverId to our driver number."""
-    return ERGAST_TO_NUMBER.get(driver_id)
+    s = season or CURRENT_SEASON
+    mapping = ERGAST_TO_NUMBER_2026 if s == 2026 else ERGAST_TO_NUMBER_2025
+    return mapping.get(driver_id)
 
 
 def _get_circuit_image(circuit_id: str) -> str:
@@ -429,15 +452,18 @@ def _get_circuit_image(circuit_id: str) -> str:
 
 # ============ HIGH-LEVEL DATA FUNCTIONS ============
 
-async def get_schedule() -> Dict[str, Any]:
+async def get_schedule(season: int = None) -> Dict[str, Any]:
     """Get full season schedule with enriched data."""
-    cached = cache_get("schedule")
+    s = season or CURRENT_SEASON
+    cache_key = f"schedule:{s}"
+    cached = cache_get(cache_key, ttl_override=3600)
     if cached:
         return cached
 
-    data = await fetch_ergast("current")
+    endpoint = "current" if s == 2025 else str(s)
+    data = await fetch_ergast(endpoint)
     if not data:
-        return {"season": "2025", "races": [], "error": "Failed to fetch schedule"}
+        return {"season": str(s), "races": [], "error": "Failed to fetch schedule"}
 
     races = data.get("RaceTable", {}).get("Races", [])
     result = []
@@ -502,21 +528,23 @@ async def get_schedule() -> Dict[str, Any]:
             break
 
     response = {
-        "season": data.get("RaceTable", {}).get("season", "2025"),
+        "season": data.get("RaceTable", {}).get("season", str(s)),
         "races": result,
         "total_races": len(result),
     }
-    cache_set("schedule", response)
+    cache_set(cache_key, response)
     return response
 
 
-async def get_next_race() -> Dict[str, Any]:
+async def get_next_race(season: int = None) -> Dict[str, Any]:
     """Get the next upcoming race with full details."""
-    cached = cache_get("next_race")
+    s = season or CURRENT_SEASON
+    nrc_key = f"next_race:{s}"
+    cached = cache_get(nrc_key, ttl_override=1800)
     if cached:
         return cached
 
-    schedule = await get_schedule()
+    schedule = await get_schedule(s)
     now = datetime.utcnow()
 
     for race in schedule.get("races", []):
@@ -525,7 +553,7 @@ async def get_next_race() -> Dict[str, Any]:
                 race_dt = datetime.fromisoformat(race["race_datetime"].replace("Z", ""))
                 # Include races up to 6 hours after start (still might be going)
                 if race_dt + timedelta(hours=6) > now:
-                    cache_set("next_race", race)
+                    cache_set(nrc_key, race)
                     return race
             except (ValueError, TypeError):
                 continue
@@ -669,141 +697,159 @@ async def get_qualifying_results(round_num: int) -> Dict[str, Any]:
 
 # ============ STANDINGS ============
 
-async def get_driver_standings() -> Dict[str, Any]:
-    """Get current driver championship standings."""
-    cached = cache_get("standings_drivers")
+async def get_driver_standings(season: int = None) -> Dict[str, Any]:
+    """Get driver championship standings for a given season."""
+    s = season or CURRENT_SEASON
+    cache_key = f"standings_drivers:{s}"
+    cached = cache_get(cache_key, ttl_override=900)
     if cached:
         return cached
 
-    data = await fetch_ergast("current/driverStandings")
+    endpoint = "current/driverStandings" if s == 2025 else f"{s}/driverStandings"
+    data = await fetch_ergast(endpoint)
     if not data:
         return {"standings": [], "error": "Failed to fetch standings"}
 
     standings_lists = data.get("StandingsTable", {}).get("StandingsLists", [])
     if not standings_lists:
-        # Fallback: use hardcoded 2025 final standings
-        standings = []
-        leader_points = 0
-        prev_points = 0
-        for s in STANDINGS_2025_DRIVERS:
-            points = s["points"]
-            if not leader_points:
-                leader_points = points
-            entry = enrich_driver(s["driver_number"], {
-                "position": s["position"],
-                "points": points,
-                "gap_to_leader": round(leader_points - points, 1),
-                "gap_to_prev": round(prev_points - points, 1) if prev_points else 0,
-                "wins": s.get("wins", 0),
-            })
-            standings.append(entry)
-            prev_points = points
-        response = {"standings": standings, "season": "2025", "round": "24", "fallback": True}
-        cache_set("standings_drivers", response)
-        return response
+        if s == 2025:
+            # Fallback: use hardcoded 2025 final standings
+            standings = []
+            leader_points = 0
+            prev_points = 0
+            for sd in STANDINGS_2025_DRIVERS:
+                points = sd["points"]
+                if not leader_points:
+                    leader_points = points
+                entry = enrich_driver(sd["driver_number"], {
+                    "position": sd["position"],
+                    "points": points,
+                    "gap_to_leader": round(leader_points - points, 1),
+                    "gap_to_prev": round(prev_points - points, 1) if prev_points else 0,
+                    "wins": sd.get("wins", 0),
+                }, season=2025)
+                standings.append(entry)
+                prev_points = points
+            response = {"standings": standings, "season": "2025", "round": "24", "fallback": True}
+            cache_set(cache_key, response)
+            return response
+        else:
+            # 2026 season not started yet
+            response = {"standings": [], "season": str(s), "not_started": True}
+            cache_set(cache_key, response)
+            return response
 
     standings = []
     leader_points = 0
     prev_points = 0
 
-    for s in standings_lists[0].get("DriverStandings", []):
-        points = float(s["points"])
+    for sd in standings_lists[0].get("DriverStandings", []):
+        points = float(sd["points"])
         if not leader_points:
             leader_points = points
 
-        driver_id = s["Driver"].get("driverId", "")
-        driver_num = ergast_driver_id_to_number(driver_id) or int(s["Driver"].get("permanentNumber", 0))
-        team_name = s["Constructors"][0]["name"] if s.get("Constructors") else ""
+        driver_id = sd["Driver"].get("driverId", "")
+        driver_num = ergast_driver_id_to_number(driver_id, s) or int(sd["Driver"].get("permanentNumber", 0))
+        team_name = sd["Constructors"][0]["name"] if sd.get("Constructors") else ""
 
         entry = enrich_driver(driver_num, {
-            "position": int(s["position"]),
+            "position": int(sd["position"]),
             "points": points,
             "gap_to_leader": round(leader_points - points, 1),
             "gap_to_prev": round(prev_points - points, 1) if prev_points else 0,
-            "wins": int(s.get("wins", 0)),
-            "nationality": s["Driver"].get("nationality", ""),
+            "wins": int(sd.get("wins", 0)),
+            "nationality": sd["Driver"].get("nationality", ""),
             "ergast_id": driver_id,
-        })
+        }, season=s)
         standings.append(entry)
         prev_points = points
 
     response = {
         "standings": standings,
-        "season": standings_lists[0].get("season", "2025"),
+        "season": standings_lists[0].get("season", str(s)),
         "round": standings_lists[0].get("round", ""),
     }
-    cache_set("standings_drivers", response)
+    cache_set(cache_key, response)
     return response
 
 
-async def get_constructor_standings() -> Dict[str, Any]:
-    """Get current constructor championship standings."""
-    cached = cache_get("standings_constructors")
+async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
+    """Get constructor championship standings."""
+    s = season or CURRENT_SEASON
+    cache_key = f"standings_constructors:{s}"
+    cached = cache_get(cache_key, ttl_override=900)
     if cached:
         return cached
 
-    data = await fetch_ergast("current/constructorStandings")
+    endpoint = "current/constructorStandings" if s == 2025 else f"{s}/constructorStandings"
+    data = await fetch_ergast(endpoint)
     if not data:
         return {"standings": [], "error": "Failed to fetch constructor standings"}
 
+    drivers_dict = get_drivers(s)
+    colors = get_team_colors(s)
+
     standings_lists = data.get("StandingsTable", {}).get("StandingsLists", [])
     if not standings_lists:
-        # Fallback: use hardcoded 2025 final standings
-        standings = []
-        leader_points = 0
-        for s in STANDINGS_2025_CONSTRUCTORS:
-            points = s["points"]
-            if not leader_points:
-                leader_points = points
-            team_name = s["team"]
-            team_drivers = [
-                enrich_driver(num)
-                for num, info in DRIVERS.items()
-                if info.get("team") == team_name
-            ]
-            standings.append({
-                "position": s["position"],
-                "team": team_name,
-                "team_color": TEAM_COLORS.get(team_name, "#888"),
-                "points": points,
-                "gap_to_leader": round(leader_points - points, 1),
-                "wins": s.get("wins", 0),
-                "drivers": team_drivers,
-            })
-        response = {"standings": standings, "fallback": True}
-        cache_set("standings_constructors", response)
-        return response
+        if s == 2025:
+            standings = []
+            leader_points = 0
+            for sc in STANDINGS_2025_CONSTRUCTORS:
+                points = sc["points"]
+                if not leader_points:
+                    leader_points = points
+                team_name = sc["team"]
+                team_drivers = [
+                    enrich_driver(num, season=2025)
+                    for num, info in DRIVERS_2025.items()
+                    if info.get("team") == team_name
+                ]
+                standings.append({
+                    "position": sc["position"],
+                    "team": team_name,
+                    "team_color": colors.get(team_name, "#888"),
+                    "points": points,
+                    "gap_to_leader": round(leader_points - points, 1),
+                    "wins": sc.get("wins", 0),
+                    "drivers": team_drivers,
+                })
+            response = {"standings": standings, "season": "2025", "fallback": True}
+            cache_set(cache_key, response)
+            return response
+        else:
+            response = {"standings": [], "season": str(s), "not_started": True}
+            cache_set(cache_key, response)
+            return response
 
     standings = []
     leader_points = 0
 
-    for s in standings_lists[0].get("ConstructorStandings", []):
-        points = float(s["points"])
+    for sc in standings_lists[0].get("ConstructorStandings", []):
+        points = float(sc["points"])
         if not leader_points:
             leader_points = points
 
-        team_name = s["Constructor"]["name"]
+        team_name = sc["Constructor"]["name"]
 
-        # Get drivers for this team
         team_drivers = [
-            enrich_driver(num)
-            for num, info in DRIVERS.items()
+            enrich_driver(num, season=s)
+            for num, info in drivers_dict.items()
             if info.get("team") == team_name
         ]
 
         standings.append({
-            "position": int(s["position"]),
+            "position": int(sc["position"]),
             "team": team_name,
-            "team_color": TEAM_COLORS.get(team_name, "#888"),
+            "team_color": colors.get(team_name, "#888"),
             "points": points,
             "gap_to_leader": round(leader_points - points, 1),
-            "wins": int(s.get("wins", 0)),
-            "nationality": s["Constructor"].get("nationality", ""),
+            "wins": int(sc.get("wins", 0)),
+            "nationality": sc["Constructor"].get("nationality", ""),
             "drivers": team_drivers,
         })
 
-    response = {"standings": standings}
-    cache_set("standings_constructors", response)
+    response = {"standings": standings, "season": str(s)}
+    cache_set(cache_key, response)
     return response
 
 
@@ -1201,32 +1247,41 @@ async def get_live_pit_stops(_session_key=None) -> Dict[str, Any]:
 
 # ============ ENRICHED DRIVER PROFILES ============
 
-async def get_driver_profile(driver_number: int) -> Dict[str, Any]:
-    """Get full driver profile with season stats from Ergast."""
-    if driver_number not in DRIVERS:
-        return {"error": "Driver not found"}
+async def get_driver_profile(driver_number: int, season: int = None) -> Dict[str, Any]:
+    """Get full driver profile with season stats."""
+    s = season or CURRENT_SEASON
+    drivers_dict = get_drivers(s)
+    # Try current season, fallback to other
+    if driver_number not in drivers_dict:
+        other = get_drivers(2025 if s == 2026 else 2026)
+        if driver_number not in other:
+            return {"error": "Driver not found"}
 
-    driver = enrich_driver(driver_number)
+    driver = enrich_driver(driver_number, season=s)
 
     # Find Ergast ID for this driver
+    ergast_map = ERGAST_TO_NUMBER_2026 if s == 2026 else ERGAST_TO_NUMBER_2025
     ergast_id = None
-    for eid, num in ERGAST_TO_NUMBER.items():
+    for eid, num in ergast_map.items():
         if num == driver_number:
             ergast_id = eid
             break
 
     if not ergast_id:
+        # For 2025: still try to get stats from hardcoded data
+        if s == 2025:
+            driver["season_stats"] = _get_2025_hardcoded_stats(driver_number)
         return driver
 
-    # Get driver's season results
-    data = await fetch_ergast(f"current/drivers/{ergast_id}/results")
+    # Get driver's season results from API
+    endpoint = f"current/drivers/{ergast_id}/results" if s == 2025 else f"{s}/drivers/{ergast_id}/results"
+    data = await fetch_ergast(endpoint)
     if data:
         races = data.get("RaceTable", {}).get("Races", [])
         season_results = []
         total_points = 0
         wins = 0
         podiums = 0
-        poles = 0  # Would need qualifying data
         dnfs = 0
         best_finish = 99
 
@@ -1251,41 +1306,90 @@ async def get_driver_profile(driver_number: int) -> Dict[str, Any]:
                     "status": r.get("status", ""),
                 })
 
-        driver["season_stats"] = {
-            "races": len(season_results),
-            "points": total_points,
-            "wins": wins,
-            "podiums": podiums,
-            "dnfs": dnfs,
-            "best_finish": best_finish if best_finish < 99 else None,
-            "results": season_results,
-        }
+        if season_results:
+            driver["season_stats"] = {
+                "races": len(season_results),
+                "points": total_points,
+                "wins": wins,
+                "podiums": podiums,
+                "dnfs": dnfs,
+                "best_finish": best_finish if best_finish < 99 else None,
+                "results": season_results,
+            }
+        elif s == 2025:
+            driver["season_stats"] = _get_2025_hardcoded_stats(driver_number)
+    elif s == 2025:
+        driver["season_stats"] = _get_2025_hardcoded_stats(driver_number)
 
     # Get teammate for comparison
-    team = DRIVERS[driver_number]["team"]
+    d_dict = get_drivers(s)
+    d_info = d_dict.get(driver_number, {})
+    team = d_info.get("team", "")
     teammate_num = None
-    for num, info in DRIVERS.items():
+    for num, info in d_dict.items():
         if info["team"] == team and num != driver_number:
             teammate_num = num
             break
 
     if teammate_num:
-        driver["teammate"] = enrich_driver(teammate_num)
+        driver["teammate"] = enrich_driver(teammate_num, season=s)
 
     return driver
 
 
+def _get_2025_hardcoded_stats(driver_number: int) -> Dict[str, Any]:
+    """Get 2025 season stats from hardcoded STANDINGS and RESULTS data."""
+    POINTS_TABLE = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    # Points and wins from standings
+    standing = next((s for s in STANDINGS_2025_DRIVERS if s["driver_number"] == driver_number), None)
+    points = standing["points"] if standing else 0
+    wins_from_standings = standing.get("wins", 0) if standing else 0
+
+    # Calculate from SEASON_2025_RESULTS
+    wins = 0
+    podiums = 0
+    results = []
+    for rnd, race in sorted(SEASON_2025_RESULTS.items()):
+        podium = race.get("podium", [])
+        top_10 = race.get("top_10", [])
+        if driver_number in podium:
+            podiums += 1
+            if podium[0] == driver_number:
+                wins += 1
+        if driver_number in top_10:
+            pos = top_10.index(driver_number) + 1
+            results.append({
+                "round": rnd,
+                "race": race["name"],
+                "position": pos,
+                "grid": 0,
+                "points": POINTS_TABLE.get(pos, 0),
+                "status": "Finished",
+            })
+
+    return {
+        "races": len(results),
+        "points": points,
+        "wins": wins or wins_from_standings,
+        "podiums": podiums,
+        "dnfs": 0,
+        "best_finish": min((r["position"] for r in results), default=None),
+        "results": results,
+    }
+
+
 # ============ COMBINED DASHBOARD DATA ============
 
-async def get_home_data() -> Dict[str, Any]:
+async def get_home_data(season: int = None) -> Dict[str, Any]:
     """
     Get all data needed for the home screen in parallel.
     This is the 'heavy' Stage 2 load.
     """
+    s = season or CURRENT_SEASON
     next_race, last_race, standings = await asyncio.gather(
-        get_next_race(),
+        get_next_race(s),
         get_last_race(),
-        get_driver_standings(),
+        get_driver_standings(s),
     )
 
     return {
@@ -1294,6 +1398,7 @@ async def get_home_data() -> Dict[str, Any]:
         "standings_top3": {
             "standings": (standings.get("standings") or [])[:3]
         },
+        "season": s,
     }
 
 

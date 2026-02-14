@@ -306,13 +306,27 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange}) => {
-            if (!nextRace && !lastRace) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:16}}/><CardSkeleton/></div>;
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange, season, onSeasonChange}) => {
+            if (!nextRace && !lastRace) return (
+                <div className="page-container fade-in" style={{padding:16}}>
+                    <div style={{textAlign:'center',padding:'8px 0'}}>
+                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · {season}</div>
+                        <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
+                        <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
+                            {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
+                        </div>
+                    </div>
+                    <CardSkeleton/><div style={{height:16}}/><CardSkeleton/>
+                </div>
+            );
             return (
                 <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
                     <div style={{textAlign:'center',padding:'8px 0'}}>
-                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · 2025</div>
+                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · {season}</div>
                         <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
+                        <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
+                            {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
+                        </div>
                     </div>
 
                     {nextRace && nextRace.name && (
@@ -431,6 +445,14 @@
                     )}
 
                     {/* Championship top-3 — bigger photos */}
+                    {standings?.not_started && (
+                        <div className="card" style={{padding:'20px 16px',textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
+                            <div style={{fontSize:32,marginBottom:8}}>🏁</div>
+                            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Сезон {season} ещё не начался</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Результаты появятся после первой гонки</div>
+                        </div>
+                    )}
                     {standings?.standings && (
                         <div className="card" style={{padding:'16px 12px'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
@@ -841,16 +863,16 @@
             'interlagos':'🇧🇷','las_vegas':'🇺🇸','lusail':'🇶🇦','yas_marina':'🇦🇪'
         };
 
-        const SchedulePage = ({seasonResults, onRaceClick}) => {
-            if (!seasonResults?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
+        const SchedulePage = ({seasonResults, schedule, season, onRaceClick}) => {
+            const races = (seasonResults?.races?.length ? seasonResults.races : null) || schedule?.races || [];
+            if (!races.length) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
 
             const now = new Date();
-            const races = seasonResults.races;
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Сезон 2025</h2>
-                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при · Все результаты</div>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Сезон {season}</h2>
+                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при{seasonResults?.races?.length ? ' · Все результаты' : ''}</div>
 
                     {races.map((race) => {
                         const isPast = new Date(race.date) < now;
@@ -899,18 +921,19 @@
         };
 
         // ==== STANDINGS PAGE ====
-        const StandingsPage = ({driversStandings, constructorsStandings}) => {
+        const StandingsPage = ({driversStandings, constructorsStandings, season}) => {
             const [tab, setTab] = useState('drivers');
             const [selectedDriver, setSelectedDriver] = useState(null);
             const [driverDetail, setDriverDetail] = useState(null);
             const [allDrivers, setAllDrivers] = useState(null);
             const [teamsData, setTeamsData] = useState(null);
             useEffect(() => {
-                if (tab==='cards' && !allDrivers) api.get('/api/drivers').then(d=>setAllDrivers(d?.drivers||[]));
-                if (tab==='teams' && !teamsData) api.get('/api/teams').then(d=>setTeamsData(d?.teams||[]));
-            }, [tab]);
+                setAllDrivers(null); setTeamsData(null); setSelectedDriver(null); setDriverDetail(null);
+                if (tab==='cards') api.get(`/api/drivers?season=${season}`).then(d=>setAllDrivers(d?.drivers||[]));
+                if (tab==='teams') api.get(`/api/teams?season=${season}`).then(d=>setTeamsData(d?.teams||[]));
+            }, [tab, season]);
 
-            const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}`)); };
+            const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}?season=${season}`)); };
 
             if (selectedDriver && driverDetail) {
                 const d = driverDetail, stats = d.season_stats;
@@ -956,6 +979,7 @@
                 );
             }
 
+            const notStarted = (tab==='drivers' && driversStandings?.not_started) || (tab==='constructors' && constructorsStandings?.not_started);
             const data = tab==='drivers'?driversStandings:tab==='constructors'?constructorsStandings:null;
             const leaderPts = data?.standings?.[0]?.points || 1;
 
@@ -974,8 +998,13 @@
                         </div>
                     </div>
 
+                    {/* Not started placeholder */}
+                    {notStarted && (
+                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏁</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>Сезон {season} ещё не начался</div><div style={{fontSize:13}}>Результаты появятся после первой гонки</div></div>
+                    )}
+
                     {/* DRIVERS STANDINGS */}
-                    {tab==='drivers' && (!data?.standings ? (
+                    {tab==='drivers' && !notStarted && (!data?.standings ? (
                         <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="64px" r="16px" className="mb-3"/>)}</div>
                     ) : (
                         <div style={{padding:'0 12px'}}>
@@ -1028,12 +1057,16 @@
                     ))}
 
                     {/* CONSTRUCTORS STANDINGS */}
-                    {tab==='constructors' && (!constructorsStandings?.standings ? (
+                    {tab==='constructors' && !notStarted && (!constructorsStandings?.standings ? (
                         <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="56px" r="16px" className="mb-3"/>)}</div>
                     ) : (
                         <div style={{padding:'0 12px'}}>
                             {constructorsStandings.standings.map((s,i)=>{
                                 const cLeader = constructorsStandings.standings[0]?.points || 1;
+                                const driverPoints = s.drivers?.map(d => {
+                                    const ds = driversStandings?.standings?.find(x => x.driver_number === d.driver_number);
+                                    return {code: d.code, photo_url: d.photo_url, points: ds?.points || 0, driver_number: d.driver_number};
+                                }) || [];
                                 return (
                                     <div key={i} className="card" style={{marginBottom:8,padding:12,borderLeft:`4px solid ${s.team_color}`}}>
                                         <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -1041,17 +1074,28 @@
                                             {s.logo_url && <img src={s.logo_url} alt="" style={{width:36,height:36,objectFit:'contain',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                             <div style={{flex:1,minWidth:0}}>
                                                 <div style={{fontWeight:700,fontSize:15}}>{s.team}</div>
-                                                <div style={{display:'flex',gap:6,marginTop:4,alignItems:'center'}}>
-                                                    {s.drivers?.map((d,j)=>(
-                                                        <div key={j} style={{display:'flex',alignItems:'center',gap:3}}>
+                                                <div style={{display:'flex',gap:8,marginTop:6,alignItems:'center'}}>
+                                                    {driverPoints.map((d,j)=>(
+                                                        <div key={j} onClick={(e)=>{e.stopPropagation();d.driver_number&&openDriver(d.driver_number);}} style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer',padding:'3px 8px',background:'rgba(255,255,255,0.03)',borderRadius:8,border:'1px solid var(--f1-border)'}}>
                                                             {d.photo_url && <img src={d.photo_url} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                                            <span style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>{d.code}</span>
+                                                            <span style={{fontSize:11,fontWeight:700}}>{d.code}</span>
+                                                            <span style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.points}</span>
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <div className="progress-bar-bg" style={{marginTop:4,maxWidth:140}}>
-                                                    <div className="progress-bar-fill" style={{width:`${Math.max(3,(s.points/cLeader)*100)}%`,background:s.team_color}}/>
-                                                </div>
+                                                {s.points > 0 && (
+                                                    <div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:6,background:'var(--f1-gray)',gap:1}}>
+                                                        {driverPoints.map((d,j)=>{
+                                                            const w = Math.max(3, (d.points / s.points) * 100);
+                                                            return <div key={j} style={{width:`${w}%`,background:j===0?s.team_color:`${s.team_color}99`,borderRadius:3,transition:'width 0.5s ease'}}/>;
+                                                        })}
+                                                    </div>
+                                                )}
+                                                {s.points === 0 && (
+                                                    <div className="progress-bar-bg" style={{marginTop:6,maxWidth:140}}>
+                                                        <div className="progress-bar-fill" style={{width:'3%',background:s.team_color}}/>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div style={{textAlign:'right'}}>
                                                 <div style={{fontWeight:900,fontSize:18,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
@@ -1675,7 +1719,7 @@
         };
 
         // ==== RACE DETAIL PAGE ====
-        const RaceDetailPage = ({race, onBack}) => {
+        const RaceDetailPage = ({race, onBack, season}) => {
             const [tyreData, setTyreData] = useState(null);
             const [tyreLoading, setTyreLoading] = useState(false);
             useEffect(() => {
@@ -1825,6 +1869,7 @@
         // ==== MAIN APP ====
         const App = () => {
             const [tab, setTab] = useState('home');
+            const [currentSeason, setCurrentSeason] = useState(2026);
             const [loading, setLoading] = useState(true);
             const [user, setUser] = useState(null);
             const [nextRace, setNextRace] = useState(null);
@@ -1851,11 +1896,13 @@
 
             useEffect(() => {
                 if (loading) return;
-                Promise.all([api.get('/api/home'),api.get('/api/standings/drivers'),api.get('/api/standings/constructors'),api.get('/api/schedule'),api.get('/api/streams'),api.get('/api/season/2025/results')]).then(([home,ds,cs,sched,str,sr])=>{
+                const s = currentSeason;
+                setNextRace(null); setLastRace(null); setDriversStandings(null); setConstructorsStandings(null); setSchedule(null); setSeasonResults(null);
+                Promise.all([api.get(`/api/home?season=${s}`),api.get(`/api/standings/drivers?season=${s}`),api.get(`/api/standings/constructors?season=${s}`),api.get(`/api/schedule?season=${s}`),api.get('/api/streams'),api.get(`/api/season/${s}/results`)]).then(([home,ds,cs,sched,str,sr])=>{
                     if(home){setNextRace(home.next_race);setLastRace(home.last_race);}
                     setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str); setSeasonResults(sr);
                 });
-            }, [loading]);
+            }, [loading, currentSeason]);
 
             useEffect(() => {
                 if (tab !== 'live') return;
@@ -1897,12 +1944,12 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
                     case 'news': return <NewsPage/>;
-                    case 'schedule': return <SchedulePage seasonResults={seasonResults} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
-                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')}/>;
-                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings}/>;
+                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
+                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason}/>;
+                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
                     case 'analytics': return <AnalyticsPage/>;
