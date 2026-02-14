@@ -27,7 +27,7 @@ from config import (
     DRIVERS, TEAM_COLORS, TYRE_COLORS,
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
     DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY,
-    PAST_RACES_VK
+    PAST_RACES_VK, SEASON_2025_RESULTS
 )
 
 # ============ LOGGING ============
@@ -115,6 +115,35 @@ def get_current_user(request: Request) -> Dict[str, Any]:
     return validate_telegram_data(init_data)
 
 
+async def fetch_telegram_avatar(user_id: int) -> Optional[str]:
+    """Fetch user avatar URL via Telegram Bot API."""
+    if not TELEGRAM_TOKEN:
+        return None
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUserProfilePhotos",
+                params={"user_id": user_id, "limit": 1}
+            )
+            data = resp.json()
+            if not data.get("ok") or not data["result"]["photos"]:
+                return None
+            # Get the largest available photo
+            photo = data["result"]["photos"][0][-1]
+            resp2 = await client.get(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile",
+                params={"file_id": photo["file_id"]}
+            )
+            data2 = resp2.json()
+            if not data2.get("ok"):
+                return None
+            return f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{data2['result']['file_path']}"
+    except Exception as e:
+        logger.debug(f"Failed to fetch avatar for user {user_id}: {e}")
+        return None
+
+
 # ============ HEALTH ============
 
 @app.get("/api/health")
@@ -156,6 +185,14 @@ async def user_me(request: Request):
         last_name=tg_user.get("last_name"),
         photo_url=tg_user.get("photo_url"),
     )
+
+    # Fetch avatar from Bot API if not available from initData
+    if not user.get("photo_url"):
+        avatar_url = await fetch_telegram_avatar(tg_user["id"])
+        if avatar_url:
+            user["photo_url"] = avatar_url
+            db.execute_write("UPDATE users SET photo_url = ? WHERE user_id = ?", (avatar_url, tg_user["id"]))
+
     rank = db.get_user_rank(user["user_id"])
     achievements = db.get_user_achievements(user["user_id"])
 
@@ -750,6 +787,14 @@ async def get_streams():
 async def get_past_races_vk():
     """Return list of past race VK video recording links."""
     return {"races": PAST_RACES_VK}
+
+
+@app.get("/api/season/{season}/results")
+async def get_season_results(season: int):
+    """Get full season results with podiums, top-10, VK links."""
+    if season != 2025:
+        raise HTTPException(status_code=404, detail="Only 2025 season available")
+    return f1_data.get_season_results(season)
 
 
 # ============ ANALYTICS ENDPOINTS ============

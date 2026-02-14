@@ -72,55 +72,55 @@ TEAM_COLORS = {
 
 # ============ DRIVERS 2025 ============
 # Updated: mid-season transfers applied (Tsunoda→RBR, Lawson→Racing Bulls, Colapinto→Alpine, Hadjar #35)
-_PB = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/2025Drivers"
+_PB25 = "https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers"
+_PB24 = "https://media.formula1.com/content/dam/fom-website/drivers/2024Drivers"
 
-def _dp(last, first, size="1col"):
-    """Build F1 driver photo URL."""
-    s = last.replace("ü", "u").replace("é", "e")
-    c = s[:6]
-    return f"{_PB}/{c.upper()}01_{first}_{s.upper()}/{c.lower()}01.png.transform/{size}/image.png"
+def _dp(slug, size="1col", year=2025):
+    """Build verified F1 driver photo URL. slug = lowercase lastname."""
+    base = _PB25 if year == 2025 else _PB24
+    return f"{base}/{slug}.png.transform/{size}/image.png"
 
 DRIVERS = {
     1:  {"name": "Max Verstappen", "code": "VER", "team": "Red Bull Racing", "country": "NL",
-         "photo_url": _dp("Verstappen", "Max"), "photo_url_large": _dp("Verstappen", "Max", "4col")},
+         "photo_url": _dp("verstappen"), "photo_url_large": _dp("verstappen", "4col")},
     22: {"name": "Yuki Tsunoda", "code": "TSU", "team": "Red Bull Racing", "country": "JP",
-         "photo_url": _dp("Tsunoda", "Yuki"), "photo_url_large": _dp("Tsunoda", "Yuki", "4col")},
+         "photo_url": _dp("tsunoda"), "photo_url_large": _dp("tsunoda", "4col")},
     44: {"name": "Lewis Hamilton", "code": "HAM", "team": "Ferrari", "country": "GB",
-         "photo_url": _dp("Hamilton", "Lewis"), "photo_url_large": _dp("Hamilton", "Lewis", "4col")},
+         "photo_url": _dp("hamilton"), "photo_url_large": _dp("hamilton", "4col")},
     16: {"name": "Charles Leclerc", "code": "LEC", "team": "Ferrari", "country": "MC",
-         "photo_url": _dp("Leclerc", "Charles"), "photo_url_large": _dp("Leclerc", "Charles", "4col")},
+         "photo_url": _dp("leclerc"), "photo_url_large": _dp("leclerc", "4col")},
     4:  {"name": "Lando Norris", "code": "NOR", "team": "McLaren", "country": "GB",
-         "photo_url": _dp("Norris", "Lando"), "photo_url_large": _dp("Norris", "Lando", "4col")},
+         "photo_url": _dp("norris"), "photo_url_large": _dp("norris", "4col")},
     81: {"name": "Oscar Piastri", "code": "PIA", "team": "McLaren", "country": "AU",
-         "photo_url": _dp("Piastri", "Oscar"), "photo_url_large": _dp("Piastri", "Oscar", "4col")},
+         "photo_url": _dp("piastri"), "photo_url_large": _dp("piastri", "4col")},
     63: {"name": "George Russell", "code": "RUS", "team": "Mercedes", "country": "GB",
-         "photo_url": _dp("Russell", "George"), "photo_url_large": _dp("Russell", "George", "4col")},
+         "photo_url": _dp("russell"), "photo_url_large": _dp("russell", "4col")},
     12: {"name": "Andrea Kimi Antonelli", "code": "ANT", "team": "Mercedes", "country": "IT",
-         "photo_url": _dp("Antonelli", "Kimi"), "photo_url_large": _dp("Antonelli", "Kimi", "4col")},
+         "photo_url": _dp("antonelli"), "photo_url_large": _dp("antonelli", "4col")},
     14: {"name": "Fernando Alonso", "code": "ALO", "team": "Aston Martin", "country": "ES",
-         "photo_url": _dp("Alonso", "Fernando"), "photo_url_large": _dp("Alonso", "Fernando", "4col")},
+         "photo_url": _dp("alonso"), "photo_url_large": _dp("alonso", "4col")},
     18: {"name": "Lance Stroll", "code": "STR", "team": "Aston Martin", "country": "CA",
-         "photo_url": _dp("Stroll", "Lance"), "photo_url_large": _dp("Stroll", "Lance", "4col")},
+         "photo_url": _dp("stroll"), "photo_url_large": _dp("stroll", "4col")},
     10: {"name": "Pierre Gasly", "code": "GAS", "team": "Alpine", "country": "FR",
-         "photo_url": _dp("Gasly", "Pierre"), "photo_url_large": _dp("Gasly", "Pierre", "4col")},
+         "photo_url": _dp("gasly"), "photo_url_large": _dp("gasly", "4col")},
     43: {"name": "Franco Colapinto", "code": "COL", "team": "Alpine", "country": "AR",
-         "photo_url": _dp("Colapinto", "Franco"), "photo_url_large": _dp("Colapinto", "Franco", "4col")},
+         "photo_url": _dp("colapinto", year=2024), "photo_url_large": _dp("colapinto", "4col", year=2024)},
     23: {"name": "Alexander Albon", "code": "ALB", "team": "Williams", "country": "TH",
-         "photo_url": _dp("Albon", "Alexander"), "photo_url_large": _dp("Albon", "Alexander", "4col")},
+         "photo_url": _dp("albon"), "photo_url_large": _dp("albon", "4col")},
     55: {"name": "Carlos Sainz", "code": "SAI", "team": "Williams", "country": "ES",
-         "photo_url": _dp("Sainz", "Carlos"), "photo_url_large": _dp("Sainz", "Carlos", "4col")},
+         "photo_url": _dp("sainz"), "photo_url_large": _dp("sainz", "4col")},
     31: {"name": "Esteban Ocon", "code": "OCO", "team": "Haas F1 Team", "country": "FR",
-         "photo_url": _dp("Ocon", "Esteban"), "photo_url_large": _dp("Ocon", "Esteban", "4col")},
+         "photo_url": _dp("ocon"), "photo_url_large": _dp("ocon", "4col")},
     87: {"name": "Oliver Bearman", "code": "BEA", "team": "Haas F1 Team", "country": "GB",
-         "photo_url": _dp("Bearman", "Oliver"), "photo_url_large": _dp("Bearman", "Oliver", "4col")},
+         "photo_url": _dp("bearman"), "photo_url_large": _dp("bearman", "4col")},
     30: {"name": "Liam Lawson", "code": "LAW", "team": "Racing Bulls", "country": "NZ",
-         "photo_url": _dp("Lawson", "Liam"), "photo_url_large": _dp("Lawson", "Liam", "4col")},
+         "photo_url": _dp("lawson"), "photo_url_large": _dp("lawson", "4col")},
     35: {"name": "Isack Hadjar", "code": "HAD", "team": "Racing Bulls", "country": "FR",
-         "photo_url": _dp("Hadjar", "Isack"), "photo_url_large": _dp("Hadjar", "Isack", "4col")},
+         "photo_url": _dp("hadjar"), "photo_url_large": _dp("hadjar", "4col")},
     27: {"name": "Nico Hülkenberg", "code": "HUL", "team": "Kick Sauber", "country": "DE",
-         "photo_url": _dp("Hülkenberg", "Nico"), "photo_url_large": _dp("Hülkenberg", "Nico", "4col")},
+         "photo_url": _dp("hulkenberg"), "photo_url_large": _dp("hulkenberg", "4col")},
     5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Kick Sauber", "country": "BR",
-         "photo_url": _dp("Bortoleto", "Gabriel"), "photo_url_large": _dp("Bortoleto", "Gabriel", "4col")},
+         "photo_url": _dp("bortoleto"), "photo_url_large": _dp("bortoleto", "4col")},
 }
 
 # ============ CIRCUIT COORDINATES (for weather) ============
@@ -345,37 +345,241 @@ ACHIEVEMENTS = {
 # ============ STANDINGS FALLBACK (2025 final) ============
 # Used when Ergast API returns empty (off-season)
 STANDINGS_2025_DRIVERS = [
-    {"position": 1,  "driver_number": 1,  "points": 437, "wins": 9},
-    {"position": 2,  "driver_number": 4,  "points": 374, "wins": 8},
-    {"position": 3,  "driver_number": 16, "points": 356, "wins": 5},
-    {"position": 4,  "driver_number": 81, "points": 292, "wins": 3},
-    {"position": 5,  "driver_number": 44, "points": 258, "wins": 2},
-    {"position": 6,  "driver_number": 63, "points": 231, "wins": 2},
-    {"position": 7,  "driver_number": 55, "points": 171, "wins": 0},
-    {"position": 8,  "driver_number": 14, "points": 137, "wins": 0},
-    {"position": 9,  "driver_number": 22, "points": 96,  "wins": 0},
-    {"position": 10, "driver_number": 10, "points": 84,  "wins": 0},
-    {"position": 11, "driver_number": 30, "points": 78,  "wins": 0},
-    {"position": 12, "driver_number": 23, "points": 68,  "wins": 0},
-    {"position": 13, "driver_number": 18, "points": 58,  "wins": 0},
-    {"position": 14, "driver_number": 31, "points": 52,  "wins": 0},
-    {"position": 15, "driver_number": 12, "points": 48,  "wins": 0},
-    {"position": 16, "driver_number": 27, "points": 41,  "wins": 0},
-    {"position": 17, "driver_number": 87, "points": 36,  "wins": 0},
-    {"position": 18, "driver_number": 35, "points": 22,  "wins": 0},
-    {"position": 19, "driver_number": 43, "points": 14,  "wins": 0},
-    {"position": 20, "driver_number": 5,  "points": 10,  "wins": 0},
+    {"position": 1,  "driver_number": 4,  "points": 423, "wins": 8},   # Норрис
+    {"position": 2,  "driver_number": 1,  "points": 421, "wins": 9},   # Ферстаппен
+    {"position": 3,  "driver_number": 81, "points": 410, "wins": 3},   # Пиастри
+    {"position": 4,  "driver_number": 63, "points": 319, "wins": 2},   # Расселл
+    {"position": 5,  "driver_number": 16, "points": 242, "wins": 2},   # Леклер
+    {"position": 6,  "driver_number": 44, "points": 156, "wins": 0},   # Хэмилтон
+    {"position": 7,  "driver_number": 12, "points": 150, "wins": 0},   # Антонелли
+    {"position": 8,  "driver_number": 23, "points": 73,  "wins": 0},   # Албон
+    {"position": 9,  "driver_number": 55, "points": 64,  "wins": 0},   # Сайнс
+    {"position": 10, "driver_number": 14, "points": 56,  "wins": 0},   # Алонсо
+    {"position": 11, "driver_number": 27, "points": 51,  "wins": 0},   # Хюлькенберг
+    {"position": 12, "driver_number": 35, "points": 51,  "wins": 0},   # Хаджар
+    {"position": 13, "driver_number": 87, "points": 41,  "wins": 0},   # Берман
+    {"position": 14, "driver_number": 30, "points": 38,  "wins": 0},   # Лоусон
+    {"position": 15, "driver_number": 31, "points": 38,  "wins": 0},   # Окон
+    {"position": 16, "driver_number": 18, "points": 33,  "wins": 0},   # Стролл
+    {"position": 17, "driver_number": 22, "points": 33,  "wins": 0},   # Цунода
+    {"position": 18, "driver_number": 10, "points": 22,  "wins": 0},   # Гасли
+    {"position": 19, "driver_number": 5,  "points": 19,  "wins": 0},   # Бортолето
+    {"position": 20, "driver_number": 43, "points": 0,   "wins": 0},   # Колапинто
 ]
 
 STANDINGS_2025_CONSTRUCTORS = [
-    {"position": 1,  "team": "McLaren",          "points": 666, "wins": 11},
-    {"position": 2,  "team": "Ferrari",          "points": 614, "wins": 7},
-    {"position": 3,  "team": "Red Bull Racing",  "points": 533, "wins": 9},
-    {"position": 4,  "team": "Mercedes",         "points": 279, "wins": 2},
-    {"position": 5,  "team": "Williams",         "points": 239, "wins": 0},
-    {"position": 6,  "team": "Aston Martin",     "points": 195, "wins": 0},
-    {"position": 7,  "team": "Racing Bulls",     "points": 100, "wins": 0},
-    {"position": 8,  "team": "Alpine",           "points": 98,  "wins": 0},
-    {"position": 9,  "team": "Haas F1 Team",     "points": 88,  "wins": 0},
-    {"position": 10, "team": "Kick Sauber",      "points": 51,  "wins": 0},
+    {"position": 1,  "team": "McLaren",          "points": 833, "wins": 11},
+    {"position": 2,  "team": "Mercedes",         "points": 469, "wins": 2},
+    {"position": 3,  "team": "Red Bull Racing",  "points": 451, "wins": 9},
+    {"position": 4,  "team": "Ferrari",          "points": 398, "wins": 2},
+    {"position": 5,  "team": "Williams",         "points": 137, "wins": 0},
+    {"position": 6,  "team": "Racing Bulls",     "points": 92,  "wins": 0},
+    {"position": 7,  "team": "Aston Martin",     "points": 89,  "wins": 0},
+    {"position": 8,  "team": "Haas F1 Team",     "points": 79,  "wins": 0},
+    {"position": 9,  "team": "Kick Sauber",      "points": 70,  "wins": 0},
+    {"position": 10, "team": "Alpine",           "points": 22,  "wins": 0},
 ]
+
+# ============ SEASON 2025 RESULTS (all 24 races) ============
+# Data sourced from championat.com; podium = [P1, P2, P3] driver numbers
+# sprint = True for sprint weekends
+SEASON_2025_RESULTS = {
+    1: {
+        "name": "Гран-при Австралии",
+        "date": "2025-03-16",
+        "circuit_id": "albert_park",
+        "laps": 58,
+        "podium": [4, 1, 63],
+        "top_10": [4, 1, 63, 81, 16, 22, 23, 44, 10, 14],
+    },
+    2: {
+        "name": "Гран-при Китая",
+        "date": "2025-03-23",
+        "circuit_id": "shanghai",
+        "laps": 56,
+        "sprint": True,
+        "podium": [81, 4, 63],
+        "top_10": [81, 4, 63, 44, 16, 1, 12, 22, 35, 31],
+    },
+    3: {
+        "name": "Гран-при Японии",
+        "date": "2025-04-06",
+        "circuit_id": "suzuka",
+        "laps": 53,
+        "podium": [1, 4, 81],
+        "top_10": [1, 4, 81, 16, 63, 12, 44, 35, 23, 87],
+    },
+    4: {
+        "name": "Гран-при Бахрейна",
+        "date": "2025-04-13",
+        "circuit_id": "bahrain",
+        "laps": 57,
+        "podium": [81, 63, 4],
+        "top_10": [81, 63, 4, 16, 10, 55, 12, 1, 44, 22],
+    },
+    5: {
+        "name": "Гран-при Саудовской Аравии",
+        "date": "2025-04-20",
+        "circuit_id": "jeddah",
+        "laps": 50,
+        "podium": [81, 1, 16],
+        "top_10": [81, 1, 16, 63, 12, 44, 4, 55, 23, 35],
+    },
+    6: {
+        "name": "Гран-при Майами",
+        "date": "2025-05-04",
+        "circuit_id": "miami",
+        "laps": 57,
+        "sprint": True,
+        "podium": [81, 4, 63],
+        "top_10": [81, 4, 63, 12, 23, 55, 16, 22, 31, 44],
+    },
+    7: {
+        "name": "Гран-при Эмилии-Романьи",
+        "date": "2025-05-18",
+        "circuit_id": "imola",
+        "laps": 63,
+        "podium": [1, 4, 81],
+        "top_10": [1, 4, 81, 63, 14, 55, 23, 18, 35, 12],
+    },
+    8: {
+        "name": "Гран-при Монако",
+        "date": "2025-05-25",
+        "circuit_id": "monaco",
+        "laps": 78,
+        "podium": [4, 16, 81],
+        "top_10": [4, 16, 81, 1, 35, 14, 44, 31, 30, 23],
+    },
+    9: {
+        "name": "Гран-при Испании",
+        "date": "2025-06-01",
+        "circuit_id": "catalunya",
+        "laps": 66,
+        "podium": [81, 4, 16],
+        "top_10": [81, 4, 16, 44, 63, 12, 35, 1, 30, 5],
+    },
+    10: {
+        "name": "Гран-при Канады",
+        "date": "2025-06-15",
+        "circuit_id": "villeneuve",
+        "laps": 70,
+        "podium": [63, 1, 12],
+        "top_10": [63, 1, 12, 81, 44, 14, 4, 16, 27, 43],
+    },
+    11: {
+        "name": "Гран-при Австрии",
+        "date": "2025-06-29",
+        "circuit_id": "red_bull_ring",
+        "laps": 71,
+        "podium": [4, 81, 16],
+        "top_10": [4, 81, 16, 44, 63, 5, 30, 14, 31, 22],
+    },
+    12: {
+        "name": "Гран-при Великобритании",
+        "date": "2025-07-06",
+        "circuit_id": "silverstone",
+        "laps": 52,
+        "podium": [4, 81, 27],
+        "top_10": [4, 81, 27, 63, 16, 1, 44, 12, 14, 55],
+    },
+    13: {
+        "name": "Гран-при Бельгии",
+        "date": "2025-07-27",
+        "circuit_id": "spa",
+        "laps": 44,
+        "sprint": True,
+        "podium": [81, 4, 16],
+        "top_10": [81, 4, 16, 1, 63, 23, 22, 35, 30, 5],
+    },
+    14: {
+        "name": "Гран-при Венгрии",
+        "date": "2025-08-03",
+        "circuit_id": "hungaroring",
+        "laps": 70,
+        "podium": [4, 81, 63],
+        "top_10": [4, 81, 63, 14, 16, 5, 1, 18, 30, 87],
+    },
+    15: {
+        "name": "Гран-при Нидерландов",
+        "date": "2025-08-31",
+        "circuit_id": "zandvoort",
+        "laps": 72,
+        "podium": [81, 1, 35],
+        "top_10": [81, 1, 35, 4, 16, 63, 44, 30, 55, 23],
+    },
+    16: {
+        "name": "Гран-при Италии",
+        "date": "2025-09-07",
+        "circuit_id": "monza",
+        "laps": 53,
+        "podium": [1, 4, 81],
+        "top_10": [1, 4, 81, 16, 63, 44, 5, 14, 22, 12],
+    },
+    17: {
+        "name": "Гран-при Азербайджана",
+        "date": "2025-09-21",
+        "circuit_id": "baku",
+        "laps": 51,
+        "podium": [1, 63, 55],
+        "top_10": [1, 63, 55, 12, 22, 30, 35, 4, 16, 44],
+    },
+    18: {
+        "name": "Гран-при Сингапура",
+        "date": "2025-10-05",
+        "circuit_id": "marina_bay",
+        "laps": 62,
+        "podium": [63, 1, 4],
+        "top_10": [63, 1, 4, 81, 16, 12, 44, 35, 14, 87],
+    },
+    19: {
+        "name": "Гран-при США",
+        "date": "2025-10-19",
+        "circuit_id": "cota",
+        "laps": 56,
+        "sprint": True,
+        "podium": [1, 4, 16],
+        "top_10": [1, 4, 16, 63, 44, 81, 12, 55, 27, 87],
+    },
+    20: {
+        "name": "Гран-при Мексики",
+        "date": "2025-10-26",
+        "circuit_id": "rodriguez",
+        "laps": 71,
+        "podium": [1, 4, 63],
+        "top_10": [1, 4, 63, 81, 16, 44, 12, 14, 55, 23],
+    },
+    21: {
+        "name": "Гран-при Бразилии",
+        "date": "2025-11-09",
+        "circuit_id": "interlagos",
+        "laps": 71,
+        "sprint": True,
+        "podium": [4, 1, 16],
+        "top_10": [4, 1, 16, 81, 63, 44, 12, 23, 55, 14],
+    },
+    22: {
+        "name": "Гран-при Лас-Вегаса",
+        "date": "2025-11-23",
+        "circuit_id": "las_vegas",
+        "laps": 50,
+        "podium": [16, 4, 1],
+        "top_10": [16, 4, 1, 81, 63, 44, 12, 23, 55, 27],
+    },
+    23: {
+        "name": "Гран-при Катара",
+        "date": "2025-11-30",
+        "circuit_id": "lusail",
+        "laps": 57,
+        "sprint": True,
+        "podium": [1, 4, 81],
+        "top_10": [1, 4, 81, 63, 16, 44, 12, 35, 30, 14],
+    },
+    24: {
+        "name": "Гран-при Абу-Даби",
+        "date": "2025-12-07",
+        "circuit_id": "yas_marina",
+        "laps": 58,
+        "podium": [1, 81, 4],
+        "top_10": [1, 81, 4, 16, 63, 14, 5, 35, 31, 22],
+    },
+}

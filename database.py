@@ -165,9 +165,10 @@ def get_or_create_user(user_id: int, username: str = None,
             """UPDATE users SET last_active = CURRENT_TIMESTAMP,
                username = COALESCE(?, username),
                first_name = COALESCE(?, first_name),
-               last_name = COALESCE(?, last_name)
+               last_name = COALESCE(?, last_name),
+               photo_url = COALESCE(?, photo_url)
                WHERE user_id = ?""",
-            (username, first_name, last_name, user_id)
+            (username, first_name, last_name, photo_url, user_id)
         )
         user = execute_one("SELECT * FROM users WHERE user_id = ?", (user_id,))
     else:

@@ -16,7 +16,8 @@ import httpx
 from config import (
     OPENF1_API, ERGAST_API, DRIVERS, TEAM_COLORS, TYRE_COLORS, CACHE_TTL,
     CIRCUIT_IMAGES, CIRCUIT_IMAGE_BASE, DRIVER_PHOTO_BASE, TEAM_ASSETS,
-    STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS
+    STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS,
+    SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -1379,3 +1380,37 @@ async def get_race_laptimes(session_key: str = "latest", driver_numbers: list = 
     if not driver_numbers:
         cache_set(cache_key, response)
     return response
+
+
+# ============ SEASON 2025 RESULTS ============
+
+def get_season_results(season: int = 2025) -> Dict[str, Any]:
+    """Get full season race results from hardcoded data."""
+    races = []
+    vk_by_round = {r["round"]: r["url"] for r in PAST_RACES_VK if r["season"] == season}
+
+    for rnd, data in sorted(SEASON_2025_RESULTS.items()):
+        winner_num = data["podium"][0]
+        winner = enrich_driver(winner_num)
+        podium = [enrich_driver(n) for n in data["podium"]]
+        top_10 = [enrich_driver(n, {"position": i + 1}) for i, n in enumerate(data.get("top_10", data["podium"]))]
+
+        circuit_id = data.get("circuit_id", "")
+        circuit_info = CIRCUITS.get(circuit_id, {})
+
+        races.append({
+            "round": rnd,
+            "name": data["name"],
+            "date": data["date"],
+            "circuit_id": circuit_id,
+            "circuit_name": circuit_info.get("name", ""),
+            "circuit_image": _get_circuit_image(circuit_id),
+            "laps": data.get("laps", 0),
+            "sprint": data.get("sprint", False),
+            "winner": winner,
+            "podium": podium,
+            "top_10": top_10,
+            "vk_url": vk_by_round.get(rnd, ""),
+        })
+
+    return {"season": season, "races": races, "total_races": len(races)}

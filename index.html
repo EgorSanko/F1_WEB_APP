@@ -307,7 +307,7 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, onChange}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange}) => {
             if (!nextRace && !lastRace) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:16}}/><CardSkeleton/></div>;
             return (
                 <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
@@ -399,6 +399,47 @@
                             )}
                         </div>
                     )}
+
+                    {/* VK Race Recordings — last 3 races */}
+                    {seasonResults?.races && (() => {
+                        const now = new Date();
+                        const pastRaces = seasonResults.races.filter(r => new Date(r.date) < now && r.vk_url).slice(-3).reverse();
+                        if (!pastRaces.length) return null;
+                        return (
+                            <div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
+                                    📺 Записи гонок
+                                </div>
+                                <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
+                                    {pastRaces.map(race => {
+                                        const flag = circuitFlags[race.circuit_id] || '🏁';
+                                        return (
+                                            <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url)} style={{minWidth:200}}>
+                                                <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                                    {race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                    <div style={{position:'absolute',top:8,left:8,fontSize:20}}>{flag}</div>
+                                                    <div style={{position:'absolute',top:8,right:8,background:'rgba(0,119,255,0.9)',color:'#fff',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:4}}>VK</div>
+                                                </div>
+                                                <div style={{padding:'10px 12px'}}>
+                                                    <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.name}</div>
+                                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,display:'flex',alignItems:'center',gap:4}}>
+                                                        <span style={{color:'#FFD700',fontWeight:700}}>🏆 {race.winner?.code}</span>
+                                                        <span>· R{race.round}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="stream-card" onClick={()=>onChange('schedule')} style={{display:'flex',alignItems:'center',justifyContent:'center',minWidth:120,minHeight:160}}>
+                                        <div style={{textAlign:'center',padding:20}}>
+                                            <div style={{fontSize:28,marginBottom:8}}>📅</div>
+                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>Все гонки</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Last race — podium layout */}
                     {lastRace && lastRace.results && (
@@ -700,101 +741,64 @@
         };
 
         // ==== SCHEDULE PAGE ====
-        const SchedulePage = ({schedule, nextRace}) => {
-            const [pastRaces, setPastRaces] = useState(null);
-            const [lastResults, setLastResults] = useState({});
-            useEffect(() => {
-                api.get('/api/past-races-vk').then(d => setPastRaces(d?.races || []));
-                // Fetch last race winner
-                api.get('/api/race/last').then(d => {
-                    if (d?.results?.length > 0) {
-                        setLastResults(prev => ({...prev, [d.round]: d.results[0]}));
-                    }
-                });
-            }, []);
+        const circuitFlags = {
+            'albert_park':'🇦🇺','shanghai':'🇨🇳','suzuka':'🇯🇵','bahrain':'🇧🇭',
+            'jeddah':'🇸🇦','miami':'🇺🇸','imola':'🇮🇹','monaco':'🇲🇨',
+            'catalunya':'🇪🇸','villeneuve':'🇨🇦','red_bull_ring':'🇦🇹','silverstone':'🇬🇧',
+            'spa':'🇧🇪','hungaroring':'🇭🇺','zandvoort':'🇳🇱','monza':'🇮🇹',
+            'baku':'🇦🇿','marina_bay':'🇸🇬','cota':'🇺🇸','rodriguez':'🇲🇽',
+            'interlagos':'🇧🇷','las_vegas':'🇺🇸','lusail':'🇶🇦','yas_marina':'🇦🇪'
+        };
 
-            if (!schedule?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
+        const SchedulePage = ({seasonResults, onRaceClick}) => {
+            if (!seasonResults?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
+
             const now = new Date();
-            const vkMap = {};
-            if (pastRaces) pastRaces.forEach(r => { vkMap[`${r.season}-${r.round}`] = r.url; });
-
-            const pastList = schedule.races.filter(r => new Date(r.date) < now);
-            const futureList = schedule.races.filter(r => new Date(r.date) >= now);
-            const nextIdx = futureList.length > 0 ? 0 : -1;
+            const races = seasonResults.races;
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>Сезон {schedule.season||2026}</h2>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Сезон 2025</h2>
+                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при · Все результаты</div>
 
-                    {/* Next race — big card */}
-                    {futureList[0] && (
-                        <div className="gradient-card" style={{marginBottom:16,minHeight:180}}>
-                            {futureList[0].circuit_image && <img src={futureList[0].circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
-                            <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
-                            <div style={{position:'relative',zIndex:1}}>
-                                <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                                    🏁 Следующий гран-при
-                                </div>
-                                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                                    <span style={{fontSize:32}}>{flagEmoji(futureList[0].country)}</span>
-                                    <div>
-                                        <div style={{fontSize:20,fontWeight:900}}>{futureList[0].name?.replace('Grand Prix','Гран-при')}</div>
-                                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{futureList[0].circuit} · Раунд {futureList[0].round}</div>
-                                    </div>
-                                </div>
-                                {futureList[0].race_datetime && <Countdown targetDate={futureList[0].race_datetime}/>}
-                            </div>
-                        </div>
-                    )}
+                    {races.map((race) => {
+                        const isPast = new Date(race.date) < now;
+                        const flag = circuitFlags[race.circuit_id] || '🏁';
+                        const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
+                        const winner = race.winner;
 
-                    {/* Past races */}
-                    {pastList.length > 0 && (<>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:2,marginBottom:8,paddingLeft:4}}>Прошедшие</div>
-                        {pastList.slice().reverse().map((race)=>{
-                            const vkUrl = vkMap[`${schedule.season||2026}-${race.round}`];
-                            const winner = lastResults[race.round];
-                            return (
-                                <div key={race.round} className="card" style={{marginBottom:8,padding:12,opacity:0.7}}>
-                                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                                        <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
-                                        <div style={{flex:1,minWidth:0}}>
-                                            <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','ГП')}</span></div>
-                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.date}</div>
+                        return (
+                            <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
+                                 style={{marginBottom:8, padding:12, cursor:'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
+                                {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:80,height:'100%',objectFit:'contain',opacity:0.05,pointerEvents:'none'}}/>}
+                                <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
+                                    <div style={{width:36,height:36,borderRadius:10,background:isPast?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0,color:isPast?'var(--f1-red)':'var(--f1-text-muted)'}}>{race.round}</div>
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                                            <span>{flag}</span>
+                                            <span style={{fontWeight:700,fontSize:14}}>{race.name}</span>
+                                            {race.sprint && <span style={{background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>СПРИНТ</span>}
                                         </div>
-                                        {winner && (
-                                            <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                                                {winner.photo_url && <img src={winner.photo_url} alt="" style={{width:24,height:24,borderRadius:'50%',objectFit:'cover',border:'2px solid #FFD700'}} onError={e=>{e.target.style.display='none'}}/>}
-                                                <span style={{fontSize:11,fontWeight:700,color:'#FFD700'}}>🏆 {winner.code}</span>
-                                            </div>
-                                        )}
-                                        {vkUrl && (
-                                            <button onClick={(e)=>{e.stopPropagation();openLink(vkUrl);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-                                                📺
-                                            </button>
-                                        )}
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit_name} · {dateStr}</div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                        <div className="divider-line" style={{margin:'12px 0'}}/>
-                    </>)}
-
-                    {/* Future races */}
-                    {futureList.length > 1 && (
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:2,marginBottom:8,paddingLeft:4}}>Предстоящие</div>
-                    )}
-                    {futureList.slice(1).map((race)=>(
-                        <div key={race.round} className="card" style={{marginBottom:8,padding:12,position:'relative',overflow:'hidden'}}>
-                            {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:70,height:'100%',objectFit:'contain',opacity:0.05,pointerEvents:'none'}}/>}
-                            <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
-                                <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
-                                <div style={{flex:1,minWidth:0}}>
-                                    <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','ГП')}</span></div>
-                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit} · {race.date}</div>
+                                    {isPast && winner && (
+                                        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                                            {winner.photo_url && <img src={winner.photo_url} alt="" style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',border:'2px solid #FFD700',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            <div style={{textAlign:'right'}}>
+                                                <div style={{fontSize:12,fontWeight:900,color:'#FFD700'}}>{winner.code}</div>
+                                                <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>{winner.team?.split(' ')[0]}</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {race.vk_url && isPast && (
+                                        <button onClick={(e)=>{e.stopPropagation();openLink(race.vk_url);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                                            📺
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             );
         };
@@ -1135,7 +1139,10 @@
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
                     <div className="card" style={{textAlign:'center',marginBottom:16,position:'relative',overflow:'hidden'}}>
                         <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,rgba(225,6,0,0.2),transparent)'}}/>
-                        <div style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,position:'relative',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}}>{user.first_name?.[0]||'?'}</div>
+                        {user.photo_url ? (
+                            <img src={user.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',objectFit:'cover',border:'3px solid var(--f1-red)',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
+                        ) : null}
+                        <div style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,position:'relative',boxShadow:'0 4px 16px rgba(225,6,0,0.3)',display:user.photo_url?'none':'flex'}}>{user.first_name?.[0]||'?'}</div>
                         <div style={{fontSize:20,fontWeight:900}}>{user.first_name}</div>
                         {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)'}}>@{user.username}</div>}
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:16}}>
@@ -1434,6 +1441,90 @@
             );
         };
 
+        // ==== RACE DETAIL PAGE ====
+        const RaceDetailPage = ({race, onBack}) => {
+            if (!race) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+
+            const flag = circuitFlags[race.circuit_id] || '🏁';
+            const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+            const podiumColors = ['#FFD700','#C0C0C0','#CD7F32'];
+            const podiumHeights = [130, 100, 85];
+            const podiumSizes = [64, 48, 48];
+
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>← Расписание</button>
+
+                    {/* Race header */}
+                    <div className="gradient-card" style={{marginBottom:16,minHeight:120}}>
+                        {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
+                        <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
+                        <div style={{position:'relative',zIndex:1}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                <span style={{fontSize:36}}>{flag}</span>
+                                <div>
+                                    <div style={{fontSize:20,fontWeight:900}}>{race.name}</div>
+                                    <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{race.circuit_name} · Раунд {race.round}</div>
+                                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>{dateStr} · {race.laps} кругов</div>
+                                </div>
+                            </div>
+                            {race.sprint && <div style={{marginTop:8,display:'inline-block',background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6}}>Спринт-уикенд</div>}
+                        </div>
+                    </div>
+
+                    {/* Podium */}
+                    {race.podium?.length >= 3 && (
+                        <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏆 Подиум</div>
+                            <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:4}}>
+                                {[1,0,2].map(idx => {
+                                    const d = race.podium[idx]; if(!d) return null;
+                                    return (
+                                        <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
+                                            <div style={{position:'relative',marginBottom:6}}>
+                                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:podiumSizes[idx],height:podiumSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${podiumColors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            </div>
+                                            <div style={{fontWeight:900,fontSize:idx===0?16:14}}>{d.code}</div>
+                                            <div style={{fontSize:10,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</div>
+                                            <div style={{background:`${podiumColors[idx]}22`,borderRadius:'8px 8px 0 0',padding:'10px 0',marginTop:6,height:podiumHeights[idx],display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',paddingTop:10}}>
+                                                <div style={{fontSize:28,fontWeight:900,color:podiumColors[idx]}}>{idx+1}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Full top-10 results */}
+                    {race.top_10?.length > 0 && (
+                        <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📋 Топ-10 результаты</div>
+                            {race.top_10.map((d, i) => (
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.top_10.length-1?'1px solid var(--f1-border)':'none'}}>
+                                    <PosBadge pos={d.position}/>
+                                    <div style={{background:d.team_color,width:3,height:28,borderRadius:2}}/>
+                                    {d.photo_url && <DriverPhoto url={d.photo_url} size={28}/>}
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <span style={{fontWeight:700,fontSize:13}}>{d.code}</span>
+                                        <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{d.first_name} {d.last_name}</span>
+                                    </div>
+                                    <span style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* VK Video */}
+                    {race.vk_url && (
+                        <button className="btn-primary" onClick={()=>openLink(race.vk_url)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                            📺 Смотреть запись гонки
+                        </button>
+                    )}
+                </div>
+            );
+        };
+
         // ==== MAIN APP ====
         const App = () => {
             const [tab, setTab] = useState('home');
@@ -1450,6 +1541,8 @@
             const [weather, setWeather] = useState(null);
             const [raceControl, setRaceControl] = useState(null);
             const [streams, setStreams] = useState(null);
+            const [seasonResults, setSeasonResults] = useState(null);
+            const [selectedRound, setSelectedRound] = useState(null);
             const isLive = session?.is_live;
 
             useEffect(() => {
@@ -1461,9 +1554,9 @@
 
             useEffect(() => {
                 if (loading) return;
-                Promise.all([api.get('/api/home'),api.get('/api/standings/drivers'),api.get('/api/standings/constructors'),api.get('/api/schedule'),api.get('/api/streams')]).then(([home,ds,cs,sched,str])=>{
+                Promise.all([api.get('/api/home'),api.get('/api/standings/drivers'),api.get('/api/standings/constructors'),api.get('/api/schedule'),api.get('/api/streams'),api.get('/api/season/2025/results')]).then(([home,ds,cs,sched,str,sr])=>{
                     if(home){setNextRace(home.next_race);setLastRace(home.last_race);}
-                    setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str);
+                    setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str); setSeasonResults(sr);
                 });
             }, [loading]);
 
@@ -1477,8 +1570,19 @@
 
             useEffect(() => {
                 if (!tg) return;
-                if (tab !== 'home') { tg.BackButton?.show(); const h=()=>setTab('home'); tg.BackButton?.onClick(h); return ()=>tg.BackButton?.offClick(h); }
-                else { tg.BackButton?.hide(); }
+                if (tab === 'raceDetail') {
+                    tg.BackButton?.show();
+                    const h = () => setTab('schedule');
+                    tg.BackButton?.onClick(h);
+                    return () => tg.BackButton?.offClick(h);
+                } else if (tab !== 'home') {
+                    tg.BackButton?.show();
+                    const h = () => setTab('home');
+                    tg.BackButton?.onClick(h);
+                    return () => tg.BackButton?.offClick(h);
+                } else {
+                    tg.BackButton?.hide();
+                }
             }, [tab]);
 
             if (loading) return (
@@ -1491,11 +1595,12 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} onChange={setTab}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
                     case 'analytics': return <AnalyticsPage/>;
                     case 'news': return <NewsPage/>;
-                    case 'schedule': return <SchedulePage schedule={schedule} nextRace={nextRace}/>;
+                    case 'schedule': return <SchedulePage seasonResults={seasonResults} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
+                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
