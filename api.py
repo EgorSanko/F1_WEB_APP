@@ -28,7 +28,7 @@ from config import (
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
     DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY,
     PAST_RACES_VK, SEASON_2025_RESULTS,
-    get_drivers, get_team_colors, CURRENT_SEASON,
+    get_drivers, get_team_colors, CURRENT_SEASON, GROQ_API_KEY,
 )
 
 # ============ LOGGING ============
@@ -314,7 +314,20 @@ async def live_race_control():
 
 @app.get("/api/live/radio")
 async def live_radio():
-    return await f1_data.get_live_radio()
+    data = await f1_data.get_live_radio()
+    if data and isinstance(data, dict):
+        data["transcription_available"] = bool(GROQ_API_KEY)
+    return data
+
+
+@app.get("/api/radio/transcribe")
+async def transcribe_radio(url: str):
+    """Transcribe a team radio message via Groq Whisper API."""
+    if not GROQ_API_KEY:
+        raise HTTPException(503, "Transcription not configured")
+    if not url.startswith("https://"):
+        raise HTTPException(400, "Invalid audio URL")
+    return await f1_data.transcribe_radio_groq(url)
 
 
 @app.get("/api/live/pit-stops")

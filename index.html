@@ -306,7 +306,7 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange, season, onSeasonChange}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange, season, onSeasonChange, spoilerFree}) => {
             if (!nextRace && !lastRace) return (
                 <div className="page-container fade-in" style={{padding:16}}>
                     <div style={{textAlign:'center',padding:'8px 0'}}>
@@ -373,19 +373,20 @@
                                     📺 Записи гонок
                                 </div>
                                 <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
-                                    {pastRaces.map(race => {
+                                    {pastRaces.map((race, ri) => {
                                         const flag = countryFlag(race.country_code) || circuitFlags[race.circuit_id] || '🏁';
+                                        const isLastRace = spoilerFree && ri === 0;
                                         return (
                                             <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url || race.vk_search_url)} style={{minWidth:200}}>
-                                                <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                                    {race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${isLastRace?'var(--f1-red)':race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                                                    {isLastRace ? <div style={{fontSize:36}}>🔒</div> : race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                                     <div style={{position:'absolute',top:8,left:8,fontSize:20}}>{flag}</div>
                                                     <div style={{position:'absolute',top:8,right:8,background:'rgba(0,119,255,0.9)',color:'#fff',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:4}}>VK</div>
                                                 </div>
                                                 <div style={{padding:'10px 12px'}}>
                                                     <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.name}</div>
                                                     <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,display:'flex',alignItems:'center',gap:4}}>
-                                                        <span style={{color:'#FFD700',fontWeight:700}}>🏆 {race.winner?.code}</span>
+                                                        {isLastRace ? <span style={{color:'var(--f1-red)',fontWeight:700}}>🔒 Без спойлеров</span> : <span style={{color:'#FFD700',fontWeight:700}}>🏆 {race.winner?.code}</span>}
                                                         <span>· R{race.round}</span>
                                                     </div>
                                                 </div>
@@ -541,7 +542,21 @@
             const [trackMapData, setTrackMapData] = useState(null);
             const [selectedCar, setSelectedCar] = useState(null);
             const [showDemoPicker, setShowDemoPicker] = useState(false);
+            const [transcripts, setTranscripts] = useState({});
+            const [transcribing, setTranscribing] = useState({});
             const audioRef = useRef(null);
+
+            const handleTranscribe = async (audioUrl) => {
+                if (transcripts[audioUrl] || transcribing[audioUrl]) return;
+                setTranscribing(p => ({...p, [audioUrl]: true}));
+                try {
+                    const data = await api.get(`/api/radio/transcribe?url=${encodeURIComponent(audioUrl)}`);
+                    if (data) setTranscripts(p => ({...p, [audioUrl]: data}));
+                } catch(e) {
+                    setTranscripts(p => ({...p, [audioUrl]: {error: 'Ошибка транскрипции'}}));
+                }
+                setTranscribing(p => ({...p, [audioUrl]: false}));
+            };
             const isLive = session?.is_live;
 
             useEffect(() => {
@@ -778,19 +793,37 @@
 
                     {liveTab==='radio' && (radioData?.radio?.length>0 ? (
                         <div><audio ref={audioRef}/>
-                            {radioData.radio.slice().reverse().map((r,i)=>(
-                                <div key={i} className="radio-entry" style={{padding:'12px 16px',animation:i<2?'fadeIn 0.3s ease-out':'none'}}>
-                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
-                                    <div style={{flex:1,minWidth:0}}>
-                                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
-                                            <div style={{width:4,height:20,borderRadius:2,background:r.team_color}}/>
-                                            <span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span>
-                                            <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</span>
-                                            <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
+                            {radioData.radio.slice().reverse().map((r,i)=>{
+                                const t = transcripts[r.recording_url];
+                                const isLoading = transcribing[r.recording_url];
+                                return (
+                                <div key={i} style={{padding:'12px 16px',borderBottom:'1px solid var(--f1-border)',animation:i<2?'fadeIn 0.3s ease-out':'none'}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                        <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                                                <div style={{width:4,height:20,borderRadius:2,background:r.team_color}}/>
+                                                <span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span>
+                                                <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</span>
+                                                <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
+                                            </div>
                                         </div>
+                                        {radioData.transcription_available && r.recording_url && !t && (
+                                            <button onClick={()=>handleTranscribe(r.recording_url)} disabled={isLoading} style={{background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'4px 8px',color:isLoading?'var(--f1-text-muted)':'var(--f1-text-secondary)',fontSize:10,fontWeight:600,cursor:isLoading?'wait':'pointer',fontFamily:'inherit',flexShrink:0,transition:'all 0.2s'}}>
+                                                {isLoading ? '⏳' : '📝'}
+                                            </button>
+                                        )}
                                     </div>
+                                    {t && !t.error && (
+                                        <div style={{marginTop:8,marginLeft:46,padding:'8px 10px',background:'rgba(255,255,255,0.03)',borderRadius:8,borderLeft:'3px solid var(--f1-text-muted)'}}>
+                                            {t.text_en && <div style={{fontSize:12,color:'var(--f1-text-secondary)',lineHeight:1.4}}>🇬🇧 {t.text_en}</div>}
+                                            {t.text_ru && <div style={{fontSize:13,color:'var(--f1-text)',fontWeight:600,marginTop:4,lineHeight:1.4}}>🇷🇺 {t.text_ru}</div>}
+                                            {!t.text_en && <div style={{fontSize:12,color:'var(--f1-text-muted)',fontStyle:'italic'}}>🎙️ [неразборчиво]</div>}
+                                        </div>
+                                    )}
+                                    {t?.error && <div style={{marginTop:6,marginLeft:46,fontSize:11,color:'var(--f1-red)'}}>{t.error}</div>}
                                 </div>
-                            ))}
+                            );})}
                         </div>
                     ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>)}
 
@@ -874,27 +907,24 @@
             return `${String(msk).padStart(2,'0')}:${m} МСК`;
         };
 
-        const SchedulePage = ({seasonResults, schedule, season, onRaceClick}) => {
+        const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree, onToggleSpoiler}) => {
             const races = (seasonResults?.races?.length ? seasonResults.races : null) || schedule?.races || [];
-            const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
             if (!races.length) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
 
             const now = new Date();
             const lastCompletedRound = races.filter(r => new Date(r.date) < now).pop();
-
-            const toggleSpoiler = () => {
-                const next = !spoilerFree;
-                setSpoilerFree(next);
-                localStorage.setItem('f1hub_spoiler_free', String(next));
-            };
+            const isSpoilerActive = spoilerFree && season === 2026;
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <h2 style={{fontSize:22,fontWeight:900}}>Сезон {season}</h2>
-                        <button onClick={toggleSpoiler} style={{background:spoilerFree?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(spoilerFree?'rgba(225,6,0,0.3)':'var(--f1-border)'),borderRadius:8,padding:'5px 10px',color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
-                            {spoilerFree ? '🔒 Без спойлеров' : '🔓 Спойлеры'}
-                        </button>
+                        {season === 2026 && <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <span style={{fontSize:11,color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontWeight:600}}>🔒 Без спойлеров</span>
+                            <div onClick={onToggleSpoiler} style={{width:44,height:24,borderRadius:12,background:spoilerFree?'var(--f1-red)':'#333',position:'relative',cursor:'pointer',transition:'background 0.3s'}}>
+                                <div style={{width:20,height:20,borderRadius:10,background:'#fff',position:'absolute',top:2,left:spoilerFree?22:2,transition:'left 0.3s'}}/>
+                            </div>
+                        </div>}
                     </div>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при{seasonResults?.races?.length ? ' · Все результаты' : ''}</div>
 
@@ -904,10 +934,10 @@
                         const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
                         const raceTime = toMSK(race.time);
                         const winner = race.winner;
-                        const shouldHide = spoilerFree && lastCompletedRound && race.round === lastCompletedRound.round;
+                        const shouldHide = isSpoilerActive && lastCompletedRound && race.round === lastCompletedRound.round;
 
                         return (
-                            <div key={race.round} className="card" onClick={() => !shouldHide && onRaceClick(race.round)}
+                            <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
                                  style={{marginBottom:8, padding:12, cursor: shouldHide ? 'default' : 'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
                                 {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:80,height:'100%',objectFit:'contain',opacity:0.05,pointerEvents:'none'}}/>}
                                 <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
@@ -925,9 +955,9 @@
                                         <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit || race.circuit_name} · {dateStr}{raceTime ? ` · ${raceTime}` : ''}</div>
                                     </div>
                                     {shouldHide ? (
-                                        <div onClick={(e)=>{e.stopPropagation();toggleSpoiler();}} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:'rgba(225,6,0,0.1)',border:'1px solid rgba(225,6,0,0.2)',borderRadius:8,cursor:'pointer',flexShrink:0}}>
-                                            <span style={{fontSize:12}}>🏁</span>
-                                            <span style={{fontSize:10,color:'var(--f1-red)',fontWeight:600}}>Показать</span>
+                                        <div style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:'rgba(225,6,0,0.1)',border:'1px solid rgba(225,6,0,0.2)',borderRadius:8,flexShrink:0}}>
+                                            <span style={{fontSize:12}}>🔒</span>
+                                            <span style={{fontSize:10,color:'var(--f1-red)',fontWeight:600}}>Скрыто</span>
                                         </div>
                                     ) : (<>
                                         {isPast && winner && (
@@ -1752,10 +1782,12 @@
         };
 
         // ==== RACE DETAIL PAGE ====
-        const RaceDetailPage = ({race, onBack, season}) => {
+        const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces}) => {
             const [tyreData, setTyreData] = useState(null);
             const [tyreLoading, setTyreLoading] = useState(false);
+            const [revealed, setRevealed] = useState(false);
             useEffect(() => {
+                setRevealed(false);
                 if (race?.round) {
                     setTyreLoading(true);
                     setTyreData(null);
@@ -1766,6 +1798,11 @@
             }, [race?.round]);
 
             if (!race) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+
+            // Determine if this race should be spoiler-hidden
+            const now = new Date();
+            const lastCompletedRound = allRaces?.filter(r => new Date(r.date) < now).pop();
+            const isSpoilerHidden = spoilerFree && !revealed && lastCompletedRound && race.round === lastCompletedRound.round;
 
             const flag = circuitFlags[race.circuit_id] || '🏁';
             const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
@@ -1795,9 +1832,19 @@
                         </div>
                     </div>
 
+                    {/* Spoiler reveal button */}
+                    {isSpoilerHidden && (
+                        <div className="card" onClick={()=>setRevealed(true)} style={{padding:'16px 20px',marginBottom:16,cursor:'pointer',textAlign:'center',background:'rgba(225,6,0,0.08)',border:'1px solid rgba(225,6,0,0.2)'}}>
+                            <div style={{fontSize:24,marginBottom:6}}>🔒</div>
+                            <div style={{fontSize:14,fontWeight:700,color:'var(--f1-red)'}}>Показать результаты</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>Результаты скрыты режимом антиспойлера</div>
+                        </div>
+                    )}
+
                     {/* Podium */}
                     {race.podium?.length >= 3 && (
-                        <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                        <div className="card" style={{padding:'16px 12px', marginBottom:16, position:'relative', overflow:'hidden'}}>
+                            <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏆 Подиум</div>
                             <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:4}}>
                                 {[1,0,2].map(idx => {
@@ -1816,12 +1863,14 @@
                                     );
                                 })}
                             </div>
+                            </div>{/* close blur wrapper */}
                         </div>
                     )}
 
                     {/* Full top-10 results */}
                     {race.top_10?.length > 0 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📋 Топ-10 результаты</div>
                             {race.top_10.map((d, i) => (
                                 <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.top_10.length-1?'1px solid var(--f1-border)':'none'}}>
@@ -1835,12 +1884,14 @@
                                     <span style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</span>
                                 </div>
                             ))}
+                            </div>{/* close blur wrapper */}
                         </div>
                     )}
 
                     {/* Sprint top-10 results */}
                     {race.sprint_top_10?.length > 0 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
                             <div style={{fontSize:11,color:'#FF8000',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>🏁 Спринт · Топ-10</div>
                             {race.sprint_top_10.map((d, i) => (
                                 <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.sprint_top_10.length-1?'1px solid var(--f1-border)':'none'}}>
@@ -1854,6 +1905,7 @@
                                     <span style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</span>
                                 </div>
                             ))}
+                            </div>{/* close blur wrapper */}
                         </div>
                     )}
 
@@ -1918,7 +1970,9 @@
             const [streams, setStreams] = useState(null);
             const [seasonResults, setSeasonResults] = useState(null);
             const [selectedRound, setSelectedRound] = useState(null);
+            const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
             const isLive = session?.is_live;
+            const toggleSpoiler = () => { const v = !spoilerFree; setSpoilerFree(v); localStorage.setItem('f1hub_spoiler_free', String(v)); };
 
             useEffect(() => {
                 (async () => {
@@ -1977,11 +2031,11 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
                     case 'news': return <NewsPage/>;
-                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
-                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason}/>;
+                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
+                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;

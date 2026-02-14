@@ -20,7 +20,7 @@ from config import (
     STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS,
     SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025,
     DRIVERS_2025, DRIVERS_2026, TEAM_COLORS_2025, TEAM_COLORS_2026,
-    get_drivers, get_team_colors, CURRENT_SEASON,
+    get_drivers, get_team_colors, CURRENT_SEASON, GROQ_API_KEY,
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -2106,3 +2106,68 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
         races.append(race_entry)
 
     return {"season": season, "races": races, "total_races": len(races)}
+
+
+# ============ RADIO TRANSCRIPTION (Groq Whisper API) ============
+
+async def transcribe_radio_groq(audio_url: str) -> Dict[str, Any]:
+    """Transcribe team radio via Groq Whisper API (free tier)."""
+    import io
+
+    cache_key = f"radio_transcript:{audio_url}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    if not GROQ_API_KEY:
+        return {"text_en": None, "text_ru": None, "error": "not_configured"}
+
+    try:
+        client = get_client()
+
+        # Download audio
+        audio_resp = await client.get(audio_url, timeout=10.0)
+        if audio_resp.status_code != 200:
+            return {"text_en": None, "text_ru": None, "error": "audio_download_failed"}
+
+        # Send to Groq Whisper API
+        audio_bytes = io.BytesIO(audio_resp.content)
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=30.0) as groq_client:
+            resp = await groq_client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                files={"file": ("radio.mp3", audio_bytes, "audio/mpeg")},
+                data={"model": "whisper-large-v3", "language": "en", "response_format": "json"},
+            )
+
+        if resp.status_code != 200:
+            logger.warning(f"Groq API error {resp.status_code}: {resp.text[:200]}")
+            return {"text_en": None, "text_ru": None, "error": f"groq_{resp.status_code}"}
+
+        text_en = resp.json().get("text", "").strip()
+        if not text_en:
+            result = {"text_en": "", "text_ru": None}
+            cache_set(cache_key, result)
+            return result
+
+        # Translate EN→RU via MyMemory (free, no key needed)
+        text_ru = None
+        try:
+            tr_resp = await client.get(
+                "https://api.mymemory.translated.net/get",
+                params={"q": text_en[:500], "langpair": "en|ru"},
+                timeout=5.0,
+            )
+            if tr_resp.status_code == 200:
+                text_ru = tr_resp.json().get("responseData", {}).get("translatedText")
+        except Exception:
+            pass
+
+        result = {"text_en": text_en, "text_ru": text_ru}
+        cache_set(cache_key, result)
+        return result
+
+    except Exception as e:
+        logger.error(f"Transcription error: {e}")
+        return {"text_en": None, "text_ru": None, "error": str(e)}
