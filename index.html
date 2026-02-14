@@ -346,27 +346,54 @@
                         </div>
                     )}
 
-                    {streams?.channels?.length > 0 && (
+                    {(streams?.videos?.length > 0 || streams?.channels?.length > 0) && (
                         <div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
                                 \u{1F4FA} \u0422\u0440\u0430\u043D\u0441\u043B\u044F\u0446\u0438\u0438 \u0438 \u0432\u0438\u0434\u0435\u043E
                             </div>
-                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                                {streams.channels.map((ch,i)=>{
-                                    const icons = {vk:'\u{1F4F9}',yt:'\u25B6\uFE0F',tg:'\u{1F4E8}'};
-                                    const colors = {vk:'#0077FF','yt':'#FF0000',tg:'#229ED9'};
-                                    return (
-                                        <div key={i} className="card" onClick={()=>openLink(ch.url)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:12,padding:'14px 16px'}}>
-                                            <div style={{width:42,height:42,borderRadius:12,background:`${colors[ch.icon]||'var(--f1-gray)'}22`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{icons[ch.icon]||'\u{1F517}'}</div>
-                                            <div style={{flex:1}}>
-                                                <div style={{fontWeight:700,fontSize:14}}>{ch.title}</div>
-                                                <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{ch.platform} \u00b7 {ch.channel}</div>
+
+                            {streams?.videos?.length > 0 && (
+                                <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch',marginBottom:8}}>
+                                    {streams.videos.map((v,i)=>{
+                                        const dur = v.duration ? `${Math.floor(v.duration/60)}:${String(v.duration%60).padStart(2,'0')}` : '';
+                                        const views = v.views >= 1000 ? `${(v.views/1000).toFixed(1)}K` : v.views || '';
+                                        return (
+                                            <div key={i} className="stream-card" onClick={()=>openLink(v.url)}>
+                                                <div className="stream-thumb">
+                                                    {v.thumbnail && <img src={v.thumbnail} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                    {v.is_live && <div className="live-badge">LIVE</div>}
+                                                    {dur && !v.is_live && <div style={{position:'absolute',bottom:6,right:6,background:'rgba(0,0,0,0.75)',color:'#fff',fontSize:10,fontWeight:600,padding:'2px 6px',borderRadius:4}}>{dur}</div>}
+                                                </div>
+                                                <div style={{padding:'10px 12px'}}>
+                                                    <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{v.title}</div>
+                                                    {views && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>\u{1F441} {views}</div>}
+                                                </div>
                                             </div>
-                                            <div style={{color:'var(--f1-text-muted)',fontSize:18}}>\u2192</div>
+                                        );
+                                    })}
+                                    <div className="stream-card" onClick={()=>openLink(streams.channel_url)} style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:160}}>
+                                        <div style={{textAlign:'center',padding:20}}>
+                                            <div style={{fontSize:28,marginBottom:8}}>\u25B6\uFE0F</div>
+                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>\u0412\u0441\u0435 \u0432\u0438\u0434\u0435\u043E</div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {streams?.channels?.length > 0 && (
+                                <div style={{display:'flex',gap:8,overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
+                                    {streams.channels.map((ch,i)=>{
+                                        const colors = {vk:'#0077FF',yt:'#FF0000',tg:'#229ED9'};
+                                        const labels = {vk:'VK',yt:'YT',tg:'TG'};
+                                        return (
+                                            <div key={i} onClick={()=>openLink(ch.url)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--f1-card-solid)',borderRadius:12,border:'1px solid var(--f1-border)',flexShrink:0,transition:'transform 0.15s'}}>
+                                                <div style={{width:24,height:24,borderRadius:6,background:colors[ch.icon]||'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',flexShrink:0}}>{labels[ch.icon]||'\u{1F517}'}</div>
+                                                <div style={{fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>{ch.title}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 

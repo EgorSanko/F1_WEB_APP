@@ -26,7 +26,7 @@ from config import (
     TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_IDS,
     DRIVERS, TEAM_COLORS, TYRE_COLORS,
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
-    DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS
+    DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY
 )
 
 # ============ LOGGING ============
@@ -641,13 +641,59 @@ async def get_news():
 
 @app.get("/api/streams")
 async def get_streams():
-    """Return configured stream/video channel links."""
-    return {
+    """Fetch F1 videos from YouTube RSS feeds + channel links."""
+    cached = f1_data.cache_get("streams")
+    if cached:
+        return cached
+
+    videos = []
+    try:
+        client = f1_data.get_client()
+
+        # YouTube RSS feeds (no API key needed)
+        yt_feeds = [
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCB_qr75-ydFVKSF9Dmo6izg",  # Formula 1 Official
+        ]
+
+        for feed_url in yt_feeds:
+            resp = await client.get(feed_url, timeout=10.0)
+            if resp.status_code == 200:
+                xml = resp.text
+                # Parse Atom feed entries
+                entries = re.findall(r'<entry>(.*?)</entry>', xml, re.DOTALL)
+                for entry_xml in entries[:15]:
+                    title_m = re.search(r'<title>([^<]+)</title>', entry_xml)
+                    vid_id_m = re.search(r'<yt:videoId>([^<]+)</yt:videoId>', entry_xml)
+                    published_m = re.search(r'<published>([^<]+)</published>', entry_xml)
+                    views_m = re.search(r'<media:statistics views="(\d+)"', entry_xml)
+
+                    if title_m and vid_id_m:
+                        vid_id = vid_id_m.group(1)
+                        videos.append({
+                            "title": title_m.group(1),
+                            "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
+                            "url": f"https://www.youtube.com/watch?v={vid_id}",
+                            "duration": 0,
+                            "views": int(views_m.group(1)) if views_m else 0,
+                            "is_live": False,
+                            "date": published_m.group(1) if published_m else "",
+                            "platform": "youtube",
+                        })
+            else:
+                logger.warning(f"YouTube RSS fetch failed: {resp.status_code}")
+
+    except Exception as e:
+        logger.error(f"Streams fetch error: {e}")
+
+    response = {
+        "videos": videos[:15],
         "channels": STREAM_LINKS,
-        "videos": [],
         "channel_url": "https://vkvideo.ru/@stanizlavskylive",
         "channel_name": "@stanizlavskylive",
     }
+    if videos:
+        f1_data.cache_set("streams", response)
+    return response
 
 
 # ============ ANALYTICS ENDPOINTS ============
