@@ -725,7 +725,11 @@
                                         <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                                             <span>{flag}</span>
                                             <span style={{fontWeight:700,fontSize:14}}>{race.name}</span>
-                                            {race.sprint && <span style={{background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>СПРИНТ</span>}
+                                            {race.sprint ? (
+                                                <span style={{background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>СПРИНТ + ГОНКА</span>
+                                            ) : (
+                                                <span style={{background:'rgba(225,6,0,0.15)',color:'var(--f1-red)',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>ГОНКА</span>
+                                            )}
                                         </div>
                                         <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit_name} · {dateStr}</div>
                                     </div>
