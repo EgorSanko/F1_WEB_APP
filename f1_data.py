@@ -8,6 +8,7 @@ import asyncio
 import time
 import logging
 import json
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
@@ -77,6 +78,8 @@ class RateLimiter:
 
 _ergast_limiter = RateLimiter(rate=3.5, burst=4)  # slightly under 4/s to be safe
 
+# ============ OpenF1 CONCURRENCY LIMIT ============
+_openf1_semaphore = asyncio.Semaphore(3)  # max 3 concurrent OpenF1 requests
 
 # ============ CACHE ============
 
@@ -249,37 +252,38 @@ async def fetch_openf1(
     retry_delay: float = 1.0,
 ) -> Optional[Any]:
     """
-    Fetch from OpenF1 API with retry logic.
+    Fetch from OpenF1 API with retry logic and concurrency limit.
     Returns parsed JSON (list or dict) or None on failure.
     """
-    client = get_client()
-    url = f"{OPENF1_API}/{endpoint}"
+    async with _openf1_semaphore:
+        client = get_client()
+        url = f"{OPENF1_API}/{endpoint}"
 
-    for attempt in range(retries + 1):
-        try:
-            resp = await client.get(url, params=params)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data
-            elif resp.status_code == 429:
-                # Rate limited — wait and retry
-                wait = min(retry_delay * (2 ** attempt), 10)
-                logger.warning(f"OpenF1 rate limited on {endpoint}, waiting {wait}s")
-                await asyncio.sleep(wait)
-                continue
-            else:
-                logger.warning(f"OpenF1 {endpoint} returned {resp.status_code}")
-                if attempt < retries:
-                    await asyncio.sleep(retry_delay)
+        for attempt in range(retries + 1):
+            try:
+                resp = await client.get(url, params=params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data
+                elif resp.status_code == 429:
+                    # Rate limited — wait and retry
+                    wait = min(retry_delay * (2 ** attempt), 10)
+                    logger.warning(f"OpenF1 rate limited on {endpoint}, waiting {wait}s")
+                    await asyncio.sleep(wait)
                     continue
-                return None
-        except (httpx.RequestError, httpx.TimeoutException) as e:
-            logger.error(f"OpenF1 {endpoint} error (attempt {attempt+1}): {e}")
-            if attempt < retries:
-                await asyncio.sleep(retry_delay * (attempt + 1))
-            continue
+                else:
+                    logger.warning(f"OpenF1 {endpoint} returned {resp.status_code}")
+                    if attempt < retries:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return None
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                logger.error(f"OpenF1 {endpoint} error (attempt {attempt+1}): {e}")
+                if attempt < retries:
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+                continue
 
-    return None
+        return None
 
 
 async def fetch_ergast(
@@ -1728,20 +1732,36 @@ async def get_live_tyre_degradation(session_key: str = "latest", driver_numbers:
 
 # ============ LIVE TRACK MAP ============
 
+TRACK_CACHE_DIR = "/app/data/tracks"
+
+
 async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
-    """Get track outline points from one driver's one complete lap. Cached 1 hour."""
+    """Get track outline points from one driver's one complete lap.
+    Persisted to disk — fetched from OpenF1 only once ever per session."""
+    # 1) In-memory cache (fastest)
     cache_key = f"track_outline:{session_key}"
-    cached = cache_get(cache_key, ttl_override=3600)
+    cached = cache_get(cache_key, ttl_override=86400)
     if cached:
         return cached
 
-    # Find a completed lap with date_start from driver 1 (or first available)
+    # 2) File cache (survives restarts)
+    cache_file = os.path.join(TRACK_CACHE_DIR, f"{session_key}.json")
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r") as f:
+                points = json.load(f)
+            if points and len(points) >= 20:
+                cache_set(cache_key, points)
+                return points
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # 3) Fetch from OpenF1 (heavy — only once)
     laps = await fetch_openf1("laps", {
         "session_key": session_key,
         "driver_number": 1,
     })
     if not laps:
-        # Try another driver
         laps = await fetch_openf1("laps", {
             "session_key": session_key,
             "driver_number": 44,
@@ -1756,7 +1776,6 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
             target_lap = lap
             break
     if not target_lap and laps:
-        # Fallback: use any lap with date_start
         for lap in laps:
             if lap.get("date_start"):
                 target_lap = lap
@@ -1764,7 +1783,7 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
     if not target_lap:
         return None
 
-    # Fetch location data for that one lap
+    # Fetch location data for that one lap (one driver only)
     dn = target_lap.get("driver_number", 1)
     date_start = target_lap["date_start"]
     location = await fetch_openf1("location", {
@@ -1775,8 +1794,7 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
     if not location:
         return None
 
-    # Take approximately one lap worth of points (~300-500 expected)
-    # Limit to ~500 points then downsample to ~250
+    # Downsample to ~250 points
     points_raw = location[:500]
     stride = max(1, len(points_raw) // 250)
     points = [
@@ -1788,80 +1806,43 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
     if len(points) < 20:
         return None
 
+    # Save to disk (persist forever)
+    try:
+        os.makedirs(TRACK_CACHE_DIR, exist_ok=True)
+        with open(cache_file, "w") as f:
+            json.dump(points, f)
+        logger.info(f"Track outline saved to disk: {cache_file} ({len(points)} points)")
+    except IOError as e:
+        logger.warning(f"Failed to save track outline to disk: {e}")
+
     cache_set(cache_key, points)
     return points
 
 
 async def get_live_track_map() -> Dict[str, Any]:
-    """Get track outline + current car positions for live map."""
+    """Get track outline + car positions.
+    Uses lightweight /position API instead of heavy /location.
+    Cars are distributed along track outline based on race position."""
     _session_key, _is_demo, _demo_info = await get_fallback_session_key()
 
     cache_key = f"live_track_map:{_session_key}"
-    cached = cache_get(cache_key, ttl_override=300 if _is_demo else 2)
+    cached = cache_get(cache_key, ttl_override=3600 if _is_demo else 5)
     if cached:
         return cached
 
-    # Get session info for date_end (needed for demo mode)
+    # Get session info
     session = await get_live_session(_session_key)
     session_key = session.get("session_key")
     if not session_key:
         return {"track": None, "cars": [], "is_demo": _is_demo, "error": "No active session"}
 
-    # Get track outline (heavily cached)
+    # Get track outline (persisted to disk — fetched from API only once ever)
     track_points = await _get_track_outline(str(session_key))
 
-    # For demo mode: find actual end of race location data
-    # For live mode: use last 5 seconds from now
-    if _is_demo:
-        # Get last lap to estimate when the race ended
-        laps = await fetch_openf1("laps", {
-            "session_key": session_key,
-            "driver_number": 1,
-        })
-        if not laps:
-            laps = await fetch_openf1("laps", {"session_key": session_key, "driver_number": 4})
-        date_from = None
-        if laps:
-            for lap in reversed(laps):
-                if lap.get("date_start"):
-                    try:
-                        last_lap_dt = datetime.fromisoformat(
-                            lap["date_start"].replace("Z", "+00:00").replace("+00:00", ""))
-                        # Use last lap start directly — location data exists at this time
-                        date_from = last_lap_dt.strftime("%Y-%m-%dT%H:%M:%S")
-                    except (ValueError, TypeError):
-                        pass
-                    break
-    else:
-        now = datetime.utcnow()
-        date_from = (now - timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%S")
+    # Fetch ONLY /position (lightweight) — NO /location (thousands of points, crashes VPS)
+    position_raw = await fetch_openf1("position", {"session_key": session_key})
 
-    location_params = {"session_key": session_key}
-    if date_from:
-        location_params["date>"] = date_from
-    elif _is_demo:
-        # No date_end available — fetch last position per driver only
-        # Use position data to show car positions without location coords
-        location_raw = []
-        position_raw = await fetch_openf1("position", {"session_key": session_key})
-        # Skip location fetch entirely — cars will show at track positions without coords
-        response = {
-            "track": {"points": track_points} if track_points else None,
-            "cars": [],
-            "timestamp": datetime.utcnow().isoformat(),
-            "is_demo": _is_demo,
-        }
-        if _demo_info:
-            response["demo_session"] = _demo_info
-        cache_set(cache_key, response)
-        return response
-
-    location_raw, position_raw = await asyncio.gather(
-        fetch_openf1("location", location_params),
-        fetch_openf1("position", {"session_key": session_key}),
-    )
-
-    # Latest position per driver for race position info
+    # Latest position per driver
     latest_position = {}
     if position_raw:
         for entry in position_raw:
@@ -1870,23 +1851,27 @@ async def get_live_track_map() -> Dict[str, Any]:
                 if dn not in latest_position or entry.get("date", "") > latest_position[dn].get("date", ""):
                     latest_position[dn] = entry
 
-    # Latest (x,y) per driver from location data
-    latest_loc = {}
-    if location_raw:
-        for entry in location_raw:
-            dn = entry.get("driver_number")
-            if dn is not None and entry.get("x") is not None and entry.get("y") is not None:
-                if dn not in latest_loc or entry.get("date", "") > latest_loc[dn].get("date", ""):
-                    latest_loc[dn] = entry
-
-    # Build car list
+    # Distribute cars along track outline based on race position
     cars = []
-    for dn, loc in latest_loc.items():
-        pos_entry = latest_position.get(dn, {})
+    total_points = len(track_points) if track_points else 0
+    sorted_drivers = sorted(latest_position.values(), key=lambda x: x.get("position", 99))
+
+    for i, pos in enumerate(sorted_drivers):
+        dn = pos.get("driver_number")
+        if dn is None:
+            continue
+        # Spread cars evenly along ~80% of track (leader at front, P20 behind)
+        if total_points > 0:
+            idx = int((i / max(len(sorted_drivers), 1)) * total_points * 0.8)
+            point = track_points[idx % total_points]
+            x, y = point["x"], point["y"]
+        else:
+            x, y = 0, 0
+
         cars.append(enrich_driver(dn, {
-            "x": loc.get("x", 0),
-            "y": loc.get("y", 0),
-            "position": pos_entry.get("position", 0),
+            "x": x,
+            "y": y,
+            "position": pos.get("position", 0),
         }))
 
     cars.sort(key=lambda c: c.get("position", 99))
