@@ -238,6 +238,10 @@ CIRCUITS = {
     "las_vegas":     {"lat": 36.1147, "lon": -115.173, "name": "Las Vegas Street Circuit"},
     "lusail":        {"lat": 25.4900, "lon": 51.4542, "name": "Lusail International Circuit"},
     "yas_marina":    {"lat": 24.4672, "lon": 54.6031, "name": "Yas Marina Circuit"},
+    # Aliases for Jolpica API circuit IDs
+    "americas":      {"lat": 30.1328, "lon": -97.6411, "name": "Circuit of the Americas"},
+    "vegas":         {"lat": 36.1147, "lon": -115.173, "name": "Las Vegas Street Circuit"},
+    "losail":        {"lat": 25.4900, "lon": 51.4542, "name": "Lusail International Circuit"},
 }
 
 # ============ CIRCUIT TRACK IMAGES ============
@@ -265,6 +269,7 @@ CIRCUIT_IMAGES = {
     "rodriguez": "Mexico",
     "interlagos": "Brazil",
     "las_vegas": "Las%20Vegas",
+    "vegas": "Las%20Vegas",
     "losail": "Qatar",
     "yas_marina": "Abu%20Dhabi",
 }
@@ -455,11 +460,11 @@ ACHIEVEMENTS = {
 # ============ STANDINGS FALLBACK (2025 final) ============
 # Used when Ergast API returns empty (off-season)
 STANDINGS_2025_DRIVERS = [
-    {"position": 1,  "driver_number": 4,  "points": 423, "wins": 8},   # Норрис
-    {"position": 2,  "driver_number": 1,  "points": 421, "wins": 9},   # Ферстаппен
-    {"position": 3,  "driver_number": 81, "points": 410, "wins": 3},   # Пиастри
+    {"position": 1,  "driver_number": 4,  "points": 423, "wins": 7},   # Норрис
+    {"position": 2,  "driver_number": 1,  "points": 421, "wins": 8},   # Ферстаппен
+    {"position": 3,  "driver_number": 81, "points": 410, "wins": 7},   # Пиастри
     {"position": 4,  "driver_number": 63, "points": 319, "wins": 2},   # Расселл
-    {"position": 5,  "driver_number": 16, "points": 242, "wins": 2},   # Леклер
+    {"position": 5,  "driver_number": 16, "points": 242, "wins": 0},   # Леклер
     {"position": 6,  "driver_number": 44, "points": 156, "wins": 0},   # Хэмилтон
     {"position": 7,  "driver_number": 12, "points": 150, "wins": 0},   # Антонелли
     {"position": 8,  "driver_number": 23, "points": 73,  "wins": 0},   # Албон
@@ -475,13 +480,14 @@ STANDINGS_2025_DRIVERS = [
     {"position": 18, "driver_number": 10, "points": 22,  "wins": 0},   # Гасли
     {"position": 19, "driver_number": 5,  "points": 19,  "wins": 0},   # Бортолето
     {"position": 20, "driver_number": 43, "points": 0,   "wins": 0},   # Колапинто
+    {"position": 21, "driver_number": 7,  "points": 0,   "wins": 0},   # Дуэн
 ]
 
 STANDINGS_2025_CONSTRUCTORS = [
-    {"position": 1,  "team": "McLaren",          "points": 833, "wins": 11},
+    {"position": 1,  "team": "McLaren",          "points": 833, "wins": 14},
     {"position": 2,  "team": "Mercedes",         "points": 469, "wins": 2},
-    {"position": 3,  "team": "Red Bull Racing",  "points": 451, "wins": 9},
-    {"position": 4,  "team": "Ferrari",          "points": 398, "wins": 2},
+    {"position": 3,  "team": "Red Bull Racing",  "points": 451, "wins": 8},
+    {"position": 4,  "team": "Ferrari",          "points": 398, "wins": 0},
     {"position": 5,  "team": "Williams",         "points": 137, "wins": 0},
     {"position": 6,  "team": "Racing Bulls",     "points": 92,  "wins": 0},
     {"position": 7,  "team": "Aston Martin",     "points": 89,  "wins": 0},
@@ -491,17 +497,17 @@ STANDINGS_2025_CONSTRUCTORS = [
 ]
 
 # ============ SEASON 2025 RESULTS (all 24 races) ============
-# Data sourced from championat.com; podium = [P1, P2, P3] driver numbers
+# Data sourced from Jolpica/Ergast API; podium = [P1, P2, P3] driver numbers
 # sprint = True for sprint weekends
 SEASON_2025_RESULTS = {
     1: {
         "name": "Гран-при Австралии",
         "date": "2025-03-16",
         "circuit_id": "albert_park",
-        "laps": 58,
+        "laps": 57,
         "session_key": 9693,
         "podium": [4, 1, 63],
-        "top_10": [4, 1, 63, 81, 16, 22, 23, 44, 10, 14],
+        "top_10": [4, 1, 63, 12, 23, 18, 27, 16, 81, 44],
     },
     2: {
         "name": "Гран-при Китая",
@@ -512,7 +518,7 @@ SEASON_2025_RESULTS = {
         "session_key": 9998,
         "sprint_session_key": 9993,
         "podium": [81, 4, 63],
-        "top_10": [81, 4, 63, 44, 16, 1, 12, 22, 6, 31],
+        "top_10": [81, 4, 63, 1, 31, 12, 23, 87, 18, 55],
         "sprint_podium": [44, 81, 1],
         "sprint_top_10": [44, 81, 1, 63, 16, 22, 12, 4, 18, 14],
     },
@@ -532,7 +538,7 @@ SEASON_2025_RESULTS = {
         "laps": 57,
         "session_key": 10014,
         "podium": [81, 63, 4],
-        "top_10": [81, 63, 4, 16, 10, 55, 12, 1, 44, 22],
+        "top_10": [81, 63, 4, 16, 44, 1, 10, 31, 22, 87],
     },
     5: {
         "name": "Гран-при Саудовской Аравии",
@@ -541,7 +547,7 @@ SEASON_2025_RESULTS = {
         "laps": 50,
         "session_key": 10022,
         "podium": [81, 1, 16],
-        "top_10": [81, 1, 16, 63, 12, 44, 4, 55, 23, 6],
+        "top_10": [81, 1, 16, 4, 63, 12, 44, 55, 23, 6],
     },
     6: {
         "name": "Гран-при Майами",
@@ -552,7 +558,7 @@ SEASON_2025_RESULTS = {
         "session_key": 10033,
         "sprint_session_key": 10028,
         "podium": [81, 4, 63],
-        "top_10": [81, 4, 63, 12, 23, 55, 16, 22, 31, 44],
+        "top_10": [81, 4, 63, 1, 23, 12, 16, 44, 55, 22],
         "sprint_podium": [4, 81, 44],
         "sprint_top_10": [4, 81, 44, 63, 18, 22, 12, 10, 27, 6],
     },
@@ -563,7 +569,7 @@ SEASON_2025_RESULTS = {
         "laps": 63,
         "session_key": 9987,
         "podium": [1, 4, 81],
-        "top_10": [1, 4, 81, 63, 14, 55, 23, 18, 6, 12],
+        "top_10": [1, 4, 81, 44, 23, 16, 63, 55, 6, 22],
     },
     8: {
         "name": "Гран-при Монако",
@@ -572,7 +578,7 @@ SEASON_2025_RESULTS = {
         "laps": 78,
         "session_key": 9979,
         "podium": [4, 16, 81],
-        "top_10": [4, 16, 81, 1, 6, 14, 44, 31, 30, 23],
+        "top_10": [4, 16, 81, 1, 44, 6, 31, 30, 23, 55],
     },
     9: {
         "name": "Гран-при Испании",
@@ -581,7 +587,7 @@ SEASON_2025_RESULTS = {
         "laps": 66,
         "session_key": 9971,
         "podium": [81, 4, 16],
-        "top_10": [81, 4, 16, 44, 63, 12, 6, 1, 30, 5],
+        "top_10": [81, 4, 16, 63, 27, 44, 6, 10, 14, 1],
     },
     10: {
         "name": "Гран-при Канады",
@@ -590,16 +596,16 @@ SEASON_2025_RESULTS = {
         "laps": 70,
         "session_key": 9963,
         "podium": [63, 1, 12],
-        "top_10": [63, 1, 12, 81, 44, 14, 4, 16, 27, 43],
+        "top_10": [63, 1, 12, 81, 16, 44, 14, 27, 31, 55],
     },
     11: {
         "name": "Гран-при Австрии",
         "date": "2025-06-29",
         "circuit_id": "red_bull_ring",
-        "laps": 71,
+        "laps": 70,
         "session_key": 9955,
         "podium": [4, 81, 16],
-        "top_10": [4, 81, 16, 44, 63, 5, 30, 14, 31, 22],
+        "top_10": [4, 81, 16, 44, 63, 30, 14, 5, 27, 31],
     },
     12: {
         "name": "Гран-при Великобритании",
@@ -608,7 +614,7 @@ SEASON_2025_RESULTS = {
         "laps": 52,
         "session_key": 9947,
         "podium": [4, 81, 27],
-        "top_10": [4, 81, 27, 63, 16, 1, 44, 12, 14, 55],
+        "top_10": [4, 81, 27, 44, 1, 10, 18, 23, 14, 63],
     },
     13: {
         "name": "Гран-при Бельгии",
@@ -619,7 +625,7 @@ SEASON_2025_RESULTS = {
         "session_key": 9939,
         "sprint_session_key": 9934,
         "podium": [81, 4, 16],
-        "top_10": [81, 4, 16, 1, 63, 23, 22, 6, 30, 5],
+        "top_10": [81, 4, 16, 1, 63, 23, 44, 30, 5, 10],
         "sprint_podium": [1, 81, 4],
         "sprint_top_10": [1, 81, 4, 16, 31, 55, 87, 6, 5, 30],
     },
@@ -630,7 +636,7 @@ SEASON_2025_RESULTS = {
         "laps": 70,
         "session_key": 9928,
         "podium": [4, 81, 63],
-        "top_10": [4, 81, 63, 14, 16, 5, 1, 18, 30, 87],
+        "top_10": [4, 81, 63, 16, 14, 5, 18, 30, 1, 12],
     },
     15: {
         "name": "Гран-при Нидерландов",
@@ -639,7 +645,7 @@ SEASON_2025_RESULTS = {
         "laps": 72,
         "session_key": 9920,
         "podium": [81, 1, 6],
-        "top_10": [81, 1, 6, 4, 16, 63, 44, 30, 55, 23],
+        "top_10": [81, 1, 6, 63, 23, 87, 18, 14, 22, 31],
     },
     16: {
         "name": "Гран-при Италии",
@@ -648,7 +654,7 @@ SEASON_2025_RESULTS = {
         "laps": 53,
         "session_key": 9912,
         "podium": [1, 4, 81],
-        "top_10": [1, 4, 81, 16, 63, 44, 5, 14, 22, 12],
+        "top_10": [1, 4, 81, 16, 63, 44, 23, 5, 12, 6],
     },
     17: {
         "name": "Гран-при Азербайджана",
@@ -657,7 +663,7 @@ SEASON_2025_RESULTS = {
         "laps": 51,
         "session_key": 9904,
         "podium": [1, 63, 55],
-        "top_10": [1, 63, 55, 12, 22, 30, 6, 4, 16, 44],
+        "top_10": [1, 63, 55, 12, 30, 22, 4, 44, 16, 6],
     },
     18: {
         "name": "Гран-при Сингапура",
@@ -666,18 +672,18 @@ SEASON_2025_RESULTS = {
         "laps": 62,
         "session_key": 9896,
         "podium": [63, 1, 4],
-        "top_10": [63, 1, 4, 81, 16, 12, 44, 6, 14, 87],
+        "top_10": [63, 1, 4, 81, 12, 16, 14, 44, 87, 55],
     },
     19: {
         "name": "Гран-при США",
         "date": "2025-10-19",
-        "circuit_id": "cota",
+        "circuit_id": "americas",
         "laps": 56,
         "sprint": True,
         "session_key": 9888,
         "sprint_session_key": 9883,
         "podium": [1, 4, 16],
-        "top_10": [1, 4, 16, 63, 44, 81, 12, 55, 27, 87],
+        "top_10": [1, 4, 16, 44, 81, 63, 22, 27, 87, 14],
         "sprint_podium": [1, 63, 55],
         "sprint_top_10": [1, 63, 55, 44, 16, 23, 22, 12, 30, 10],
     },
@@ -687,8 +693,8 @@ SEASON_2025_RESULTS = {
         "circuit_id": "rodriguez",
         "laps": 71,
         "session_key": 9877,
-        "podium": [1, 4, 63],
-        "top_10": [1, 4, 63, 81, 16, 44, 12, 14, 55, 23],
+        "podium": [4, 16, 1],
+        "top_10": [4, 16, 1, 87, 81, 12, 63, 44, 31, 5],
     },
     21: {
         "name": "Гран-при Бразилии",
@@ -698,30 +704,30 @@ SEASON_2025_RESULTS = {
         "sprint": True,
         "session_key": 9869,
         "sprint_session_key": 9864,
-        "podium": [4, 1, 16],
-        "top_10": [4, 1, 16, 81, 63, 44, 12, 23, 55, 14],
+        "podium": [4, 12, 1],
+        "top_10": [4, 12, 1, 63, 81, 87, 30, 6, 27, 10],
         "sprint_podium": [4, 12, 63],
         "sprint_top_10": [4, 12, 63, 1, 16, 14, 44, 10, 18, 6],
     },
     22: {
         "name": "Гран-при Лас-Вегаса",
         "date": "2025-11-23",
-        "circuit_id": "las_vegas",
+        "circuit_id": "vegas",
         "laps": 50,
         "session_key": 9858,
-        "podium": [16, 4, 1],
-        "top_10": [16, 4, 1, 81, 63, 44, 12, 23, 55, 27],
+        "podium": [1, 63, 12],
+        "top_10": [1, 63, 12, 16, 55, 6, 27, 44, 31, 87],
     },
     23: {
         "name": "Гран-при Катара",
         "date": "2025-11-30",
-        "circuit_id": "lusail",
+        "circuit_id": "losail",
         "laps": 57,
         "sprint": True,
         "session_key": 9850,
         "sprint_session_key": 9845,
-        "podium": [1, 4, 81],
-        "top_10": [1, 4, 81, 63, 16, 44, 12, 6, 30, 14],
+        "podium": [1, 81, 55],
+        "top_10": [1, 81, 55, 4, 12, 63, 14, 16, 30, 22],
         "sprint_podium": [81, 63, 4],
         "sprint_top_10": [81, 63, 4, 1, 22, 12, 14, 55, 6, 23],
     },
@@ -731,7 +737,7 @@ SEASON_2025_RESULTS = {
         "circuit_id": "yas_marina",
         "laps": 58,
         "session_key": 9839,
-        "podium": [4, 81, 16],
-        "top_10": [4, 81, 16, 1, 63, 14, 5, 6, 31, 22],
+        "podium": [1, 81, 4],
+        "top_10": [1, 81, 4, 16, 63, 14, 31, 44, 27, 18],
     },
 }
