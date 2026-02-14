@@ -17,7 +17,7 @@ from config import (
     OPENF1_API, ERGAST_API, DRIVERS, TEAM_COLORS, TYRE_COLORS, CACHE_TTL,
     CIRCUIT_IMAGES, CIRCUIT_IMAGE_BASE, DRIVER_PHOTO_BASE, TEAM_ASSETS,
     STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS,
-    SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK
+    SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -1387,7 +1387,6 @@ async def get_race_laptimes(session_key: str = "latest", driver_numbers: list = 
 def get_season_results(season: int = 2025) -> Dict[str, Any]:
     """Get full season race results from hardcoded data."""
     races = []
-    vk_by_round = {r["round"]: r["url"] for r in PAST_RACES_VK if r["season"] == season}
 
     for rnd, data in sorted(SEASON_2025_RESULTS.items()):
         winner_num = data["podium"][0]
@@ -1397,6 +1396,11 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
 
         circuit_id = data.get("circuit_id", "")
         circuit_info = CIRCUITS.get(circuit_id, {})
+
+        # VK video: direct link if available, search URL as fallback
+        vk_url = VK_DIRECT_2025.get(rnd, "")
+        race_name_short = data["name"].replace("Гран-при ", "")
+        vk_search_url = f"https://vkvideo.ru/search?q=станиславский+формула+1+{race_name_short.replace(' ', '+')}+гонка+2025"
 
         races.append({
             "round": rnd,
@@ -1410,7 +1414,8 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
             "winner": winner,
             "podium": podium,
             "top_10": top_10,
-            "vk_url": vk_by_round.get(rnd, ""),
+            "vk_url": vk_url,
+            "vk_search_url": vk_search_url,
         })
 
     return {"season": season, "races": races, "total_races": len(races)}

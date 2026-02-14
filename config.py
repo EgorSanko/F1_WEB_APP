@@ -263,30 +263,51 @@ STREAM_LINKS = [
 
 # ============ PAST RACE RECORDINGS (VK Video) ============
 _VK_CHANNEL = "https://vkvideo.ru/@stanizlavskylive"
+# Main VK groups with F1 race recordings:
+#   -212096379 = Вершина Автоспорта (versporta) — Попов и Фабричнова commentary
+#   -52461685  = F1 archive group — numbered episodes, Setanta Sports commentary
+#   -213739922 = АиМ Трансляции — Попов и Фабричнова, 1080p
+_VK_V = "https://vk.com/video"  # prefix for direct video links
+
+# Direct VK video links for 2025 races (found via web search)
+VK_DIRECT_2025 = {
+    1: f"{_VK_V}-212096379_456239428",   # Австралия
+    2: f"{_VK_V}-52461685_456258496",    # Китай
+    3: f"{_VK_V}-212096379_456239453",   # Япония
+    5: f"{_VK_V}-212096379_456239481",   # Саудовская Аравия
+    7: f"{_VK_V}-212096379_456239539",   # Эмилия-Романья
+    11: f"{_VK_V}-52461685_456259022",   # Австрия
+    12: f"{_VK_V}-52461685_456259056",   # Великобритания
+    13: f"{_VK_V}-213739922_456242679",  # Бельгия
+    14: f"{_VK_V}-212096379_456239710",  # Венгрия
+    15: f"{_VK_V}-212096379_456239724",  # Нидерланды
+    22: f"{_VK_V}-52461685_456259606",   # Лас-Вегас
+}
+
 PAST_RACES_VK = [
-    # 2025 season
-    {"race": "Bahrain GP 2025",        "round": 1,  "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Saudi Arabia GP 2025",   "round": 2,  "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Australia GP 2025",      "round": 3,  "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Japan GP 2025",          "round": 4,  "season": 2025, "url": _VK_CHANNEL},
-    {"race": "China GP 2025",          "round": 5,  "season": 2025, "url": _VK_CHANNEL},
+    # 2025 season — direct VK video links where found, channel fallback otherwise
+    {"race": "Australia GP 2025",      "round": 1,  "season": 2025, "url": f"{_VK_V}-212096379_456239428"},
+    {"race": "China GP 2025",          "round": 2,  "season": 2025, "url": f"{_VK_V}-52461685_456258496"},
+    {"race": "Japan GP 2025",          "round": 3,  "season": 2025, "url": f"{_VK_V}-212096379_456239453"},
+    {"race": "Bahrain GP 2025",        "round": 4,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Saudi Arabia GP 2025",   "round": 5,  "season": 2025, "url": f"{_VK_V}-212096379_456239481"},
     {"race": "Miami GP 2025",          "round": 6,  "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Emilia Romagna GP 2025", "round": 7,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Emilia Romagna GP 2025", "round": 7,  "season": 2025, "url": f"{_VK_V}-212096379_456239539"},
     {"race": "Monaco GP 2025",         "round": 8,  "season": 2025, "url": _VK_CHANNEL},
     {"race": "Spain GP 2025",          "round": 9,  "season": 2025, "url": _VK_CHANNEL},
     {"race": "Canada GP 2025",         "round": 10, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Austria GP 2025",        "round": 11, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Great Britain GP 2025",  "round": 12, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Hungary GP 2025",        "round": 13, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Belgium GP 2025",        "round": 14, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Netherlands GP 2025",    "round": 15, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Austria GP 2025",        "round": 11, "season": 2025, "url": f"{_VK_V}-52461685_456259022"},
+    {"race": "Great Britain GP 2025",  "round": 12, "season": 2025, "url": f"{_VK_V}-52461685_456259056"},
+    {"race": "Belgium GP 2025",        "round": 13, "season": 2025, "url": f"{_VK_V}-213739922_456242679"},
+    {"race": "Hungary GP 2025",        "round": 14, "season": 2025, "url": f"{_VK_V}-212096379_456239710"},
+    {"race": "Netherlands GP 2025",    "round": 15, "season": 2025, "url": f"{_VK_V}-212096379_456239724"},
     {"race": "Italy GP 2025",          "round": 16, "season": 2025, "url": _VK_CHANNEL},
     {"race": "Azerbaijan GP 2025",     "round": 17, "season": 2025, "url": _VK_CHANNEL},
     {"race": "Singapore GP 2025",      "round": 18, "season": 2025, "url": _VK_CHANNEL},
     {"race": "USA GP 2025",            "round": 19, "season": 2025, "url": _VK_CHANNEL},
     {"race": "Mexico GP 2025",         "round": 20, "season": 2025, "url": _VK_CHANNEL},
     {"race": "Brazil GP 2025",         "round": 21, "season": 2025, "url": _VK_CHANNEL},
-    {"race": "Las Vegas GP 2025",      "round": 22, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Las Vegas GP 2025",      "round": 22, "season": 2025, "url": f"{_VK_V}-52461685_456259606"},
     {"race": "Qatar GP 2025",          "round": 23, "season": 2025, "url": _VK_CHANNEL},
     {"race": "Abu Dhabi GP 2025",      "round": 24, "season": 2025, "url": _VK_CHANNEL},
     # 2024 season

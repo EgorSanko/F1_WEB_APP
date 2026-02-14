@@ -351,7 +351,7 @@
                     {/* VK Race Recordings — last 3 races */}
                     {seasonResults?.races && (() => {
                         const now = new Date();
-                        const pastRaces = seasonResults.races.filter(r => new Date(r.date) < now && r.vk_url).slice(-3).reverse();
+                        const pastRaces = seasonResults.races.filter(r => new Date(r.date) < now && (r.vk_url || r.vk_search_url)).slice(-3).reverse();
                         if (!pastRaces.length) return null;
                         return (
                             <div>
@@ -362,7 +362,7 @@
                                     {pastRaces.map(race => {
                                         const flag = circuitFlags[race.circuit_id] || '🏁';
                                         return (
-                                            <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url)} style={{minWidth:200}}>
+                                            <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url || race.vk_search_url)} style={{minWidth:200}}>
                                                 <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                                                     {race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                                     <div style={{position:'absolute',top:8,left:8,fontSize:20}}>{flag}</div>
@@ -738,9 +738,9 @@
                                             </div>
                                         </div>
                                     )}
-                                    {race.vk_url && isPast && (
-                                        <button onClick={(e)=>{e.stopPropagation();openLink(race.vk_url);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-                                            📺
+                                    {(race.vk_url || race.vk_search_url) && isPast && (
+                                        <button onClick={(e)=>{e.stopPropagation();openLink(race.vk_url || race.vk_search_url);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                                            {race.vk_url ? '📺' : '🔍'}
                                         </button>
                                     )}
                                 </div>
@@ -1509,9 +1509,9 @@
                     )}
 
                     {/* VK Video */}
-                    {race.vk_url && (
-                        <button className="btn-primary" onClick={()=>openLink(race.vk_url)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                            📺 Смотреть запись гонки
+                    {(race.vk_url || race.vk_search_url) && (
+                        <button className="btn-primary" onClick={()=>openLink(race.vk_url || race.vk_search_url)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                            {race.vk_url ? '📺 Смотреть запись гонки' : '🔍 Найти трансляцию на VK'}
                         </button>
                     )}
                 </div>
