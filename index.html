@@ -92,7 +92,7 @@
         .fade-in { animation:fadeIn 0.35s ease-out; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-        .page-container { height:100dvh; padding-bottom:90px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .page-container { height:100dvh; padding-bottom:calc(90px + env(safe-area-inset-bottom, 16px)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
 
         .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }
         .standings-row:active { background:var(--f1-card-hover); }
@@ -219,7 +219,7 @@
         };
 
         const flagEmoji = (code) => {
-            const flags = {'NL':'🇳🇱','GB':'🇬🇧','MC':'🇲🇨','AU':'🇦🇺','ES':'🇪🇸','DE':'🇩🇪','FR':'🇫🇷','CA':'🇨🇦','TH':'🇹🇭','JP':'🇯🇵','IT':'🇮🇹','NZ':'🇳🇿','BR':'🇧🇷',
+            const flags = {'NL':'🇳🇱','GB':'🇬🇧','MC':'🇲🇨','AU':'🇦🇺','ES':'🇪🇸','DE':'🇩🇪','FR':'🇫🇷','CA':'🇨🇦','TH':'🇹🇭','JP':'🇯🇵','IT':'🇮🇹','NZ':'🇳🇿','BR':'🇧🇷','AR':'🇦🇷',
                 'Bahrain':'🇧🇭','Saudi Arabia':'🇸🇦','Australia':'🇦🇺','Japan':'🇯🇵','China':'🇨🇳','USA':'🇺🇸','Italy':'🇮🇹','Monaco':'🇲🇨','Spain':'🇪🇸','Canada':'🇨🇦','Austria':'🇦🇹','UK':'🇬🇧','Hungary':'🇭🇺','Belgium':'🇧🇪','Netherlands':'🇳🇱','Azerbaijan':'🇦🇿','Singapore':'🇸🇬','Mexico':'🇲🇽','Brazil':'🇧🇷','Qatar':'🇶🇦','UAE':'🇦🇪'};
             return flags[code] || '🏳️';
         };
@@ -403,7 +403,7 @@
                     {/* Last race — podium layout */}
                     {lastRace && lastRace.results && (
                         <div className="card" style={{padding:'16px 12px'}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','GP')}</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
                             {/* Podium — positions 2, 1, 3 */}
                             <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:16}}>
                                 {[1,0,2].map(idx => {
@@ -551,7 +551,7 @@
                     {liveTab==='positions' && (positions?.positions?.length>0 ? (
                         <div>
                             <div className="live-row" style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5,minHeight:28,padding:'4px 12px'}}>
-                                <span>P</span><span></span><span>Пилот</span><span style={{textAlign:'center'}}>Время</span><span style={{textAlign:'center'}}>Ш</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>🔧</span>
+                                <span>P</span><span></span><span>Пилот</span><span style={{textAlign:'center'}}>Время</span><span style={{textAlign:'center'}}>Ш</span><span style={{textAlign:'right'}}>Отст.</span><span style={{textAlign:'center'}}>🔧</span>
                             </div>
                             {positions.positions.map((p,i) => {
                                 const t = timingMap[p.driver_number]; const isExp = expandedRow===p.driver_number;
@@ -647,7 +647,7 @@
                                 <div style={{flex:1}}>
                                     <div style={{fontSize:13,lineHeight:1.4}}>{msg.message}</div>
                                     <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:3,display:'flex',gap:8}}>
-                                        {msg.lap_number&&<span>Круг {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
+                                        {msg.lap_number&&<span>Круг {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{{Other:'Другое',Flag:'Флаг',SafetyCar:'Сейфти-кар',VirtualSafetyCar:'Виртуальный СК',DRS:'DRS',SessionStatus:'Статус'}[msg.category]||msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -758,7 +758,7 @@
                                     <div style={{display:'flex',alignItems:'center',gap:10}}>
                                         <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
                                         <div style={{flex:1,minWidth:0}}>
-                                            <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','GP')}</span></div>
+                                            <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','ГП')}</span></div>
                                             <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.date}</div>
                                         </div>
                                         {winner && (
@@ -789,7 +789,7 @@
                             <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
                                 <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
                                 <div style={{flex:1,minWidth:0}}>
-                                    <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','GP')}</span></div>
+                                    <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','ГП')}</span></div>
                                     <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit} · {race.date}</div>
                                 </div>
                             </div>
@@ -839,7 +839,7 @@
                             <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Результаты сезона</div>
                                 {stats.results?.map((r,i)=>(
                                     <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:i<stats.results.length-1?'1px solid var(--f1-border)':'none'}}>
-                                        <span style={{width:30,fontSize:11,color:'var(--f1-text-muted)'}}>R{r.round}</span><span style={{flex:1,fontSize:13}}>{r.race?.replace('Grand Prix','GP')}</span><PosBadge pos={r.position}/><span style={{width:36,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
+                                        <span style={{width:30,fontSize:11,color:'var(--f1-text-muted)'}}>R{r.round}</span><span style={{flex:1,fontSize:13}}>{r.race?.replace('Grand Prix','ГП')}</span><PosBadge pos={r.position}/><span style={{width:36,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1262,7 +1262,7 @@
                                 borderColor: '#38383F', borderWidth: 1,
                                 callbacks: {
                                     title: (items) => items[0]?.dataset?.label || '',
-                                    label: (item) => `Lap ${item.parsed.x}: P${item.parsed.y}`,
+                                    label: (item) => `Круг ${item.parsed.x}: P${item.parsed.y}`,
                                 }
                             },
                         },
@@ -1320,7 +1320,7 @@
                                         const t = item.parsed.y;
                                         const m = Math.floor(t/60);
                                         const s = (t%60).toFixed(3);
-                                        return `Lap ${item.parsed.x}: ${m>0?m+':'+s.padStart(6,'0'):s}`;
+                                        return `Круг ${item.parsed.x}: ${m>0?m+':'+s.padStart(6,'0'):s}`;
                                     },
                                 }
                             },

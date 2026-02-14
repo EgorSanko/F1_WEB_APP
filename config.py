@@ -66,33 +66,61 @@ TEAM_COLORS = {
     "Alpine": "#FF87BC",
     "Williams": "#64C4FF",
     "Haas F1 Team": "#B6BABD",
-    "RB": "#6692FF",
+    "Racing Bulls": "#6692FF",
     "Kick Sauber": "#52E252",
 }
 
 # ============ DRIVERS 2025 ============
-# Update this at the start of each season
+# Updated: mid-season transfers applied (Tsunoda→RBR, Lawson→Racing Bulls, Colapinto→Alpine, Hadjar #35)
+_PB = "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/2025Drivers"
+
+def _dp(last, first, size="1col"):
+    """Build F1 driver photo URL."""
+    s = last.replace("ü", "u").replace("é", "e")
+    c = s[:6]
+    return f"{_PB}/{c.upper()}01_{first}_{s.upper()}/{c.lower()}01.png.transform/{size}/image.png"
+
 DRIVERS = {
-    1:  {"name": "Max Verstappen",    "code": "VER", "team": "Red Bull Racing",  "country": "NL"},
-    44: {"name": "Lewis Hamilton",    "code": "HAM", "team": "Ferrari",          "country": "GB"},
-    16: {"name": "Charles Leclerc",   "code": "LEC", "team": "Ferrari",          "country": "MC"},
-    4:  {"name": "Lando Norris",      "code": "NOR", "team": "McLaren",          "country": "GB"},
-    81: {"name": "Oscar Piastri",     "code": "PIA", "team": "McLaren",          "country": "AU"},
-    63: {"name": "George Russell",    "code": "RUS", "team": "Mercedes",         "country": "GB"},
-    12: {"name": "Andrea Kimi Antonelli", "code": "ANT", "team": "Mercedes",     "country": "IT"},
-    14: {"name": "Fernando Alonso",   "code": "ALO", "team": "Aston Martin",     "country": "ES"},
-    18: {"name": "Lance Stroll",      "code": "STR", "team": "Aston Martin",     "country": "CA"},
-    10: {"name": "Pierre Gasly",      "code": "GAS", "team": "Alpine",           "country": "FR"},
-    7:  {"name": "Jack Doohan",       "code": "DOO", "team": "Alpine",           "country": "AU"},
-    23: {"name": "Alexander Albon",   "code": "ALB", "team": "Williams",         "country": "TH"},
-    55: {"name": "Carlos Sainz",      "code": "SAI", "team": "Williams",         "country": "ES"},
-    31: {"name": "Esteban Ocon",      "code": "OCO", "team": "Haas F1 Team",     "country": "FR"},
-    87: {"name": "Oliver Bearman",    "code": "BEA", "team": "Haas F1 Team",     "country": "GB"},
-    22: {"name": "Yuki Tsunoda",      "code": "TSU", "team": "RB",              "country": "JP"},
-    30: {"name": "Liam Lawson",       "code": "LAW", "team": "Red Bull Racing",  "country": "NZ"},
-    27: {"name": "Nico Hülkenberg",   "code": "HUL", "team": "Kick Sauber",     "country": "DE"},
-    5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Kick Sauber",     "country": "BR"},
-    61: {"name": "Isack Hadjar",      "code": "HAD", "team": "RB",              "country": "FR"},
+    1:  {"name": "Max Verstappen", "code": "VER", "team": "Red Bull Racing", "country": "NL",
+         "photo_url": _dp("Verstappen", "Max"), "photo_url_large": _dp("Verstappen", "Max", "4col")},
+    22: {"name": "Yuki Tsunoda", "code": "TSU", "team": "Red Bull Racing", "country": "JP",
+         "photo_url": _dp("Tsunoda", "Yuki"), "photo_url_large": _dp("Tsunoda", "Yuki", "4col")},
+    44: {"name": "Lewis Hamilton", "code": "HAM", "team": "Ferrari", "country": "GB",
+         "photo_url": _dp("Hamilton", "Lewis"), "photo_url_large": _dp("Hamilton", "Lewis", "4col")},
+    16: {"name": "Charles Leclerc", "code": "LEC", "team": "Ferrari", "country": "MC",
+         "photo_url": _dp("Leclerc", "Charles"), "photo_url_large": _dp("Leclerc", "Charles", "4col")},
+    4:  {"name": "Lando Norris", "code": "NOR", "team": "McLaren", "country": "GB",
+         "photo_url": _dp("Norris", "Lando"), "photo_url_large": _dp("Norris", "Lando", "4col")},
+    81: {"name": "Oscar Piastri", "code": "PIA", "team": "McLaren", "country": "AU",
+         "photo_url": _dp("Piastri", "Oscar"), "photo_url_large": _dp("Piastri", "Oscar", "4col")},
+    63: {"name": "George Russell", "code": "RUS", "team": "Mercedes", "country": "GB",
+         "photo_url": _dp("Russell", "George"), "photo_url_large": _dp("Russell", "George", "4col")},
+    12: {"name": "Andrea Kimi Antonelli", "code": "ANT", "team": "Mercedes", "country": "IT",
+         "photo_url": _dp("Antonelli", "Kimi"), "photo_url_large": _dp("Antonelli", "Kimi", "4col")},
+    14: {"name": "Fernando Alonso", "code": "ALO", "team": "Aston Martin", "country": "ES",
+         "photo_url": _dp("Alonso", "Fernando"), "photo_url_large": _dp("Alonso", "Fernando", "4col")},
+    18: {"name": "Lance Stroll", "code": "STR", "team": "Aston Martin", "country": "CA",
+         "photo_url": _dp("Stroll", "Lance"), "photo_url_large": _dp("Stroll", "Lance", "4col")},
+    10: {"name": "Pierre Gasly", "code": "GAS", "team": "Alpine", "country": "FR",
+         "photo_url": _dp("Gasly", "Pierre"), "photo_url_large": _dp("Gasly", "Pierre", "4col")},
+    43: {"name": "Franco Colapinto", "code": "COL", "team": "Alpine", "country": "AR",
+         "photo_url": _dp("Colapinto", "Franco"), "photo_url_large": _dp("Colapinto", "Franco", "4col")},
+    23: {"name": "Alexander Albon", "code": "ALB", "team": "Williams", "country": "TH",
+         "photo_url": _dp("Albon", "Alexander"), "photo_url_large": _dp("Albon", "Alexander", "4col")},
+    55: {"name": "Carlos Sainz", "code": "SAI", "team": "Williams", "country": "ES",
+         "photo_url": _dp("Sainz", "Carlos"), "photo_url_large": _dp("Sainz", "Carlos", "4col")},
+    31: {"name": "Esteban Ocon", "code": "OCO", "team": "Haas F1 Team", "country": "FR",
+         "photo_url": _dp("Ocon", "Esteban"), "photo_url_large": _dp("Ocon", "Esteban", "4col")},
+    87: {"name": "Oliver Bearman", "code": "BEA", "team": "Haas F1 Team", "country": "GB",
+         "photo_url": _dp("Bearman", "Oliver"), "photo_url_large": _dp("Bearman", "Oliver", "4col")},
+    30: {"name": "Liam Lawson", "code": "LAW", "team": "Racing Bulls", "country": "NZ",
+         "photo_url": _dp("Lawson", "Liam"), "photo_url_large": _dp("Lawson", "Liam", "4col")},
+    35: {"name": "Isack Hadjar", "code": "HAD", "team": "Racing Bulls", "country": "FR",
+         "photo_url": _dp("Hadjar", "Isack"), "photo_url_large": _dp("Hadjar", "Isack", "4col")},
+    27: {"name": "Nico Hülkenberg", "code": "HUL", "team": "Kick Sauber", "country": "DE",
+         "photo_url": _dp("Hülkenberg", "Nico"), "photo_url_large": _dp("Hülkenberg", "Nico", "4col")},
+    5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Kick Sauber", "country": "BR",
+         "photo_url": _dp("Bortoleto", "Gabriel"), "photo_url_large": _dp("Bortoleto", "Gabriel", "4col")},
 }
 
 # ============ CIRCUIT COORDINATES (for weather) ============
@@ -191,7 +219,7 @@ TEAM_ASSETS = {
         "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/haas-logo.png.transform/2col/image.png",
         "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/haas.png.transform/4col/image.png",
     },
-    "RB": {
+    "Racing Bulls": {
         "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/rb-logo.png.transform/2col/image.png",
         "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/rb.png.transform/4col/image.png",
     },
@@ -313,3 +341,41 @@ ACHIEVEMENTS = {
     "reaction_god":        {"name": "Реакция бога",        "desc": "Реакция быстрее 0.2 секунд",         "icon": "⚡"},
     "all_predictions":     {"name": "Аналитик",            "desc": "Сделай все 5 типов прогнозов",       "icon": "📊"},
 }
+
+# ============ STANDINGS FALLBACK (2025 final) ============
+# Used when Ergast API returns empty (off-season)
+STANDINGS_2025_DRIVERS = [
+    {"position": 1,  "driver_number": 1,  "points": 437, "wins": 9},
+    {"position": 2,  "driver_number": 4,  "points": 374, "wins": 8},
+    {"position": 3,  "driver_number": 16, "points": 356, "wins": 5},
+    {"position": 4,  "driver_number": 81, "points": 292, "wins": 3},
+    {"position": 5,  "driver_number": 44, "points": 258, "wins": 2},
+    {"position": 6,  "driver_number": 63, "points": 231, "wins": 2},
+    {"position": 7,  "driver_number": 55, "points": 171, "wins": 0},
+    {"position": 8,  "driver_number": 14, "points": 137, "wins": 0},
+    {"position": 9,  "driver_number": 22, "points": 96,  "wins": 0},
+    {"position": 10, "driver_number": 10, "points": 84,  "wins": 0},
+    {"position": 11, "driver_number": 30, "points": 78,  "wins": 0},
+    {"position": 12, "driver_number": 23, "points": 68,  "wins": 0},
+    {"position": 13, "driver_number": 18, "points": 58,  "wins": 0},
+    {"position": 14, "driver_number": 31, "points": 52,  "wins": 0},
+    {"position": 15, "driver_number": 12, "points": 48,  "wins": 0},
+    {"position": 16, "driver_number": 27, "points": 41,  "wins": 0},
+    {"position": 17, "driver_number": 87, "points": 36,  "wins": 0},
+    {"position": 18, "driver_number": 35, "points": 22,  "wins": 0},
+    {"position": 19, "driver_number": 43, "points": 14,  "wins": 0},
+    {"position": 20, "driver_number": 5,  "points": 10,  "wins": 0},
+]
+
+STANDINGS_2025_CONSTRUCTORS = [
+    {"position": 1,  "team": "McLaren",          "points": 666, "wins": 11},
+    {"position": 2,  "team": "Ferrari",          "points": 614, "wins": 7},
+    {"position": 3,  "team": "Red Bull Racing",  "points": 533, "wins": 9},
+    {"position": 4,  "team": "Mercedes",         "points": 279, "wins": 2},
+    {"position": 5,  "team": "Williams",         "points": 239, "wins": 0},
+    {"position": 6,  "team": "Aston Martin",     "points": 195, "wins": 0},
+    {"position": 7,  "team": "Racing Bulls",     "points": 100, "wins": 0},
+    {"position": 8,  "team": "Alpine",           "points": 98,  "wins": 0},
+    {"position": 9,  "team": "Haas F1 Team",     "points": 88,  "wins": 0},
+    {"position": 10, "team": "Kick Sauber",      "points": 51,  "wins": 0},
+]

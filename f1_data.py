@@ -15,7 +15,8 @@ import httpx
 
 from config import (
     OPENF1_API, ERGAST_API, DRIVERS, TEAM_COLORS, TYRE_COLORS, CACHE_TTL,
-    CIRCUIT_IMAGES, CIRCUIT_IMAGE_BASE, DRIVER_PHOTO_BASE, TEAM_ASSETS
+    CIRCUIT_IMAGES, CIRCUIT_IMAGE_BASE, DRIVER_PHOTO_BASE, TEAM_ASSETS,
+    STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -204,14 +205,15 @@ def enrich_driver(driver_number: int, extra: dict = None) -> dict:
 
     result = {
         "driver_number": driver_number,
-        "name": info.get("name", f"Driver {driver_number}"),
+        "name": info.get("name", f"Пилот {driver_number}"),
         "first_name": info.get("name", "").split(" ")[0] if info.get("name") else "",
         "last_name": " ".join(info.get("name", "").split(" ")[1:]) if info.get("name") else "",
-        "code": info.get("code", "???"),
+        "code": info.get("code", str(driver_number)),
         "team": team,
         "team_color": TEAM_COLORS.get(team, "#888888"),
         "country": info.get("country", ""),
-        "photo_url": get_driver_photo_url(info.get("name", "")),
+        "photo_url": info.get("photo_url", ""),
+        "photo_url_large": info.get("photo_url_large", ""),
     }
     if extra:
         result.update(extra)
@@ -266,10 +268,10 @@ ERGAST_TO_NUMBER = {
     "max_verstappen": 1, "hamilton": 44, "leclerc": 16,
     "norris": 4, "piastri": 81, "russell": 63,
     "antonelli": 12, "alonso": 14, "stroll": 18,
-    "gasly": 10, "doohan": 7, "albon": 23,
+    "gasly": 10, "colapinto": 43, "albon": 23,
     "sainz": 55, "ocon": 31, "bearman": 87,
     "tsunoda": 22, "lawson": 30, "hulkenberg": 27,
-    "bortoleto": 5, "hadjar": 61,
+    "bortoleto": 5, "hadjar": 35,
 }
 
 
@@ -540,7 +542,26 @@ async def get_driver_standings() -> Dict[str, Any]:
 
     standings_lists = data.get("StandingsTable", {}).get("StandingsLists", [])
     if not standings_lists:
-        return {"standings": []}
+        # Fallback: use hardcoded 2025 final standings
+        standings = []
+        leader_points = 0
+        prev_points = 0
+        for s in STANDINGS_2025_DRIVERS:
+            points = s["points"]
+            if not leader_points:
+                leader_points = points
+            entry = enrich_driver(s["driver_number"], {
+                "position": s["position"],
+                "points": points,
+                "gap_to_leader": round(leader_points - points, 1),
+                "gap_to_prev": round(prev_points - points, 1) if prev_points else 0,
+                "wins": s.get("wins", 0),
+            })
+            standings.append(entry)
+            prev_points = points
+        response = {"standings": standings, "season": "2025", "round": "24", "fallback": True}
+        cache_set("standings_drivers", response)
+        return response
 
     standings = []
     leader_points = 0
@@ -588,7 +609,31 @@ async def get_constructor_standings() -> Dict[str, Any]:
 
     standings_lists = data.get("StandingsTable", {}).get("StandingsLists", [])
     if not standings_lists:
-        return {"standings": []}
+        # Fallback: use hardcoded 2025 final standings
+        standings = []
+        leader_points = 0
+        for s in STANDINGS_2025_CONSTRUCTORS:
+            points = s["points"]
+            if not leader_points:
+                leader_points = points
+            team_name = s["team"]
+            team_drivers = [
+                enrich_driver(num)
+                for num, info in DRIVERS.items()
+                if info.get("team") == team_name
+            ]
+            standings.append({
+                "position": s["position"],
+                "team": team_name,
+                "team_color": TEAM_COLORS.get(team_name, "#888"),
+                "points": points,
+                "gap_to_leader": round(leader_points - points, 1),
+                "wins": s.get("wins", 0),
+                "drivers": team_drivers,
+            })
+        response = {"standings": standings, "fallback": True}
+        cache_set("standings_constructors", response)
+        return response
 
     standings = []
     leader_points = 0
