@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>F1 Hub</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --f1-red: #E10600;
+            --f1-red-dark: #B00500;
+            --f1-dark: #15151E;
+            --f1-darker: #0F0F15;
+            --f1-card: rgba(30,30,44,0.75);
+            --f1-card-solid: #1E1E2C;
+            --f1-card-hover: #252538;
+            --f1-border: rgba(255,255,255,0.06);
+            --f1-gray: #38383F;
+            --f1-text: #FFFFFF;
+            --f1-text-secondary: #9A9AAF;
+            --f1-text-muted: #6B6B80;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+        html, body, #root { height:100dvh; overflow:hidden; }
+        body { background:var(--f1-darker); color:var(--f1-text); font-family:'Titillium Web','Segoe UI',system-ui,-apple-system,sans-serif; overflow-x:hidden; }
+
+        ::-webkit-scrollbar { width:3px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:var(--f1-gray); border-radius:4px; }
+
+        .tyre-SOFT { color:#FF3333; } .tyre-MEDIUM { color:#FFD700; } .tyre-HARD { color:#CCCCCC; }
+        .tyre-INTERMEDIATE { color:#39B54A; } .tyre-WET { color:#0067FF; } .tyre-UNKNOWN { color:#888; }
+        .tyre-dot { width:14px; height:14px; border-radius:50%; border:2px solid currentColor; display:inline-block; }
+
+        .skeleton { background:linear-gradient(90deg,#1e1e2c 25%,#2a2a3e 50%,#1e1e2c 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+        @keyframes shimmer { to { background-position:-200% 0; } }
+
+        .card {
+            background:var(--f1-card);
+            backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+            border:1px solid var(--f1-border);
+            border-radius:16px; padding:16px;
+            box-shadow:0 4px 24px rgba(0,0,0,0.2);
+            transition:background 0.2s, transform 0.15s;
+        }
+        .card:active { transform:scale(0.98); }
+
+        .bottom-nav {
+            position:fixed; bottom:0; left:0; right:0;
+            background:rgba(15,15,21,0.92); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+            border-top:1px solid var(--f1-border); z-index:100;
+            padding-bottom:env(safe-area-inset-bottom,0px);
+        }
+        .nav-item {
+            display:flex; flex-direction:column; align-items:center;
+            padding:6px 0 4px; font-size:10px; color:var(--f1-text-muted);
+            transition:color 0.2s; cursor:pointer; user-select:none;
+        }
+        .nav-item.active { color:var(--f1-red); }
+        .nav-item .nav-icon { width:22px; height:22px; margin-bottom:2px; }
+
+        .btn-primary {
+            background:var(--f1-red); color:white; border:none; border-radius:12px;
+            padding:12px 24px; font-weight:700; font-size:15px; font-family:inherit;
+            cursor:pointer; transition:background 0.2s, transform 0.1s; user-select:none;
+        }
+        .btn-primary:active { background:var(--f1-red-dark); transform:scale(0.97); }
+
+        .pos-badge {
+            width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+            border-radius:8px; font-weight:900; font-size:13px; font-variant-numeric:tabular-nums;
+        }
+        .pos-1 { background:#FFD700; color:#000; } .pos-2 { background:#C0C0C0; color:#000; }
+        .pos-3 { background:#CD7F32; color:#000; } .pos-n { background:var(--f1-gray); color:#fff; }
+
+        .live-dot { width:8px; height:8px; background:var(--f1-red); border-radius:50%; animation:pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(225,6,0,0.5)} 50%{opacity:0.8;box-shadow:0 0 0 6px rgba(225,6,0,0)} }
+
+        .sector-best { color:#A020F0; font-weight:700; } .sector-pb { color:#39B54A; } .sector-normal { color:var(--f1-text-secondary); }
+
+        .countdown-block { background:var(--f1-card-solid); border-radius:12px; padding:8px 4px; text-align:center; min-width:60px; position:relative; overflow:hidden; }
+        .countdown-num { font-size:32px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; background:linear-gradient(180deg,#fff 0%,#aaa 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .countdown-label { font-size:9px; color:var(--f1-text-muted); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+        .fade-in { animation:fadeIn 0.35s ease-out; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+        .page-container { height:100dvh; padding-bottom:72px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+        .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }
+        .standings-row:active { background:var(--f1-card-hover); }
+        .standings-row:last-child { border-bottom:none; }
+
+        .tab-switch { display:flex; background:var(--f1-card-solid); border-radius:12px; padding:3px; gap:2px; }
+        .tab-switch-btn { flex:1; padding:10px 16px; border:none; border-radius:10px; background:transparent; color:var(--f1-text-muted); font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; transition:all 0.2s; }
+        .tab-switch-btn.active { background:var(--f1-red); color:white; }
+
+        .live-row {
+            display:grid; grid-template-columns:30px 5px 1fr 80px 26px 50px 22px;
+            align-items:center; gap:6px; padding:8px 12px;
+            border-bottom:1px solid var(--f1-border); font-variant-numeric:tabular-nums;
+            transition:background 0.3s; min-height:48px;
+        }
+        .live-row:active { background:rgba(255,255,255,0.03); }
+
+        .sector-bar { display:flex; gap:2px; height:4px; border-radius:2px; overflow:hidden; }
+        .sector-bar > div { flex:1; border-radius:2px; }
+        .sb-best { background:#A020F0; } .sb-pb { background:#39B54A; } .sb-normal { background:var(--f1-gray); }
+
+        .sector-time { text-align:center; padding:6px 4px; border-radius:6px; font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+        .st-best { background:rgba(160,32,240,0.2); color:#C880FF; }
+        .st-pb { background:rgba(57,181,74,0.15); color:#39B54A; }
+        .st-normal { background:rgba(255,255,255,0.03); color:var(--f1-text-secondary); }
+
+        .live-tabs { display:flex; gap:0; padding:0 12px; margin-bottom:8px; border-bottom:1px solid var(--f1-border); overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+        .live-tabs::-webkit-scrollbar { display:none; }
+        .live-tab { padding:10px 14px; font-size:12px; font-weight:600; font-family:inherit; color:var(--f1-text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+        .live-tab.active { color:var(--f1-red); border-bottom-color:var(--f1-red); }
+
+        .flag-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:4px; font-size:10px; font-weight:900; }
+        .flag-green{background:#39B54A;color:#fff} .flag-yellow{background:#FFD700;color:#000} .flag-red{background:#E10600;color:#fff} .flag-sc{background:#FF8000;color:#fff} .flag-chequered{background:#fff;color:#000}
+
+        .weather-strip { display:flex; gap:10px; padding:10px 12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+        .weather-strip::-webkit-scrollbar { display:none; }
+        .weather-pill { display:flex; align-items:center; gap:6px; padding:6px 12px; background:var(--f1-card-solid); border-radius:20px; white-space:nowrap; font-size:12px; flex-shrink:0; }
+        .weather-pill-val { font-weight:700; }
+        .rain-active { background:rgba(0,103,255,0.15); border:1px solid rgba(0,103,255,0.3); }
+
+        .pit-entry { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--f1-border); }
+        .pit-time { font-size:18px; font-weight:900; font-variant-numeric:tabular-nums; }
+        .radio-entry { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--f1-border); }
+        .radio-play-btn { width:36px; height:36px; border-radius:50%; background:var(--f1-red); border:none; color:white; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:14px; }
+
+        .driver-avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; background:var(--f1-gray); flex-shrink:0; }
+        .progress-bar-bg { height:4px; background:var(--f1-gray); border-radius:2px; overflow:hidden; }
+        .progress-bar-fill { height:100%; border-radius:2px; transition:width 0.5s ease; }
+
+        .news-card { background:var(--f1-card); backdrop-filter:blur(20px); border:1px solid var(--f1-border); border-radius:16px; overflow:hidden; margin-bottom:12px; box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .news-card-img { width:100%; height:180px; object-fit:cover; }
+        .news-card-body { padding:14px 16px; }
+
+        .stream-card { width:220px; flex-shrink:0; background:var(--f1-card); border:1px solid var(--f1-border); border-radius:14px; overflow:hidden; cursor:pointer; transition:transform 0.15s; }
+        .stream-card:active { transform:scale(0.96); }
+        .stream-thumb { width:100%; height:124px; object-fit:cover; background:var(--f1-gray); position:relative; }
+        .live-badge { position:absolute; top:8px; left:8px; background:var(--f1-red); color:#fff; font-size:10px; font-weight:900; padding:2px 8px; border-radius:4px; letter-spacing:1px; }
+
+        .gradient-card {
+            position:relative; overflow:hidden; border-radius:16px; padding:20px;
+            background:var(--f1-card); backdrop-filter:blur(20px);
+            border:1px solid var(--f1-border); box-shadow:0 4px 24px rgba(0,0,0,0.2);
+        }
+
+        .achievement-badge { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--f1-card-solid); border-radius:12px; border:1px solid var(--f1-border); }
+        .achievement-icon { font-size:28px; }
+        .achievement-locked { opacity:0.3; filter:grayscale(1); }
+
+        .divider-line { height:1px; background:linear-gradient(90deg,transparent,var(--f1-border),transparent); margin:4px 0; }
+
+        @keyframes flipIn { 0%{transform:rotateX(90deg);opacity:0} 100%{transform:rotateX(0);opacity:1} }
+        .flip-anim { animation:flipIn 0.3s ease-out; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.expand(); tg.setHeaderColor('#0F0F15'); tg.setBackgroundColor('#0F0F15'); }
+        const initData = tg?.initData || '';
+
+        // ==== API CLIENT ====
+        const api = {
+            get: async (url) => {
+                try {
+                    const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': initData } });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return await res.json();
+                } catch (err) { console.error(`API GET ${url}:`, err); return null; }
+            },
+            post: async (url, body) => {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+                        body: JSON.stringify(body)
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return await res.json();
+                } catch (err) { console.error(`API POST ${url}:`, err); return null; }
+            }
+        };
+
+        // ==== HELPERS ====
+        const formatTime = (s) => { if(s==null) return '\u2014'; const m=Math.floor(s/60); const sec=(s%60).toFixed(3); return m>0?`${m}:${sec.padStart(6,'0')}`:sec; };
+        const fmtSector = (v) => v != null ? v.toFixed(3) : '\u2014';
+        const fmtLap = (v) => { if(v==null) return '\u2014'; const m=Math.floor(v/60); const s=(v%60).toFixed(3); return m>0?`${m}:${s.padStart(6,'0')}`:s; };
+
+        const formatCountdown = (targetDate) => {
+            const now = new Date();
+            const target = new Date(targetDate);
+            let diff = Math.max(0, Math.floor((target - now) / 1000));
+            const days = Math.floor(diff / 86400); diff %= 86400;
+            const hours = Math.floor(diff / 3600); diff %= 3600;
+            const minutes = Math.floor(diff / 60);
+            const secs = diff % 60;
+            return { days, hours, minutes, seconds: secs };
+        };
+
+        const flagEmoji = (code) => {
+            const flags = {'NL':'\u{1F1F3}\u{1F1F1}','GB':'\u{1F1EC}\u{1F1E7}','MC':'\u{1F1F2}\u{1F1E8}','AU':'\u{1F1E6}\u{1F1FA}','ES':'\u{1F1EA}\u{1F1F8}','DE':'\u{1F1E9}\u{1F1EA}','FR':'\u{1F1EB}\u{1F1F7}','CA':'\u{1F1E8}\u{1F1E6}','TH':'\u{1F1F9}\u{1F1ED}','JP':'\u{1F1EF}\u{1F1F5}','IT':'\u{1F1EE}\u{1F1F9}','NZ':'\u{1F1F3}\u{1F1FF}','BR':'\u{1F1E7}\u{1F1F7}',
+                'Bahrain':'\u{1F1E7}\u{1F1ED}','Saudi Arabia':'\u{1F1F8}\u{1F1E6}','Australia':'\u{1F1E6}\u{1F1FA}','Japan':'\u{1F1EF}\u{1F1F5}','China':'\u{1F1E8}\u{1F1F3}','USA':'\u{1F1FA}\u{1F1F8}','Italy':'\u{1F1EE}\u{1F1F9}','Monaco':'\u{1F1F2}\u{1F1E8}','Spain':'\u{1F1EA}\u{1F1F8}','Canada':'\u{1F1E8}\u{1F1E6}','Austria':'\u{1F1E6}\u{1F1F9}','UK':'\u{1F1EC}\u{1F1E7}','Hungary':'\u{1F1ED}\u{1F1FA}','Belgium':'\u{1F1E7}\u{1F1EA}','Netherlands':'\u{1F1F3}\u{1F1F1}','Azerbaijan':'\u{1F1E6}\u{1F1FF}','Singapore':'\u{1F1F8}\u{1F1EC}','Mexico':'\u{1F1F2}\u{1F1FD}','Brazil':'\u{1F1E7}\u{1F1F7}','Qatar':'\u{1F1F6}\u{1F1E6}','UAE':'\u{1F1E6}\u{1F1EA}'};
+            return flags[code] || '\u{1F3F3}\u{FE0F}';
+        };
+
+        const openLink = (url) => { if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank'); };
+
+        // ==== SVG NAV ICONS ====
+        const NavIcons = {
+            home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+            live: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/></svg>,
+            news: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
+            calendar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+            trophy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>,
+            predict: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+            user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            analytics: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+        };
+
+        // ==== SKELETON ====
+        const Skeleton = ({w='100%',h='16px',r='8px',className=''}) => <div className={`skeleton ${className}`} style={{width:w,height:h,borderRadius:r}}/>;
+        const CardSkeleton = () => <div className="card" style={{display:'flex',flexDirection:'column',gap:12}}><Skeleton w="60%" h="20px"/><Skeleton w="100%" h="14px"/><Skeleton w="80%" h="14px"/></div>;
+
+        // ==== BOTTOM NAV ====
+        const BottomNav = ({active, onChange, isLive}) => {
+            const tabs = [
+                {id:'home', icon:NavIcons.home, label:'Главная'},
+                {id:'live', icon:NavIcons.live, label:'Live'},
+                {id:'analytics', icon:NavIcons.analytics, label:'Аналитика'},
+                {id:'news', icon:NavIcons.news, label:'Новости'},
+                {id:'standings', icon:NavIcons.trophy, label:'Чемпионат'},
+                {id:'predict', icon:NavIcons.predict, label:'Прогнозы'},
+                {id:'profile', icon:NavIcons.user, label:'Профиль'},
+            ];
+            return (
+                <div className="bottom-nav">
+                    <div style={{display:'flex',justifyContent:'space-around',maxWidth:500,margin:'0 auto'}}>
+                        {tabs.map(tab => (
+                            <div key={tab.id} className={`nav-item ${active===tab.id?'active':''}`} onClick={()=>onChange(tab.id)}>
+                                <span className="nav-icon" style={{position:'relative'}}>
+                                    {tab.icon}
+                                    {tab.id==='live' && isLive && <span className="live-dot" style={{position:'absolute',top:-2,right:-6}}/>}
+                                </span>
+                                <span>{tab.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // ==== COUNTDOWN ====
+        const Countdown = ({targetDate}) => {
+            const [time, setTime] = useState(formatCountdown(targetDate));
+            const [prevSec, setPrevSec] = useState(-1);
+            useEffect(() => {
+                const iv = setInterval(() => { const t = formatCountdown(targetDate); setPrevSec(time.seconds); setTime(t); }, 1000);
+                return () => clearInterval(iv);
+            }, [targetDate, time.seconds]);
+            return (
+                <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+                    {[{val:time.days,label:'дней'},{val:time.hours,label:'часов'},{val:time.minutes,label:'минут'},{val:time.seconds,label:'секунд'}].map((item,i)=>(
+                        <div key={i} className="countdown-block">
+                            <div className={`countdown-num ${i===3?'flip-anim':''}`} key={i===3?item.val:'s'}>{String(item.val).padStart(2,'0')}</div>
+                            <div className="countdown-label">{item.label}</div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const PosBadge = ({pos}) => <div className={`pos-badge ${pos<=3?`pos-${pos}`:'pos-n'}`}>{pos}</div>;
+        const TyreIcon = ({compound}) => <span className={`tyre-dot tyre-${compound||'UNKNOWN'}`} title={compound}/>;
+        const SectorBar = ({s1,s2,s3}) => <div className="sector-bar"><div className={`sb-${s1||'normal'}`}/><div className={`sb-${s2||'normal'}`}/><div className={`sb-${s3||'normal'}`}/></div>;
+        const FlagIcon = ({flag}) => {
+            const map = {'GREEN':{cls:'flag-green',text:'G'},'YELLOW':{cls:'flag-yellow',text:'!'},'DOUBLE YELLOW':{cls:'flag-yellow',text:'!!'},'RED':{cls:'flag-red',text:'R'},'CHEQUERED':{cls:'flag-chequered',text:'\u{1F3C1}'}};
+            const f = map[flag]||{cls:'',text:'\u2022'};
+            return <span className={`flag-icon ${f.cls}`}>{f.text}</span>;
+        };
+
+        const DriverPhoto = ({url, size=32, style:s={}}) => (
+            <img src={url} alt="" className="driver-avatar"
+                 style={{width:size,height:size,...s}}
+                 onError={e=>{e.target.style.display='none'}}
+                 loading="lazy"/>
+        );
+
+        // ==== HOME PAGE ====
+        const HomePage = ({nextRace, lastRace, standings, user, streams}) => {
+            if (!nextRace && !lastRace) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:16}}/><CardSkeleton/></div>;
+            return (
+                <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
+                    <div style={{textAlign:'center',padding:'8px 0'}}>
+                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 \u00b7 2025</div>
+                        <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
+                    </div>
+
+                    {nextRace && nextRace.name && (
+                        <div className="gradient-card" style={{minHeight:200}}>
+                            {nextRace.circuit_image && <img src={nextRace.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
+                            <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
+                            <div style={{position:'relative',zIndex:1}}>
+                                <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
+                                    \u{1F3C1} \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0433\u0440\u0430\u043D-\u043F\u0440\u0438
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                                    <span style={{fontSize:32}}>{flagEmoji(nextRace.country)}</span>
+                                    <div>
+                                        <div style={{fontSize:20,fontWeight:900}}>{nextRace.name}</div>
+                                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{nextRace.circuit} \u00b7 \u0420\u0430\u0443\u043D\u0434 {nextRace.round}</div>
+                                    </div>
+                                </div>
+                                {nextRace.race_datetime && <div style={{marginTop:16}}><Countdown targetDate={nextRace.race_datetime}/></div>}
+                                {nextRace.sessions && (
+                                    <div style={{marginTop:16,display:'flex',flexWrap:'wrap',gap:6}}>
+                                        {Object.entries(nextRace.sessions).map(([key,val])=>{
+                                            const names = {fp1:'FP1',fp2:'FP2',fp3:'FP3',qualifying:'\u041A\u0412\u0410\u041B\u0418',race:'\u0413\u041E\u041D\u041A\u0410',sprint:'\u0421\u041F\u0420\u0418\u041D\u0422',sprint_qualifying:'\u0421\u041A'};
+                                            return (
+                                                <div key={key} style={{background:key==='race'?'var(--f1-red)':'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:600}}>
+                                                    <div style={{opacity:0.7}}>{names[key]||key}</div>
+                                                    <div>{val.date?.slice(5)} {val.time?.slice(0,5)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {streams?.channels?.length > 0 && (
+                        <div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
+                                \u{1F4FA} \u0422\u0440\u0430\u043D\u0441\u043B\u044F\u0446\u0438\u0438 \u0438 \u0432\u0438\u0434\u0435\u043E
+                            </div>
+                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                {streams.channels.map((ch,i)=>{
+                                    const icons = {vk:'\u{1F4F9}',yt:'\u25B6\uFE0F',tg:'\u{1F4E8}'};
+                                    const colors = {vk:'#0077FF','yt':'#FF0000',tg:'#229ED9'};
+                                    return (
+                                        <div key={i} className="card" onClick={()=>openLink(ch.url)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:12,padding:'14px 16px'}}>
+                                            <div style={{width:42,height:42,borderRadius:12,background:`${colors[ch.icon]||'var(--f1-gray)'}22`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{icons[ch.icon]||'\u{1F517}'}</div>
+                                            <div style={{flex:1}}>
+                                                <div style={{fontWeight:700,fontSize:14}}>{ch.title}</div>
+                                                <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{ch.platform} \u00b7 {ch.channel}</div>
+                                            </div>
+                                            <div style={{color:'var(--f1-text-muted)',fontSize:18}}>\u2192</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {lastRace && lastRace.results && (
+                        <div className="card">
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u00b7 {lastRace.name}</div>
+                            {lastRace.results.slice(0,5).map((r,i)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
+                                    <PosBadge pos={r.position}/>
+                                    <div style={{background:r.team_color,width:4,height:32,borderRadius:2}}/>
+                                    {r.photo_url && <DriverPhoto url={r.photo_url} size={28}/>}
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontWeight:700,fontSize:14}}>{r.code || r.name?.split(' ').pop()}</div>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</div>
+                                    </div>
+                                    <div style={{fontWeight:700,fontSize:14,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{r.time||(r.points?`${r.points} pts`:'')}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {standings?.standings && (
+                        <div className="card">
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u0427\u0435\u043C\u043F\u0438\u043E\u043D\u0430\u0442 \u043F\u0438\u043B\u043E\u0442\u043E\u0432</div>
+                            {standings.standings.slice(0,3).map((s,i)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
+                                    <PosBadge pos={s.position}/>
+                                    <div style={{background:s.team_color,width:4,height:32,borderRadius:2}}/>
+                                    {s.photo_url && <DriverPhoto url={s.photo_url} size={28}/>}
+                                    <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{s.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div></div>
+                                    <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                        <div className="gradient-card" style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(225,6,0,0.12),var(--f1-card))'}}>
+                            <div style={{fontSize:32}}>&#x1F52E;</div>
+                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0423\u0433\u0430\u0434\u0430\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442</div>
+                        </div>
+                        <div className="gradient-card" style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(102,146,255,0.12),var(--f1-card))'}}>
+                            <div style={{fontSize:32}}>&#x1F3AE;</div>
+                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>\u0418\u0433\u0440\u044B</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0417\u0430\u0440\u0430\u0431\u043E\u0442\u0430\u0439 \u043E\u0447\u043A\u0438</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==== LIVE PAGE ====
+        const LivePage = ({session, positions, timing, weather, raceControl}) => {
+            const [liveTab, setLiveTab] = useState('positions');
+            const [expandedRow, setExpandedRow] = useState(null);
+            const [radioData, setRadioData] = useState(null);
+            const [pitData, setPitData] = useState(null);
+            const [audioPlaying, setAudioPlaying] = useState(null);
+            const audioRef = useRef(null);
+            const isLive = session?.is_live;
+
+            useEffect(() => {
+                if (liveTab === 'radio' && !radioData) api.get('/api/live/radio').then(setRadioData);
+                if (liveTab === 'pits' && !pitData) api.get('/api/live/pit-stops').then(setPitData);
+            }, [liveTab]);
+
+            const playRadio = (url) => {
+                if (audioRef.current) audioRef.current.pause();
+                if (audioPlaying === url) { setAudioPlaying(null); return; }
+                const audio = new Audio(url); audioRef.current = audio;
+                audio.play().catch(()=>{}); audio.onended = () => setAudioPlaying(null); setAudioPlaying(url);
+            };
+            useEffect(() => () => { if (audioRef.current) audioRef.current.pause(); }, []);
+
+            if (!session) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+
+            const timingMap = {};
+            if (timing?.timing) timing.timing.forEach(t => { timingMap[t.driver_number] = t; });
+
+            return (
+                <div className="page-container fade-in" style={{padding:0}}>
+                    <div style={{padding:'10px 16px 0'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                            {isLive && <span className="live-dot"/>}
+                            <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':'var(--f1-text-muted)'}}>{isLive?'LIVE':'\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0441\u0435\u0441\u0441\u0438\u044F'}</span>
+                            {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>\u041B\u0443\u0447\u0448\u0438\u0439: {fmtLap(timing.session_best.lap)}</span>}
+                        </div>
+                        <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Grand Prix'}</h2>
+                        <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} \u00b7 {session.circuit_short_name}</div>
+                    </div>
+
+                    {weather?.weather && (
+                        <div className="weather-strip">
+                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'\u{1F327}\u{FE0F}':'\u2600\u{FE0F}'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'\u2014'}\u00b0C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F3C1}</span><span>\u0422\u0440\u0430\u0441\u0441\u0430 </span><span className="weather-pill-val">{weather.weather.track_temperature||'\u2014'}\u00b0C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F4A7}</span><span className="weather-pill-val">{weather.weather.humidity||'\u2014'}%</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F4A8}</span><span className="weather-pill-val">{weather.weather.wind_speed||'\u2014'} \u043C/\u0441</span></div>
+                        </div>
+                    )}
+
+                    {raceControl?.messages?.length > 0 && (() => {
+                        const last = raceControl.messages[raceControl.messages.length-1];
+                        const isFlag = last.flag==='RED'||last.flag==='YELLOW'||last.flag==='DOUBLE YELLOW';
+                        if (!isFlag && last.category !== 'SafetyCar') return null;
+                        return (
+                            <div style={{margin:'4px 12px 8px',padding:'8px 12px',borderRadius:10,display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:600,
+                                background:last.flag==='RED'?'rgba(225,6,0,0.2)':last.flag==='YELLOW'||last.flag==='DOUBLE YELLOW'?'rgba(255,215,0,0.12)':'rgba(255,128,0,0.12)',
+                                border:`1px solid ${last.flag==='RED'?'rgba(225,6,0,0.4)':last.flag==='YELLOW'||last.flag==='DOUBLE YELLOW'?'rgba(255,215,0,0.3)':'rgba(255,128,0,0.3)'}`,
+                                animation:'fadeIn 0.3s ease-out'}}>
+                                <FlagIcon flag={last.flag||'YELLOW'}/><span style={{flex:1}}>{last.message}</span>
+                                {last.lap_number && <span style={{color:'var(--f1-text-muted)'}}>L{last.lap_number}</span>}
+                            </div>
+                        );
+                    })()}
+
+                    <div className="live-tabs">
+                        {[{id:'positions',label:'\u041F\u043E\u0437\u0438\u0446\u0438\u0438'},{id:'sectors',label:'\u0421\u0435\u043A\u0442\u043E\u0440\u044B'},{id:'pits',label:'\u041F\u0438\u0442-\u0441\u0442\u043E\u043F\u044B'},{id:'radio',label:'\u0420\u0430\u0434\u0438\u043E'},{id:'messages',label:'\u0414\u0438\u0440\u0435\u043A\u0446\u0438\u044F'}].map(t=>(
+                            <button key={t.id} className={`live-tab ${liveTab===t.id?'active':''}`} onClick={()=>setLiveTab(t.id)}>{t.label}</button>
+                        ))}
+                    </div>
+
+                    {liveTab==='positions' && (positions?.positions?.length>0 ? (
+                        <div>
+                            <div className="live-row" style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5,minHeight:28,padding:'4px 12px'}}>
+                                <span>P</span><span></span><span>\u041F\u0438\u043B\u043E\u0442</span><span style={{textAlign:'center'}}>\u0412\u0440\u0435\u043C\u044F</span><span style={{textAlign:'center'}}>\u0428</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>\u{1F527}</span>
+                            </div>
+                            {positions.positions.map((p,i) => {
+                                const t = timingMap[p.driver_number]; const isExp = expandedRow===p.driver_number;
+                                return (
+                                    <div key={p.driver_number}>
+                                        <div className={`live-row ${isExp?'live-row-expanded':''}`} onClick={()=>setExpandedRow(isExp?null:p.driver_number)}
+                                             style={{background:i%2===0?'transparent':`${p.team_color}08`,cursor:'pointer'}}>
+                                            <PosBadge pos={p.position}/>
+                                            <div style={{background:p.team_color,width:5,height:34,borderRadius:2,alignSelf:'center'}}/>
+                                            <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:14,lineHeight:1.2}}>{p.code||p.name?.split(' ').pop()}</div>{t&&<SectorBar s1={t.s1_status} s2={t.s2_status} s3={t.s3_status}/>}</div>
+                                            <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:t?.is_best_lap?'#A020F0':t?.is_personal_best?'#39B54A':'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{t?fmtLap(t.lap_duration):'\u2014'}</div>
+                                            <div style={{textAlign:'center',position:'relative'}}><TyreIcon compound={p.tyre}/>{p.tyre_age>0&&<div style={{fontSize:8,color:'var(--f1-text-muted)',position:'absolute',bottom:-4,left:'50%',transform:'translateX(-50%)',fontWeight:600}}>{p.tyre_age}L</div>}</div>
+                                            <div style={{textAlign:'right',fontSize:11,fontWeight:600,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{i===0?<span style={{color:'var(--f1-text-muted)',fontSize:10}}>INT</span>:t?.interval?`+${t.interval}`:t?.gap_to_leader?`+${t.gap_to_leader}`:'\u2014'}</div>
+                                            <div style={{textAlign:'center',fontSize:12,color:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.pit_stops||0}</div>
+                                        </div>
+                                        {isExp && t && (
+                                            <div style={{padding:'4px 12px 12px',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,background:'rgba(255,255,255,0.015)',borderBottom:'1px solid var(--f1-border)',animation:'fadeIn 0.2s ease-out'}}>
+                                                <div className={`sector-time st-${t.s1_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S1</div>{fmtSector(t.sector_1)}</div>
+                                                <div className={`sector-time st-${t.s2_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S2</div>{fmtSector(t.sector_2)}</div>
+                                                <div className={`sector-time st-${t.s3_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S3</div>{fmtSector(t.sector_3)}</div>
+                                                <div style={{gridColumn:'1/-1',display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--f1-text-muted)',padding:'4px 4px 0'}}>
+                                                    <span>\u041A\u0440\u0443\u0433 {t.lap_number}</span><span>\u0421\u0442\u0438\u043D\u0442 #{p.stint_number} \u00b7 {p.tyre} {p.tyre_age>0?`(${p.tyre_age} \u043A\u0440\u0443\u0433\u043E\u0432)`:''}</span>{t.gap_to_leader&&<span>Gap: +{t.gap_to_leader}</span>}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F3CE}\u{FE0F}</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445...':'\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438'}</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043A\u043E\u0433\u0434\u0430 \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0441\u0435\u0441\u0441\u0438\u044F</div></div>
+                    ))}
+
+                    {liveTab==='sectors' && (timing?.timing?.length>0 ? (
+                        <div style={{padding:'0 8px'}}>
+                            <div style={{display:'grid',gridTemplateColumns:'40px 1fr 64px 64px 64px 72px',gap:4,padding:'6px 8px',fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',borderBottom:'1px solid var(--f1-border)'}}>
+                                <span>\u041A\u043E\u0434</span><span></span><span style={{textAlign:'center'}}>S1</span><span style={{textAlign:'center'}}>S2</span><span style={{textAlign:'center'}}>S3</span><span style={{textAlign:'center'}}>\u041A\u0440\u0443\u0433</span>
+                            </div>
+                            {(positions?.positions||[]).map((p,i) => {
+                                const t = timingMap[p.driver_number]; if(!t) return null;
+                                return (
+                                    <div key={p.driver_number} style={{display:'grid',gridTemplateColumns:'40px 1fr 64px 64px 64px 72px',gap:4,padding:'7px 8px',alignItems:'center',borderBottom:'1px solid var(--f1-border)',fontSize:12,background:i%2?`${p.team_color}06`:'transparent'}}>
+                                        <span style={{fontWeight:700,color:p.team_color}}>{p.code}</span>
+                                        <div style={{width:4,height:20,background:p.team_color,borderRadius:2}}/>
+                                        <div className={`sector-time st-${t.s1_status}`}>{fmtSector(t.sector_1)}</div>
+                                        <div className={`sector-time st-${t.s2_status}`}>{fmtSector(t.sector_2)}</div>
+                                        <div className={`sector-time st-${t.s3_status}`}>{fmtSector(t.sector_3)}</div>
+                                        <div style={{textAlign:'center',fontWeight:700,color:t.is_best_lap?'#A020F0':t.is_personal_best?'#39B54A':'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{fmtLap(t.lap_duration)}</div>
+                                    </div>
+                                );
+                            })}
+                            {timing.session_best && (
+                                <div style={{padding:'12px 8px',borderTop:'2px solid var(--f1-border)',marginTop:4}}>
+                                    <div style={{fontSize:10,color:'#A020F0',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>\u041B\u0443\u0447\u0448\u0438\u0435 \u0441\u0435\u043A\u0442\u043E\u0440\u044B \u0441\u0435\u0441\u0441\u0438\u0438</div>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6}}>
+                                        {[{label:'S1',val:timing.session_best.sector_1},{label:'S2',val:timing.session_best.sector_2},{label:'S3',val:timing.session_best.sector_3},{label:'\u041A\u0440\u0443\u0433',val:timing.session_best.lap}].map((s,i)=>(
+                                            <div key={i} className="sector-time st-best" style={{padding:8}}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>{s.label}</div>{i<3?fmtSector(s.val):fmtLap(s.val)}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043F\u043E \u0441\u0435\u043A\u0442\u043E\u0440\u0430\u043C</div>)}
+
+                    {liveTab==='pits' && (pitData?.pit_stops?.length>0 ? (
+                        <div>{pitData.pit_stops.slice().reverse().map((p,i)=>(
+                            <div key={i} className="pit-entry">
+                                <div style={{width:36,height:36,borderRadius:10,background:`${p.team_color}22`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:p.team_color,flexShrink:0}}>{p.code||p.driver_number}</div>
+                                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{p.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u041A\u0440\u0443\u0433 {p.lap_number||'?'} \u00b7 {p.team}</div></div>
+                                <div className="pit-time" style={{color:p.pit_duration&&p.pit_duration<25?'#39B54A':p.pit_duration&&p.pit_duration<30?'var(--f1-text)':'#FFD700'}}>{p.pit_duration?`${p.pit_duration.toFixed(1)}s`:'\u2014'}</div>
+                            </div>
+                        ))}</div>
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F527}</div>\u041D\u0435\u0442 \u043F\u0438\u0442-\u0441\u0442\u043E\u043F\u043E\u0432</div>)}
+
+                    {liveTab==='radio' && (radioData?.radio?.length>0 ? (
+                        <div><audio ref={audioRef}/>
+                            {radioData.radio.slice().reverse().map((r,i)=>(
+                                <div key={i} className="radio-entry">
+                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'\u23F8':'\u25B6'}</button>
+                                    <div style={{flex:1}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:4,height:16,borderRadius:2,background:r.team_color}}/><span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span></div>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{r.team} \u00b7 {r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F4FB}</div>\u041D\u0435\u0442 \u0440\u0430\u0434\u0438\u043E\u043F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043E\u0432</div>)}
+
+                    {liveTab==='messages' && (raceControl?.messages?.length>0 ? (
+                        <div style={{padding:'4px 0'}}>{raceControl.messages.slice().reverse().map((msg,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 16px',borderBottom:'1px solid var(--f1-border)'}}>
+                                <FlagIcon flag={msg.flag||'GREEN'}/>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:13,lineHeight:1.4}}>{msg.message}</div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:3,display:'flex',gap:8}}>
+                                        {msg.lap_number&&<span>\u041A\u0440\u0443\u0433 {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}</div>
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F4CB}</div>\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0434\u0438\u0440\u0435\u043A\u0446\u0438\u0438</div>)}
+                </div>
+            );
+        };
+
+        // ==== NEWS PAGE ====
+        const NewsPage = () => {
+            const [news, setNews] = useState(null);
+            const [loading, setLoading] = useState(true);
+            useEffect(() => { api.get('/api/news').then(d => { setNews(d); setLoading(false); }); }, []);
+
+            if (loading) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>\u041D\u043E\u0432\u043E\u0441\u0442\u0438</h2>
+                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{news?.channel || '@stanizlavsky'}</div>
+
+                    {news?.posts?.length > 0 ? (
+                        news.posts.slice().reverse().map((post,i) => (
+                            <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)} style={{cursor:'pointer'}}>
+                                {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                <div className="news-card-body">
+                                    {post.text && <div style={{fontSize:14,lineHeight:1.5,whiteSpace:'pre-line',marginBottom:8}}>{post.text.length>300?post.text.slice(0,300)+'...':post.text}</div>}
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date ? new Date(post.date).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+                                        {post.views && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u{1F441} {post.views}</div>}
+                                    </div>
+                                    <div style={{marginTop:8,fontSize:12,color:'var(--f1-red)',fontWeight:600}}>\u0427\u0438\u0442\u0430\u0442\u044C \u0432 Telegram \u2192</div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
+                            <div style={{fontSize:48,marginBottom:12}}>\u{1F4F0}</div>
+                            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>\u041D\u043E\u0432\u043E\u0441\u0442\u0438 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u044E\u0442\u0441\u044F...</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>\u041F\u043E\u0434\u043F\u0438\u0448\u0438\u0441\u044C \u043D\u0430 \u043A\u0430\u043D\u0430\u043B \u0434\u043B\u044F \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u043D\u043E\u0432\u043E\u0441\u0442\u0435\u0439</div>
+                            <button className="btn-primary" onClick={()=>openLink('https://t.me/stanizlavsky')}>\u041E\u0442\u043A\u0440\u044B\u0442\u044C @stanizlavsky</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ==== SCHEDULE PAGE ====
+        const SchedulePage = ({schedule}) => {
+            if (!schedule?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
+            const now = new Date();
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>\u0421\u0435\u0437\u043E\u043D {schedule.season||'2025'}</h2>
+                    {schedule.races.map((race,i)=>{
+                        const raceDate = new Date(race.date); const isPast = raceDate < now;
+                        const isNext = !isPast && (i===0 || new Date(schedule.races[i-1]?.date)<now);
+                        return (
+                            <div key={race.round} className="card" style={{marginBottom:10,opacity:isPast?0.5:1,borderColor:isNext?'var(--f1-red)':'var(--f1-border)',borderWidth:isNext?2:1,position:'relative',overflow:'hidden'}}>
+                                {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:80,height:'100%',objectFit:'contain',opacity:0.06,pointerEvents:'none'}}/>}
+                                <div style={{display:'flex',alignItems:'center',gap:12,position:'relative'}}>
+                                    <div style={{width:40,height:40,borderRadius:10,background:isNext?'var(--f1-red)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:16,flexShrink:0}}>{race.round}</div>
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:6}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{race.name?.replace('Grand Prix','GP')}</span></div>
+                                        <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{race.circuit} \u00b7 {race.date}</div>
+                                    </div>
+                                    {isPast && <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>\u2713</div>}
+                                    {isNext && <div style={{fontSize:10,fontWeight:700,color:'var(--f1-red)',textTransform:'uppercase',letterSpacing:1}}>NEXT</div>}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // ==== STANDINGS PAGE ====
+        const StandingsPage = ({driversStandings, constructorsStandings}) => {
+            const [tab, setTab] = useState('drivers');
+            const [selectedDriver, setSelectedDriver] = useState(null);
+            const [driverDetail, setDriverDetail] = useState(null);
+            const [allDrivers, setAllDrivers] = useState(null);
+            useEffect(() => { if (tab==='cards' && !allDrivers) api.get('/api/drivers').then(d=>setAllDrivers(d?.drivers||[])); }, [tab]);
+
+            const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}`)); };
+
+            if (selectedDriver && driverDetail) {
+                const d = driverDetail, stats = d.season_stats;
+                return (
+                    <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                        <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>\u2190 \u041D\u0430\u0437\u0430\u0434</button>
+                        <div className="gradient-card" style={{marginBottom:16}}>
+                            <div style={{position:'absolute',top:0,left:0,bottom:0,width:6,background:d.team_color,borderRadius:'16px 0 0 16px'}}/>
+                            <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:12}}>
+                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:64,height:64,borderRadius:12,objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${d.team_color}`}} onError={e=>{e.target.style.display='none'}}/>}
+                                <div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.country)} {d.country}</div>
+                                    <div style={{fontSize:20,fontWeight:900,lineHeight:1.1}}>{d.first_name}<br/><span style={{color:d.team_color}}>{d.last_name}</span></div>
+                                    <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginTop:2}}>{d.team}</div>
+                                </div>
+                                <div style={{marginLeft:'auto',fontSize:36,fontWeight:900,opacity:0.15,color:d.team_color}}>{d.driver_number}</div>
+                            </div>
+                        </div>
+                        {stats && (<>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
+                                {[{val:stats.points,label:'\u041E\u0447\u043A\u0438'},{val:stats.wins,label:'\u041F\u043E\u0431\u0435\u0434'},{val:stats.podiums,label:'\u041F\u043E\u0434\u0438\u0443\u043C'},{val:stats.dnfs,label:'DNF'}].map((s,i)=>(
+                                    <div key={i} className="card" style={{textAlign:'center',padding:10}}><div style={{fontSize:20,fontWeight:900}}>{s.val}</div><div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{s.label}</div></div>
+                                ))}
+                            </div>
+                            <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u044B \u0441\u0435\u0437\u043E\u043D\u0430</div>
+                                {stats.results?.map((r,i)=>(
+                                    <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:i<stats.results.length-1?'1px solid var(--f1-border)':'none'}}>
+                                        <span style={{width:30,fontSize:11,color:'var(--f1-text-muted)'}}>R{r.round}</span><span style={{flex:1,fontSize:13}}>{r.race?.replace('Grand Prix','GP')}</span><PosBadge pos={r.position}/><span style={{width:36,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>)}
+                        {d.teammate && (
+                            <div className="card" style={{marginTop:12}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>\u041D\u0430\u043F\u0430\u0440\u043D\u0438\u043A</div>
+                                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                    {d.teammate.photo_url && <DriverPhoto url={d.teammate.photo_url} size={36}/>}
+                                    <div><div style={{fontWeight:700,fontSize:14}}>{d.teammate.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.teammate.country)} {d.teammate.code}</div></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            const data = tab==='drivers'?driversStandings:tab==='constructors'?constructorsStandings:null;
+            const leaderPts = data?.standings?.[0]?.points || 1;
+
+            return (
+                <div className="page-container fade-in">
+                    <div style={{padding:'12px 16px'}}>
+                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>\u0427\u0435\u043C\u043F\u0438\u043E\u043D\u0430\u0442</h2>
+                        <div className="tab-switch" style={{marginBottom:16}}>
+                            <button className={`tab-switch-btn ${tab==='drivers'?'active':''}`} onClick={()=>setTab('drivers')}>\u041F\u0438\u043B\u043E\u0442\u044B</button>
+                            <button className={`tab-switch-btn ${tab==='constructors'?'active':''}`} onClick={()=>setTab('constructors')}>\u041A\u043E\u043C\u0430\u043D\u0434\u044B</button>
+                            <button className={`tab-switch-btn ${tab==='cards'?'active':''}`} onClick={()=>setTab('cards')}>\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0438</button>
+                        </div>
+                    </div>
+
+                    {(tab==='drivers'||tab==='constructors') && (!data?.standings ? (
+                        <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="48px" className="mb-3"/>)}</div>
+                    ) : (
+                        <div>
+                            {data.standings.map((s,i)=>(
+                                <React.Fragment key={i}>
+                                    {(i===3||i===10) && <div className="divider-line" style={{margin:'2px 16px'}}/>}
+                                    <div className="standings-row" onClick={()=>tab==='drivers'&&s.driver_number?openDriver(s.driver_number):null} style={{cursor:tab==='drivers'?'pointer':'default'}}>
+                                        <PosBadge pos={s.position}/>
+                                        <div style={{background:s.team_color,width:4,height:36,borderRadius:2}}/>
+                                        {tab==='drivers' && s.photo_url && <DriverPhoto url={s.photo_url} size={32}/>}
+                                        <div style={{flex:1}}>
+                                            <div style={{fontWeight:700,fontSize:14}}>{tab==='drivers'?s.name:s.team}</div>
+                                            {tab==='drivers' && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div>}
+                                            {tab==='constructors' && s.drivers && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.drivers.map(d=>d.code).join(' \u00b7 ')}</div>}
+                                            <div className="progress-bar-bg" style={{marginTop:4,width:'100%',maxWidth:120}}>
+                                                <div className="progress-bar-fill" style={{width:`${Math.max(3,(s.points/leaderPts)*100)}%`,background:s.team_color}}/>
+                                            </div>
+                                        </div>
+                                        <div style={{textAlign:'right'}}>
+                                            <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                            {s.gap_to_leader>0 && <div style={{fontSize:10,color:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>-{s.gap_to_leader}</div>}
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    ))}
+
+                    {tab==='cards' && (
+                        <div style={{padding:'0 16px'}}>
+                            {!allDrivers ? (
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>{[1,2,3,4,5,6].map(i=><Skeleton key={i} h="110px" r="16px"/>)}</div>
+                            ) : (
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                    {allDrivers.map(d=>(
+                                        <div key={d.driver_number} className="gradient-card" onClick={()=>openDriver(d.driver_number)}
+                                             style={{cursor:'pointer',padding:'14px 12px',background:`linear-gradient(135deg,${d.team_color}30,var(--f1-card) 70%)`}}>
+                                            <div style={{position:'absolute',top:8,right:10,fontSize:32,fontWeight:900,color:d.team_color,opacity:0.15,lineHeight:1}}>{d.driver_number}</div>
+                                            <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
+                                                <div style={{flex:1,paddingLeft:4,position:'relative',zIndex:1}}>
+                                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.country)} {d.first_name||d.name?.split(' ')[0]}</div>
+                                                    <div style={{fontSize:15,fontWeight:900,lineHeight:1.2}}>{d.last_name||d.name?.split(' ').slice(1).join(' ')}</div>
+                                                    <div style={{fontSize:11,color:d.team_color,fontWeight:600,marginTop:2}}>{d.team?.split(' ')[0]}</div>
+                                                </div>
+                                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:48,height:48,borderRadius:10,objectFit:'cover',background:'transparent',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ==== PREDICTIONS PAGE ====
+        const PredictionsPage = ({user}) => {
+            const [available, setAvailable] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [selected, setSelected] = useState({});
+            const [podiumPicks, setPodiumPicks] = useState([]);
+            const [submitting, setSubmitting] = useState(false);
+            const [myPredictions, setMyPredictions] = useState([]);
+            useEffect(() => { (async()=>{ const [a,p] = await Promise.all([api.get('/api/predictions/available'),api.get('/api/user/predictions')]); setAvailable(a); setMyPredictions(p?.predictions||[]); setLoading(false); })(); }, []);
+            const handlePredict = async (type, value) => {
+                if (!available?.race?.round) return; setSubmitting(true);
+                const result = await api.post('/api/predictions/make',{race_round:available.race.round,season:2025,prediction_type:type,prediction_value:value});
+                if (result?.status==='ok') { setSelected(prev=>({...prev,[type]:value})); const p=await api.get('/api/user/predictions'); setMyPredictions(p?.predictions||[]); }
+                setSubmitting(false);
+            };
+            if (loading) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</h2>
+                    {available?.available && available.race ? (<>
+                        <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{flagEmoji(available.race.country)} {available.race.name} \u00b7 \u0420\u0430\u0443\u043D\u0434 {available.race.round}</div>
+                        {available.predictions?.map(pred=>(
+                            <div key={pred.type} className="card" style={{marginBottom:10}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                                    <div><div style={{fontWeight:700,fontSize:15}}>{pred.label}</div><div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{pred.description}</div></div>
+                                    <div style={{background:'rgba(225,6,0,0.15)',borderRadius:8,padding:'4px 8px',fontSize:12,fontWeight:700,color:'var(--f1-red)'}}>+{pred.max_points}</div>
+                                </div>
+                                {pred.already_predicted || selected[pred.type] ? (
+                                    <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(57,181,74,0.1)',color:'#39B54A',fontSize:13,fontWeight:600}}>\u2713 \u041F\u0440\u043E\u0433\u043D\u043E\u0437 \u0441\u0434\u0435\u043B\u0430\u043D</div>
+                                ) : pred.type==='winner'||pred.type==='fastest_lap' ? (
+                                    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                                        {available.drivers?.slice(0,20).map(d=>(
+                                            <button key={d.driver_number} onClick={()=>handlePredict(pred.type,d.driver_number)} disabled={submitting}
+                                                style={{background:`${d.team_color}44`,border:`1px solid ${d.team_color}66`,borderRadius:8,padding:'6px 10px',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:submitting?0.5:1,transition:'transform 0.1s'}}>{d.code}</button>
+                                        ))}
+                                    </div>
+                                ) : pred.type==='podium' ? (
+                                    <div>
+                                        <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:6}}>\u0412\u044B\u0431\u0440\u0430\u043D\u043E: {podiumPicks.length}/3 {podiumPicks.length===3&&<span style={{color:'#39B54A',marginLeft:8}}>\u0413\u043E\u0442\u043E\u0432\u043E!</span>}</div>
+                                        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                                            {available.drivers?.slice(0,20).map(d=>{
+                                                const picked=podiumPicks.includes(d.driver_number), idx=podiumPicks.indexOf(d.driver_number);
+                                                return (
+                                                    <button key={d.driver_number} onClick={()=>{if(picked)setPodiumPicks(p=>p.filter(n=>n!==d.driver_number));else if(podiumPicks.length<3)setPodiumPicks(p=>[...p,d.driver_number]);}} disabled={submitting}
+                                                        style={{background:picked?d.team_color:`${d.team_color}33`,border:`2px solid ${picked?d.team_color:d.team_color+'44'}`,borderRadius:8,padding:'6px 10px',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1}}>
+                                                        {picked&&<span style={{marginRight:4}}>{idx+1}.</span>}{d.code}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {podiumPicks.length===3 && <button className="btn-primary" style={{width:'100%',marginTop:10}} onClick={()=>handlePredict('podium',podiumPicks)} disabled={submitting}>\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043F\u043E\u0434\u0438\u0443\u043C</button>}
+                                    </div>
+                                ) : pred.type==='safety_car' ? (
+                                    <div style={{display:'flex',gap:8}}>
+                                        <button className="btn-primary" style={{flex:1}} onClick={()=>handlePredict('safety_car','yes')} disabled={submitting}>\u0414\u0430</button>
+                                        <button className="btn-primary" style={{flex:1,background:'var(--f1-gray)'}} onClick={()=>handlePredict('safety_car','no')} disabled={submitting}>\u041D\u0435\u0442</button>
+                                    </div>
+                                ) : pred.type==='dnf_count' ? (
+                                    <div style={{display:'flex',gap:6}}>{[0,1,2,3,4,5].map(n=>(
+                                        <button key={n} onClick={()=>handlePredict('dnf_count',n)} disabled={submitting} style={{flex:1,padding:'10px 0',background:'rgba(255,255,255,0.05)',border:'1px solid var(--f1-border)',borderRadius:8,color:'white',fontSize:16,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{n}</button>
+                                    ))}</div>
+                                ) : null}
+                            </div>
+                        ))}
+                    </>) : (
+                        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F52E}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432</div><div style={{fontSize:13}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B \u043E\u0442\u043A\u0440\u043E\u044E\u0442\u0441\u044F \u043F\u0435\u0440\u0435\u0434 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0433\u043E\u043D\u043A\u043E\u0439</div></div>
+                    )}
+                    {myPredictions.length>0 && (
+                        <div style={{marginTop:20}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u041C\u043E\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</div>
+                            {myPredictions.slice(0,10).map((p,i)=>(
+                                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--f1-border)',fontSize:13}}>
+                                    <div><span style={{fontWeight:600}}>R{p.race_round}</span><span style={{color:'var(--f1-text-muted)',marginLeft:8}}>{p.prediction_type}</span></div>
+                                    <div style={{fontWeight:700,color:p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.status==='pending'?'\u23F3':p.status==='correct'?`\u2713 +${p.points_won}`:p.status==='partial'?`~ +${p.points_won}`:'\u2717'}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ==== PROFILE PAGE ====
+        const ProfilePage = ({user}) => {
+            const [leaderboard, setLeaderboard] = useState(null);
+            const [achievements, setAchievements] = useState(null);
+            useEffect(() => { api.get('/api/leaderboard').then(setLeaderboard); api.get('/api/user/achievements').then(setAchievements); }, []);
+            if (!user) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/></div>;
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <div className="card" style={{textAlign:'center',marginBottom:16,position:'relative',overflow:'hidden'}}>
+                        <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,rgba(225,6,0,0.2),transparent)'}}/>
+                        <div style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,position:'relative',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}}>{user.first_name?.[0]||'?'}</div>
+                        <div style={{fontSize:20,fontWeight:900}}>{user.first_name}</div>
+                        {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)'}}>@{user.username}</div>}
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:16}}>
+                            <div><div style={{fontSize:24,fontWeight:900,color:'var(--f1-red)'}}>{user.points}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u041E\u0447\u043A\u0438</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900}}>#{user.rank||'\u2014'}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0420\u0435\u0439\u0442\u0438\u043D\u0433</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u{1F525} \u0421\u0435\u0440\u0438\u044F</div></div>
+                        </div>
+                    </div>
+
+                    <div className="card" style={{marginBottom:16}}>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430</div>
+                        {[{label:'\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432 \u0441\u0434\u0435\u043B\u0430\u043D\u043E',value:user.predictions_total||0,max:50,color:'var(--f1-red)'},
+                          {label:'\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432 \u0443\u0433\u0430\u0434\u0430\u043D\u043E',value:user.predictions_correct||0,max:user.predictions_total||1,color:'#39B54A'},
+                          {label:'\u0422\u043E\u0447\u043D\u043E\u0441\u0442\u044C',value:user.predictions_total?Math.round(user.predictions_correct/user.predictions_total*100)+'%':'\u2014'},
+                          {label:'\u041C\u0430\u043A\u0441. \u0441\u0435\u0440\u0438\u044F',value:user.max_streak||0},
+                          {label:'\u0418\u0433\u0440 \u0441\u044B\u0433\u0440\u0430\u043D\u043E',value:user.games_played||0,max:50,color:'#6692FF'}
+                        ].map((stat,i)=>(
+                            <div key={i} style={{padding:'8px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:stat.max?4:0}}>
+                                    <span style={{color:'var(--f1-text-secondary)',fontSize:14}}>{stat.label}</span>
+                                    <span style={{fontWeight:700,fontSize:14,fontVariantNumeric:'tabular-nums'}}>{stat.value}</span>
+                                </div>
+                                {stat.max && <div className="progress-bar-bg"><div className="progress-bar-fill" style={{width:`${Math.min(100,(typeof stat.value==='number'?stat.value:0)/stat.max*100)}%`,background:stat.color}}/></div>}
+                            </div>
+                        ))}
+                    </div>
+
+                    {achievements && (
+                        <div style={{marginBottom:16}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u0414\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u044F ({achievements.achievements?.length||0}/{achievements.total||0})</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                {achievements.all_achievements && Object.entries(achievements.all_achievements).map(([key,ach])=>{
+                                    const unlocked = achievements.achievements?.some(a=>a.key===key);
+                                    return (
+                                        <div key={key} className={`achievement-badge ${unlocked?'':'achievement-locked'}`}>
+                                            <span className="achievement-icon">{ach.icon}</span>
+                                            <div style={{flex:1}}>
+                                                <div style={{fontWeight:700,fontSize:14}}>{ach.name}</div>
+                                                <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{ach.desc}</div>
+                                            </div>
+                                            {unlocked && <span style={{color:'#39B54A',fontSize:16,fontWeight:900}}>\u2713</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {leaderboard?.leaderboard && (
+                        <div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u041B\u0438\u0434\u0435\u0440\u0431\u043E\u0440\u0434</div>
+                            <div className="card" style={{padding:0,overflow:'hidden'}}>
+                                {leaderboard.leaderboard.slice(0,20).map((entry,i)=>(
+                                    <div key={entry.user_id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',borderBottom:'1px solid var(--f1-border)',background:entry.user_id===user.user_id?'rgba(225,6,0,0.08)':'transparent'}}>
+                                        <div style={{width:28,fontWeight:900,fontSize:14,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{entry.rank}</div>
+                                        <div style={{width:36,height:36,borderRadius:'50%',background:i<3?`linear-gradient(135deg,${['#FFD700','#C0C0C0','#CD7F32'][i]}33,var(--f1-gray))`:'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14}}>{entry.first_name?.[0]||'?'}</div>
+                                        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{entry.first_name}</div>{entry.username&&<div style={{fontSize:11,color:'var(--f1-text-muted)'}}>@{entry.username}</div>}</div>
+                                        <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{entry.total_points}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ==== ANALYTICS PAGE ====
+        const AnalyticsPage = () => {
+            const [aTab, setATab] = useState('strategy');
+            const [strategy, setStrategy] = useState(null);
+            const [posChart, setPosChart] = useState(null);
+            const [lapTimes, setLapTimes] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [selectedDrivers, setSelectedDrivers] = useState([]);
+            const posChartRef = useRef(null);
+            const lapChartRef = useRef(null);
+            const posChartInstance = useRef(null);
+            const lapChartInstance = useRef(null);
+
+            const tyreColors = {SOFT:'#FF3333',MEDIUM:'#FFD700',HARD:'#CCCCCC',INTERMEDIATE:'#39B54A',WET:'#0067FF',UNKNOWN:'#888888'};
+
+            useEffect(() => {
+                setLoading(true);
+                if (aTab === 'strategy' && !strategy) {
+                    api.get('/api/analytics/strategy').then(d => { setStrategy(d); setLoading(false); });
+                } else if (aTab === 'positions' && !posChart) {
+                    api.get('/api/analytics/positions').then(d => { setPosChart(d); setLoading(false); });
+                } else if (aTab === 'laptimes' && !lapTimes) {
+                    api.get('/api/analytics/laptimes').then(d => {
+                        setLapTimes(d);
+                        if (d?.drivers?.length > 0) setSelectedDrivers(d.drivers.slice(0, 3).map(dr => dr.driver_number));
+                        setLoading(false);
+                    });
+                } else setLoading(false);
+            }, [aTab]);
+
+            // Position chart rendering
+            useEffect(() => {
+                if (aTab !== 'positions' || !posChart?.drivers?.length || !posChartRef.current) return;
+                if (posChartInstance.current) posChartInstance.current.destroy();
+                const ctx = posChartRef.current.getContext('2d');
+                const datasets = posChart.drivers.map(d => ({
+                    label: d.code || d.name,
+                    data: d.positions.map(p => ({x: p.lap, y: p.position})),
+                    borderColor: d.team_color || '#888',
+                    backgroundColor: d.team_color || '#888',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.1,
+                    fill: false,
+                }));
+                posChartInstance.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {datasets},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false},
+                            tooltip: {
+                                mode: 'nearest', intersect: false,
+                                backgroundColor: '#1E1E2C', titleColor: '#fff', bodyColor: '#9A9AAF',
+                                borderColor: '#38383F', borderWidth: 1,
+                                callbacks: {
+                                    title: (items) => items[0]?.dataset?.label || '',
+                                    label: (item) => `Lap ${item.parsed.x}: P${item.parsed.y}`,
+                                }
+                            },
+                        },
+                        scales: {
+                            x: {type:'linear', title:{display:true,text:'\u041A\u0440\u0443\u0433',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
+                            y: {reverse:true, title:{display:true,text:'\u041F\u043E\u0437\u0438\u0446\u0438\u044F',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',stepSize:1}, grid:{color:'#38383F33'}, min:1, max:20},
+                        },
+                        interaction: {mode:'nearest',axis:'x',intersect:false},
+                    },
+                });
+                return () => { if (posChartInstance.current) posChartInstance.current.destroy(); };
+            }, [posChart, aTab]);
+
+            // Lap times chart rendering
+            useEffect(() => {
+                if (aTab !== 'laptimes' || !lapTimes?.drivers?.length || !lapChartRef.current || !selectedDrivers.length) return;
+                if (lapChartInstance.current) lapChartInstance.current.destroy();
+                const ctx = lapChartRef.current.getContext('2d');
+                const filtered = lapTimes.drivers.filter(d => selectedDrivers.includes(d.driver_number));
+                const datasets = filtered.map(d => ({
+                    label: d.code || d.name,
+                    data: d.laps.filter(l => l.time && !l.is_pit_out).map(l => ({x: l.lap, y: l.time})),
+                    borderColor: d.team_color || '#888',
+                    backgroundColor: (context) => {
+                        const idx = context.dataIndex;
+                        const lap = d.laps.filter(l => l.time && !l.is_pit_out)[idx];
+                        return lap ? (tyreColors[lap.compound] || '#888') : d.team_color;
+                    },
+                    borderWidth: 1.5,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0,
+                    fill: false,
+                    showLine: true,
+                }));
+                // Calculate y axis range (exclude outlier laps)
+                const allTimes = datasets.flatMap(ds => ds.data.map(p => p.y)).filter(Boolean);
+                const medianTime = allTimes.sort((a,b) => a-b)[Math.floor(allTimes.length/2)] || 90;
+                const yMin = Math.max(0, medianTime * 0.95);
+                const yMax = medianTime * 1.12;
+
+                lapChartInstance.current = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {datasets},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false},
+                            tooltip: {
+                                backgroundColor: '#1E1E2C', titleColor: '#fff', bodyColor: '#9A9AAF',
+                                borderColor: '#38383F', borderWidth: 1,
+                                callbacks: {
+                                    title: (items) => items[0]?.dataset?.label || '',
+                                    label: (item) => {
+                                        const t = item.parsed.y;
+                                        const m = Math.floor(t/60);
+                                        const s = (t%60).toFixed(3);
+                                        return `Lap ${item.parsed.x}: ${m>0?m+':'+s.padStart(6,'0'):s}`;
+                                    },
+                                }
+                            },
+                        },
+                        scales: {
+                            x: {type:'linear', title:{display:true,text:'\u041A\u0440\u0443\u0433',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
+                            y: {title:{display:true,text:'\u0412\u0440\u0435\u043C\u044F (\u0441\u0435\u043A)',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',callback:v=>{const m=Math.floor(v/60);const s=(v%60).toFixed(1);return m>0?m+':'+s.padStart(4,'0'):s;}}, grid:{color:'#38383F33'}, min:yMin, max:yMax},
+                        },
+                        interaction: {mode:'nearest',intersect:false},
+                    },
+                });
+                return () => { if (lapChartInstance.current) lapChartInstance.current.destroy(); };
+            }, [lapTimes, aTab, selectedDrivers]);
+
+            const toggleDriver = (dn) => {
+                setSelectedDrivers(prev => prev.includes(dn) ? prev.filter(n => n !== dn) : [...prev, dn].slice(-5));
+            };
+
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 0'}}>
+                    <div style={{padding:'0 16px'}}>
+                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>\u0410\u043D\u0430\u043B\u0438\u0442\u0438\u043A\u0430</h2>
+                        <div className="tab-switch" style={{marginBottom:16}}>
+                            <button className={`tab-switch-btn ${aTab==='strategy'?'active':''}`} onClick={()=>setATab('strategy')}>\u0428\u0438\u043D\u044B</button>
+                            <button className={`tab-switch-btn ${aTab==='positions'?'active':''}`} onClick={()=>setATab('positions')}>\u041F\u043E\u0437\u0438\u0446\u0438\u0438</button>
+                            <button className={`tab-switch-btn ${aTab==='laptimes'?'active':''}`} onClick={()=>setATab('laptimes')}>\u0422\u0435\u043C\u043F\u044B</button>
+                        </div>
+                    </div>
+
+                    {loading && <div style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>}
+
+                    {/* TYRE STRATEGY */}
+                    {aTab==='strategy' && !loading && (strategy?.drivers?.length > 0 ? (
+                        <div style={{padding:'0 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:4,paddingLeft:4}}>\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0448\u0438\u043D \u00b7 {strategy.total_laps} \u043A\u0440\u0443\u0433\u043E\u0432</div>
+                            <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',paddingLeft:4}}>
+                                {['SOFT','MEDIUM','HARD','INTERMEDIATE','WET'].map(c=>(
+                                    <div key={c} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
+                                        <span style={{width:10,height:10,borderRadius:'50%',background:tyreColors[c],display:'inline-block'}}/>{c}
+                                    </div>
+                                ))}
+                            </div>
+                            {strategy.drivers.map((d,i)=>(
+                                <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,padding:'4px 0'}}>
+                                    <div style={{width:30,fontSize:11,fontWeight:700,color:d.team_color,textAlign:'right',flexShrink:0}}>{d.code}</div>
+                                    <div style={{flex:1,display:'flex',height:22,borderRadius:4,overflow:'hidden',background:'var(--f1-gray)',gap:1}}>
+                                        {d.stints.map((s,j)=>{
+                                            const lapStart = s.lap_start || 1;
+                                            const lapEnd = s.lap_end || strategy.total_laps;
+                                            const widthPct = ((lapEnd - lapStart + 1) / strategy.total_laps) * 100;
+                                            return (
+                                                <div key={j} style={{width:`${widthPct}%`,background:tyreColors[s.compound]||'#888',minWidth:2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:s.compound==='HARD'||s.compound==='MEDIUM'?'#000':'#fff',overflow:'hidden',whiteSpace:'nowrap'}}>
+                                                    {widthPct>8?`${lapEnd-lapStart+1}L`:''}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div style={{width:20,fontSize:10,color:'var(--f1-text-muted)',textAlign:'center',flexShrink:0}}>P{d.finish_position}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : !loading && (
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F3CE}\u{FE0F}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u0441\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u0438</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0433\u043E\u043D\u043A\u0438</div></div>
+                    ))}
+
+                    {/* POSITION CHART */}
+                    {aTab==='positions' && !loading && (posChart?.drivers?.length > 0 ? (
+                        <div style={{padding:'0 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435 \u043F\u043E\u0437\u0438\u0446\u0438\u0439 \u043F\u043E \u043A\u0440\u0443\u0433\u0430\u043C</div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:8,paddingLeft:4}}>
+                                {posChart.drivers.map(d=>(
+                                    <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:3,fontSize:10,padding:'2px 6px',borderRadius:4,background:`${d.team_color}22`,color:d.team_color,fontWeight:600}}>
+                                        <span style={{width:6,height:6,borderRadius:'50%',background:d.team_color}}/>{d.code}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="card" style={{padding:8,height:350}}>
+                                <canvas ref={posChartRef}/>
+                            </div>
+                        </div>
+                    ) : !loading && (
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F4C8}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div><div style={{fontSize:13}}>\u0413\u0440\u0430\u0444\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
+                    ))}
+
+                    {/* LAP TIMES */}
+                    {aTab==='laptimes' && !loading && (lapTimes?.drivers?.length > 0 ? (
+                        <div style={{padding:'0 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>\u0421\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u0435 \u0442\u0435\u043C\u043F\u0430 \u00b7 \u0412\u044B\u0431\u0435\u0440\u0438 \u043F\u0438\u043B\u043E\u0442\u043E\u0432</div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:10,paddingLeft:4}}>
+                                {lapTimes.drivers.map(d=>{
+                                    const sel = selectedDrivers.includes(d.driver_number);
+                                    return (
+                                        <button key={d.driver_number} onClick={()=>toggleDriver(d.driver_number)}
+                                            style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 8px',borderRadius:6,border:`1.5px solid ${sel?d.team_color:d.team_color+'44'}`,background:sel?`${d.team_color}33`:'transparent',color:sel?'#fff':'var(--f1-text-muted)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s'}}>
+                                            {d.code}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {lapTimes.session_best && (
+                                <div style={{fontSize:12,color:'#A020F0',fontWeight:600,paddingLeft:4,marginBottom:8}}>\u041B\u0443\u0447\u0448\u0438\u0439 \u043A\u0440\u0443\u0433: {fmtLap(lapTimes.session_best)}</div>
+                            )}
+                            <div className="card" style={{padding:8,height:350}}>
+                                <canvas ref={lapChartRef}/>
+                            </div>
+                        </div>
+                    ) : !loading && (
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u23F1\uFE0F</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u043A\u0440\u0443\u0433\u0430\u0445</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
+                    ))}
+                </div>
+            );
+        };
+
+        // ==== MAIN APP ====
+        const App = () => {
+            const [tab, setTab] = useState('home');
+            const [loading, setLoading] = useState(true);
+            const [user, setUser] = useState(null);
+            const [nextRace, setNextRace] = useState(null);
+            const [lastRace, setLastRace] = useState(null);
+            const [schedule, setSchedule] = useState(null);
+            const [driversStandings, setDriversStandings] = useState(null);
+            const [constructorsStandings, setConstructorsStandings] = useState(null);
+            const [session, setSession] = useState(null);
+            const [positions, setPositions] = useState(null);
+            const [timing, setTiming] = useState(null);
+            const [weather, setWeather] = useState(null);
+            const [raceControl, setRaceControl] = useState(null);
+            const [streams, setStreams] = useState(null);
+            const isLive = session?.is_live;
+
+            useEffect(() => {
+                (async () => {
+                    const [u, s] = await Promise.all([api.get('/api/user/me'), api.get('/api/live/session')]);
+                    setUser(u); setSession(s); setLoading(false);
+                })();
+            }, []);
+
+            useEffect(() => {
+                if (loading) return;
+                Promise.all([api.get('/api/home'),api.get('/api/standings/drivers'),api.get('/api/standings/constructors'),api.get('/api/schedule'),api.get('/api/streams')]).then(([home,ds,cs,sched,str])=>{
+                    if(home){setNextRace(home.next_race);setLastRace(home.last_race);}
+                    setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str);
+                });
+            }, [loading]);
+
+            useEffect(() => {
+                if (tab !== 'live') return;
+                const fetchLive = async () => { const d=await api.get('/api/live/dashboard'); if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);} };
+                fetchLive();
+                const iv = setInterval(fetchLive, isLive ? 10000 : 30000);
+                return () => clearInterval(iv);
+            }, [tab, isLive]);
+
+            useEffect(() => {
+                if (!tg) return;
+                if (tab !== 'home') { tg.BackButton?.show(); const h=()=>setTab('home'); tg.BackButton?.onClick(h); return ()=>tg.BackButton?.offClick(h); }
+                else { tg.BackButton?.hide(); }
+            }, [tab]);
+
+            if (loading) return (
+                <div style={{height:'100dvh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+                    <div style={{fontSize:48}}>\u{1F3CE}\u{FE0F}</div>
+                    <div style={{fontSize:22,fontWeight:900}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></div>
+                    <div style={{width:40,height:4,borderRadius:2,background:'var(--f1-gray)',overflow:'hidden'}}><div style={{width:'50%',height:'100%',background:'var(--f1-red)',borderRadius:2,animation:'shimmer 1s infinite alternate'}}/></div>
+                </div>
+            );
+
+            const renderTab = () => {
+                switch(tab) {
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams}/>;
+                    case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
+                    case 'analytics': return <AnalyticsPage/>;
+                    case 'news': return <NewsPage/>;
+                    case 'schedule': return <SchedulePage schedule={schedule}/>;
+                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings}/>;
+                    case 'predict': return <PredictionsPage user={user}/>;
+                    case 'profile': return <ProfilePage user={user}/>;
+                    default: return null;
+                }
+            };
+
+            return (<>{renderTab()}<BottomNav active={tab} onChange={setTab} isLive={isLive}/></>);
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App/>);
+    </script>
+</body>
+</html>

@@ -1,0 +1,771 @@
+"""
+F1 Hub — FastAPI Backend (v2 — async with f1_data layer)
+All API endpoints with async data fetching, Telegram auth, games, predictions.
+"""
+
+import hmac
+import hashlib
+import json
+import time
+import logging
+import random
+from urllib.parse import unquote
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+import re
+import database as db
+import f1_data
+from config import (
+    TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_IDS,
+    DRIVERS, TEAM_COLORS, TYRE_COLORS,
+    PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
+    DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS
+)
+
+# ============ LOGGING ============
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger("f1hub")
+
+
+# ============ LIFESPAN ============
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    logger.info("F1 Hub API started (v2 async)")
+    yield
+    await f1_data.close_client()
+    logger.info("F1 Hub API shutting down")
+
+
+# ============ APP ============
+app = FastAPI(title="F1 Hub API", version="2.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ============ TELEGRAM AUTH ============
+
+def validate_telegram_data(init_data: str) -> Dict[str, Any]:
+    """Validate Telegram WebApp initData — HMAC-SHA256 verification."""
+    if not init_data:
+        if DEBUG:
+            return {"id": 999999, "first_name": "Test", "username": "testuser"}
+        raise HTTPException(status_code=401, detail="No auth data")
+
+    try:
+        parsed = {}
+        for part in init_data.split("&"):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                parsed[key] = unquote(value)
+
+        received_hash = parsed.pop("hash", "")
+        if not received_hash:
+            raise HTTPException(status_code=401, detail="No hash")
+
+        data_check_string = "\n".join(
+            f"{k}={parsed[k]}" for k in sorted(parsed.keys())
+        )
+
+        secret_key = hmac.new(
+            b"WebAppData", TELEGRAM_TOKEN.encode(), hashlib.sha256
+        ).digest()
+        expected_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(received_hash, expected_hash):
+            raise HTTPException(status_code=401, detail="Invalid signature")
+
+        auth_date = int(parsed.get("auth_date", 0))
+        if time.time() - auth_date > 86400:  # 24 hours
+            raise HTTPException(status_code=401, detail="Auth expired")
+
+        user_data = json.loads(parsed.get("user", "{}"))
+        if not user_data.get("id"):
+            raise HTTPException(status_code=401, detail="No user")
+
+        return user_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth error: {e}")
+        raise HTTPException(status_code=401, detail="Auth failed")
+
+
+def get_current_user(request: Request) -> Dict[str, Any]:
+    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    return validate_telegram_data(init_data)
+
+
+# ============ HEALTH ============
+
+@app.get("/api/health")
+async def health():
+    cache = f1_data.cache_stats()
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "cache": cache,
+    }
+
+
+# ============ STATIC ============
+
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
+
+
+@app.get("/{filename}.html")
+async def serve_html(filename: str):
+    import os
+    path = f"{filename}.html"
+    if os.path.exists(path):
+        return FileResponse(path)
+    raise HTTPException(status_code=404)
+
+
+# ============ USER ============
+
+@app.get("/api/user/me")
+async def user_me(request: Request):
+    tg_user = get_current_user(request)
+    user = db.get_or_create_user(
+        user_id=tg_user["id"],
+        username=tg_user.get("username"),
+        first_name=tg_user.get("first_name"),
+        last_name=tg_user.get("last_name"),
+        photo_url=tg_user.get("photo_url"),
+    )
+    rank = db.get_user_rank(user["user_id"])
+    achievements = db.get_user_achievements(user["user_id"])
+
+    return {
+        **user,
+        "rank": rank,
+        "achievements_list": [a["achievement_key"] for a in achievements],
+        "achievements_count": len(achievements),
+        "achievements_total": len(ACHIEVEMENTS),
+    }
+
+
+class FavoriteRequest(BaseModel):
+    driver: Optional[int] = None
+    team: Optional[str] = None
+
+
+@app.post("/api/user/favorite")
+async def set_favorite(body: FavoriteRequest, request: Request):
+    tg_user = get_current_user(request)
+    db.update_user_favorite(tg_user["id"], driver=body.driver, team=body.team)
+    return {"status": "ok"}
+
+
+@app.get("/api/user/predictions")
+async def user_predictions(request: Request):
+    tg_user = get_current_user(request)
+    return {"predictions": db.get_user_predictions(tg_user["id"])}
+
+
+@app.get("/api/user/achievements")
+async def user_achievements(request: Request):
+    tg_user = get_current_user(request)
+    achievements = db.get_user_achievements(tg_user["id"])
+    return {
+        "achievements": [
+            {**ACHIEVEMENTS.get(a["achievement_key"], {}), "key": a["achievement_key"], "unlocked_at": a["unlocked_at"]}
+            for a in achievements
+        ],
+        "total": len(ACHIEVEMENTS),
+        "all_achievements": ACHIEVEMENTS,
+    }
+
+
+# ============ SCHEDULE & RESULTS (Ergast) ============
+
+@app.get("/api/schedule")
+async def get_schedule():
+    return await f1_data.get_schedule()
+
+
+@app.get("/api/race/next")
+async def get_next_race():
+    return await f1_data.get_next_race()
+
+
+@app.get("/api/race/{round_num}/results")
+async def get_race_results(round_num: int):
+    result = await f1_data.get_race_results(round_num)
+    if "error" in result and "not found" in result.get("error", "").lower():
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/api/race/{round_num}/qualifying")
+async def get_qualifying(round_num: int):
+    result = await f1_data.get_qualifying_results(round_num)
+    if "error" in result and "not found" in result.get("error", "").lower():
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/api/race/last")
+async def get_last_race():
+    return await f1_data.get_last_race()
+
+
+# ============ COMBINED ENDPOINTS (fewer requests from frontend) ============
+
+@app.get("/api/home")
+async def get_home():
+    """Combined endpoint: next race + last race + top standings. One call for home screen."""
+    return await f1_data.get_home_data()
+
+
+@app.get("/api/live/dashboard")
+async def get_live_dashboard():
+    """Combined endpoint: session + positions + timing + weather + race control."""
+    return await f1_data.get_live_dashboard()
+
+
+# ============ LIVE DATA (OpenF1) ============
+
+@app.get("/api/live/session")
+async def live_session():
+    return await f1_data.get_live_session()
+
+
+@app.get("/api/live/positions")
+async def live_positions():
+    return await f1_data.get_live_positions()
+
+
+@app.get("/api/live/timing")
+async def live_timing():
+    return await f1_data.get_live_timing()
+
+
+@app.get("/api/live/weather")
+async def live_weather():
+    return await f1_data.get_live_weather()
+
+
+@app.get("/api/live/race-control")
+async def live_race_control():
+    return await f1_data.get_live_race_control()
+
+
+@app.get("/api/live/radio")
+async def live_radio():
+    return await f1_data.get_live_radio()
+
+
+@app.get("/api/live/pit-stops")
+async def live_pit_stops():
+    return await f1_data.get_live_pit_stops()
+
+
+# ============ STANDINGS ============
+
+@app.get("/api/standings/drivers")
+async def standings_drivers():
+    return await f1_data.get_driver_standings()
+
+
+@app.get("/api/standings/constructors")
+async def standings_constructors():
+    data = await f1_data.get_constructor_standings()
+    # Enrich with team assets
+    for s in data.get("standings", []):
+        assets = TEAM_ASSETS.get(s.get("team", ""), {})
+        s["logo_url"] = assets.get("logo", "")
+        s["car_url"] = assets.get("car", "")
+    return data
+
+
+# ============ DRIVERS & TEAMS ============
+
+@app.get("/api/drivers")
+async def get_drivers():
+    drivers = [f1_data.enrich_driver(num) for num in DRIVERS]
+    return {"drivers": drivers}
+
+
+@app.get("/api/driver/{number}")
+async def get_driver(number: int):
+    result = await f1_data.get_driver_profile(number)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    name = DRIVERS.get(number, {}).get("name", "")
+    result["photo_url_large"] = f1_data.get_driver_photo_url_large(name)
+    return result
+
+
+@app.get("/api/teams")
+async def get_teams():
+    teams = {}
+    for num, info in DRIVERS.items():
+        team_name = info["team"]
+        if team_name not in teams:
+            assets = TEAM_ASSETS.get(team_name, {})
+            teams[team_name] = {
+                "name": team_name,
+                "color": TEAM_COLORS.get(team_name, "#888"),
+                "logo_url": assets.get("logo", ""),
+                "car_url": assets.get("car", ""),
+                "drivers": [],
+            }
+        teams[team_name]["drivers"].append(f1_data.enrich_driver(num))
+    return {"teams": list(teams.values())}
+
+
+# ============ PREDICTIONS ============
+
+class PredictionRequest(BaseModel):
+    race_round: int
+    season: int = 2025
+    prediction_type: str
+    prediction_value: Any
+    points_bet: int = 0
+
+
+@app.get("/api/predictions/available")
+async def predictions_available(request: Request):
+    tg_user = get_current_user(request)
+    next_race = await f1_data.get_next_race()
+
+    if "round" not in next_race:
+        return {"available": False, "message": "No upcoming race"}
+
+    existing = db.get_user_predictions(tg_user["id"], next_race["round"], 2025)
+    existing_types = {p["prediction_type"] for p in existing}
+
+    types = [
+        {"type": "winner", "label": "Победитель гонки", "description": "Выбери 1 пилота", "max_points": 50},
+        {"type": "podium", "label": "Подиум (TOP-3)", "description": "Выбери 3 пилотов", "max_points": 100},
+        {"type": "fastest_lap", "label": "Быстрый круг", "description": "Кто покажет лучший круг?", "max_points": 30},
+        {"type": "dnf_count", "label": "Количество DNF", "description": "Сколько сходов будет?", "max_points": 40},
+        {"type": "safety_car", "label": "Safety Car", "description": "Будет ли машина безопасности?", "max_points": 20},
+    ]
+
+    return {
+        "available": True,
+        "race": next_race,
+        "predictions": [{**t, "already_predicted": t["type"] in existing_types} for t in types],
+        "drivers": [f1_data.enrich_driver(num) for num in DRIVERS],
+    }
+
+
+@app.post("/api/predictions/make")
+async def make_prediction(body: PredictionRequest, request: Request):
+    tg_user = get_current_user(request)
+
+    valid_types = {"winner", "podium", "fastest_lap", "dnf_count", "safety_car"}
+    if body.prediction_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid type: {body.prediction_type}")
+
+    val = body.prediction_value
+    if body.prediction_type == "winner" and not isinstance(val, int):
+        raise HTTPException(status_code=400, detail="Winner must be driver number")
+    if body.prediction_type == "podium" and (not isinstance(val, list) or len(val) != 3):
+        raise HTTPException(status_code=400, detail="Podium must be 3 driver numbers")
+    if body.prediction_type == "safety_car" and val not in [True, False, "yes", "no"]:
+        raise HTTPException(status_code=400, detail="Safety car: yes/no")
+
+    pred_id = db.create_prediction(
+        user_id=tg_user["id"],
+        race_round=body.race_round,
+        season=body.season,
+        prediction_type=body.prediction_type,
+        prediction_value=val,
+        points_bet=body.points_bet,
+    )
+
+    db.execute_write(
+        "UPDATE users SET predictions_total = predictions_total + 1 WHERE user_id = ?",
+        (tg_user["id"],)
+    )
+    new_achievements = db.check_and_award_achievements(tg_user["id"])
+
+    return {"status": "ok", "prediction_id": pred_id, "new_achievements": new_achievements}
+
+
+@app.get("/api/predictions/results")
+async def prediction_results(request: Request):
+    tg_user = get_current_user(request)
+    preds = db.get_user_predictions(tg_user["id"])
+    settled = [p for p in preds if p["status"] != "pending"]
+    pending = [p for p in preds if p["status"] == "pending"]
+    return {
+        "settled": settled,
+        "pending": pending,
+        "total_won": sum(p.get("points_won", 0) for p in settled),
+    }
+
+
+# ============ GAMES ============
+
+@app.get("/api/games/status")
+async def games_status(request: Request):
+    tg_user = get_current_user(request)
+    game_types = ["pit_stop", "guess_track", "reaction", "quiz"]
+    return {"games": {gt: db.can_play_game(tg_user["id"], gt) for gt in game_types}}
+
+
+class GameResultRequest(BaseModel):
+    game_type: str
+    score: int
+    details: Optional[str] = None
+
+
+@app.post("/api/games/result")
+async def submit_game_result(body: GameResultRequest, request: Request):
+    tg_user = get_current_user(request)
+
+    valid_games = {"pit_stop", "guess_track", "reaction", "quiz"}
+    if body.game_type not in valid_games:
+        raise HTTPException(status_code=400, detail="Invalid game type")
+
+    status = db.can_play_game(tg_user["id"], body.game_type)
+    if not status["can_play"]:
+        raise HTTPException(status_code=429, detail=f"Cooldown: {status['seconds_left']}s left")
+
+    points = _calc_game_points(body.game_type, body.score)
+    db.record_game(tg_user["id"], body.game_type, body.score, points, body.details)
+
+    new_achievements = db.check_and_award_achievements(tg_user["id"])
+
+    if body.game_type == "pit_stop" and body.score < 2000:
+        if db.unlock_achievement(tg_user["id"], "pit_master"):
+            new_achievements.append("pit_master")
+    if body.game_type == "reaction" and body.score < 200:
+        if db.unlock_achievement(tg_user["id"], "reaction_god"):
+            new_achievements.append("reaction_god")
+
+    return {"status": "ok", "points_earned": points, "new_achievements": new_achievements}
+
+
+def _calc_game_points(game_type: str, score: int) -> int:
+    if game_type == "pit_stop":
+        if score < 2000: return 50
+        if score < 2500: return 30
+        if score < 3000: return 20
+        if score < 4000: return 10
+        return 5
+    if game_type == "reaction":
+        if score < 200: return 50
+        if score < 300: return 30
+        if score < 500: return 10
+        return 5
+    if game_type in ("guess_track", "quiz"):
+        return score * 5
+    return 0
+
+
+# ============ QUIZ ============
+
+QUIZ_QUESTIONS = [
+    {"q": "Кто является самым молодым чемпионом мира в F1?",
+     "opts": ["Sebastian Vettel", "Max Verstappen", "Lewis Hamilton", "Fernando Alonso"], "a": 0, "cat": "history"},
+    {"q": "Сколько чемпионских титулов у Lewis Hamilton?",
+     "opts": ["6", "7", "8", "5"], "a": 1, "cat": "stats"},
+    {"q": "Какая трасса самая длинная в календаре F1?",
+     "opts": ["Spa-Francorchamps", "Jeddah", "Monza", "Silverstone"], "a": 0, "cat": "tracks"},
+    {"q": "Какой цвет у шин SOFT?",
+     "opts": ["Жёлтый", "Белый", "Красный", "Зелёный"], "a": 2, "cat": "rules"},
+    {"q": "Что означает синий флаг?",
+     "opts": ["Пропусти обгоняющего", "Опасность на трассе", "Конец сессии", "DRS активирован"], "a": 0, "cat": "rules"},
+    {"q": "В каком году Ferrari последний раз выиграла Кубок конструкторов?",
+     "opts": ["2007", "2008", "2004", "2010"], "a": 1, "cat": "history"},
+    {"q": "Какая команда базируется в Маранелло?",
+     "opts": ["McLaren", "Red Bull Racing", "Ferrari", "Mercedes"], "a": 2, "cat": "teams"},
+    {"q": "Сколько длится пит-стоп в среднем (смена шин)?",
+     "opts": ["~2.5 секунды", "~5 секунд", "~10 секунд", "~1 секунда"], "a": 0, "cat": "rules"},
+    {"q": "Сколько очков получает победитель гонки?",
+     "opts": ["20", "25", "30", "15"], "a": 1, "cat": "rules"},
+    {"q": "Кто выиграл больше всего гонок в истории F1?",
+     "opts": ["Michael Schumacher", "Lewis Hamilton", "Ayrton Senna", "Alain Prost"], "a": 1, "cat": "history"},
+    {"q": "Какой компаунд шин самый мягкий?",
+     "opts": ["Medium", "Hard", "Soft", "Intermediate"], "a": 2, "cat": "rules"},
+    {"q": "На какой трассе проходит Гран-при Монако?",
+     "opts": ["Circuit de Monaco", "Monza", "Silverstone", "Hungaroring"], "a": 0, "cat": "tracks"},
+    {"q": "Что такое DRS?",
+     "opts": ["Drag Reduction System", "Driver Radio System", "Data Recording System", "Digital Race Strategy"], "a": 0, "cat": "rules"},
+    {"q": "Сколько команд в F1 сезоне 2025?",
+     "opts": ["8", "10", "12", "11"], "a": 1, "cat": "stats"},
+    {"q": "Какая максимальная скорость болида F1?",
+     "opts": ["~300 км/ч", "~370 км/ч", "~250 км/ч", "~400 км/ч"], "a": 1, "cat": "stats"},
+]
+
+
+@app.get("/api/quiz/question")
+async def quiz_question():
+    idx = random.randint(0, len(QUIZ_QUESTIONS) - 1)
+    q = QUIZ_QUESTIONS[idx]
+    return {"question": q["q"], "options": q["opts"], "category": q["cat"], "question_id": idx}
+
+
+class QuizAnswerRequest(BaseModel):
+    question_id: int
+    answer: int
+
+
+@app.post("/api/quiz/answer")
+async def quiz_answer(body: QuizAnswerRequest):
+    if body.question_id < 0 or body.question_id >= len(QUIZ_QUESTIONS):
+        raise HTTPException(status_code=400, detail="Invalid question")
+    q = QUIZ_QUESTIONS[body.question_id]
+    correct = body.answer == q["a"]
+    return {"correct": correct, "correct_answer": q["a"], "explanation": q["opts"][q["a"]]}
+
+
+# ============ LEADERBOARD ============
+
+@app.get("/api/leaderboard")
+async def leaderboard(request: Request):
+    board = db.get_leaderboard()
+    try:
+        tg_user = get_current_user(request)
+        user_rank = db.get_user_rank(tg_user["id"])
+        user = db.execute_one("SELECT points FROM users WHERE user_id = ?", (tg_user["id"],))
+    except Exception:
+        user_rank = None
+        user = None
+
+    return {
+        "leaderboard": board,
+        "user_rank": user_rank,
+        "user_points": user["points"] if user else None,
+    }
+
+
+# ============ NEWS (from Telegram channel) ============
+
+@app.get("/api/news")
+async def get_news():
+    """Parse latest posts from public Telegram channel."""
+    cached = f1_data.cache_get("news")
+    if cached:
+        return cached
+
+    posts = []
+    try:
+        client = f1_data.get_client()
+        resp = await client.get(
+            "https://t.me/s/stanizlavsky",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            html = resp.text
+            # Parse tgme_widget_message blocks
+            msg_blocks = re.findall(
+                r'<div class="tgme_widget_message_wrap[^"]*"[^>]*>.*?</div>\s*</div>\s*</div>\s*</div>',
+                html, re.DOTALL
+            )
+            for block in msg_blocks[-20:]:
+                post = {}
+                # Post ID
+                post_match = re.search(r'data-post="([^"]+)"', block)
+                if post_match:
+                    post["id"] = post_match.group(1)
+                    post["url"] = f"https://t.me/{post_match.group(1)}"
+
+                # Text
+                text_match = re.search(
+                    r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                    block, re.DOTALL
+                )
+                if text_match:
+                    text = text_match.group(1)
+                    text = re.sub(r'<br\s*/?>', '\n', text)
+                    text = re.sub(r'<[^>]+>', '', text)
+                    text = text.strip()
+                    post["text"] = text[:500]
+
+                # Photo
+                photo_match = re.search(
+                    r"background-image:url\('([^']+)'\)",
+                    block
+                )
+                if photo_match:
+                    post["photo"] = photo_match.group(1)
+
+                # Date
+                date_match = re.search(r'<time[^>]*datetime="([^"]+)"', block)
+                if date_match:
+                    post["date"] = date_match.group(1)
+
+                # Views
+                views_match = re.search(
+                    r'<span class="tgme_widget_message_views">([^<]+)</span>',
+                    block
+                )
+                if views_match:
+                    post["views"] = views_match.group(1).strip()
+
+                if post.get("text") or post.get("photo"):
+                    posts.append(post)
+    except Exception as e:
+        logger.error(f"News fetch error: {e}")
+
+    response = {
+        "posts": posts[-20:],
+        "channel": "@stanizlavsky",
+        "channel_url": "https://t.me/stanizlavsky",
+    }
+    if posts:
+        f1_data.cache_set("news", response)
+    return response
+
+
+# ============ STREAMS (from VK Video) ============
+
+@app.get("/api/streams")
+async def get_streams():
+    """Return configured stream/video channel links."""
+    return {
+        "channels": STREAM_LINKS,
+        "videos": [],
+        "channel_url": "https://vkvideo.ru/@stanizlavskylive",
+        "channel_name": "@stanizlavskylive",
+    }
+
+
+# ============ ANALYTICS ENDPOINTS ============
+
+@app.get("/api/analytics/strategy")
+async def analytics_strategy(session_key: str = "latest"):
+    """Tyre strategy visualization data."""
+    return await f1_data.get_race_strategy(session_key)
+
+
+@app.get("/api/analytics/positions")
+async def analytics_positions(session_key: str = "latest"):
+    """Position change chart data."""
+    return await f1_data.get_race_position_chart(session_key)
+
+
+@app.get("/api/analytics/laptimes")
+async def analytics_laptimes(session_key: str = "latest", drivers: str = ""):
+    """Lap time comparison data. drivers=1,44,16 to filter."""
+    driver_numbers = None
+    if drivers:
+        try:
+            driver_numbers = [int(x.strip()) for x in drivers.split(",") if x.strip()]
+        except ValueError:
+            pass
+    return await f1_data.get_race_laptimes(session_key, driver_numbers)
+
+
+# ============ ADMIN ============
+
+@app.post("/api/admin/settle/{race_round}")
+async def admin_settle(race_round: int, request: Request):
+    """Settle all predictions for a race round."""
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    results = await f1_data.get_race_results(race_round)
+    if "error" in results:
+        raise HTTPException(status_code=404, detail=results["error"])
+
+    race_results = results.get("results", [])
+    if not race_results:
+        raise HTTPException(status_code=404, detail="No results")
+
+    winner = race_results[0]["driver_number"]
+    podium = [r["driver_number"] for r in race_results[:3]]
+    dnf_count = results.get("dnf_count", 0)
+    fastest_lap_driver = results.get("fastest_lap_driver")
+
+    # Determine safety car from OpenF1 race control data
+    rc_data = await f1_data.get_live_race_control()
+    had_safety_car = any(
+        msg.get("category") in ("SafetyCar", "VirtualSafetyCar")
+        for msg in rc_data.get("messages", [])
+    )
+
+    predictions = db.get_pending_predictions(race_round, 2025)
+    settled = 0
+
+    for pred in predictions:
+        points = 0
+        status = "incorrect"
+        ptype = pred["prediction_type"]
+        try:
+            pvalue = json.loads(pred["prediction_value"]) if isinstance(pred["prediction_value"], str) else pred["prediction_value"]
+        except (json.JSONDecodeError, TypeError):
+            pvalue = pred["prediction_value"]
+
+        if ptype == "winner" and pvalue == winner:
+            points, status = PREDICTION_POINTS["winner"]["correct"], "correct"
+        elif ptype == "podium" and isinstance(pvalue, list):
+            matches = len(set(pvalue) & set(podium))
+            if matches == 3:
+                points, status = PREDICTION_POINTS["podium"]["all_3"], "correct"
+            elif matches == 2:
+                points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
+            elif matches == 1:
+                points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
+        elif ptype == "fastest_lap" and pvalue == fastest_lap_driver:
+            points, status = PREDICTION_POINTS["fastest_lap"]["correct"], "correct"
+        elif ptype == "dnf_count":
+            try:
+                diff = abs(int(pvalue) - dnf_count)
+                if diff == 0:
+                    points, status = PREDICTION_POINTS["dnf_count"]["exact"], "correct"
+                elif diff == 1:
+                    points, status = PREDICTION_POINTS["dnf_count"]["off_by_1"], "partial"
+            except (ValueError, TypeError):
+                pass
+        elif ptype == "safety_car":
+            predicted_yes = pvalue in (True, "yes", "true")
+            if predicted_yes == had_safety_car:
+                points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
+
+        db.resolve_prediction(pred["id"], status, points)
+        if points > 0:
+            db.add_user_points(pred["user_id"], points)
+        if status == "correct":
+            db.execute_write(
+                "UPDATE users SET predictions_correct=predictions_correct+1, streak=streak+1, max_streak=MAX(max_streak,streak+1) WHERE user_id=?",
+                (pred["user_id"],)
+            )
+        elif status == "incorrect":
+            db.execute_write("UPDATE users SET streak=0 WHERE user_id=?", (pred["user_id"],))
+
+        db.check_and_award_achievements(pred["user_id"])
+        settled += 1
+
+    f1_data.cache_clear("leaderboard")
+    db.update_leaderboard()
+    return {"settled": settled, "race_round": race_round}
+
+
+@app.post("/api/admin/cache/clear")
+async def admin_cache_clear(request: Request):
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403)
+    f1_data.cache_clear()
+    return {"status": "ok", "message": "Cache cleared"}
