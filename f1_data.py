@@ -452,6 +452,56 @@ def _get_circuit_image(circuit_id: str) -> str:
 
 # ============ HIGH-LEVEL DATA FUNCTIONS ============
 
+RACE_NAMES_RU = {
+    "Australian Grand Prix": "Гран-при Австралии",
+    "Chinese Grand Prix": "Гран-при Китая",
+    "Japanese Grand Prix": "Гран-при Японии",
+    "Bahrain Grand Prix": "Гран-при Бахрейна",
+    "Saudi Arabian Grand Prix": "Гран-при Саудовской Аравии",
+    "Miami Grand Prix": "Гран-при Майами",
+    "Canadian Grand Prix": "Гран-при Канады",
+    "Monaco Grand Prix": "Гран-при Монако",
+    "Spanish Grand Prix": "Гран-при Испании",
+    "Austrian Grand Prix": "Гран-при Австрии",
+    "British Grand Prix": "Гран-при Великобритании",
+    "Belgian Grand Prix": "Гран-при Бельгии",
+    "Hungarian Grand Prix": "Гран-при Венгрии",
+    "Dutch Grand Prix": "Гран-при Нидерландов",
+    "Italian Grand Prix": "Гран-при Италии",
+    "Azerbaijan Grand Prix": "Гран-при Азербайджана",
+    "Singapore Grand Prix": "Гран-при Сингапура",
+    "United States Grand Prix": "Гран-при США",
+    "Mexico City Grand Prix": "Гран-при Мексики",
+    "São Paulo Grand Prix": "Гран-при Сан-Паулу",
+    "Las Vegas Grand Prix": "Гран-при Лас-Вегаса",
+    "Qatar Grand Prix": "Гран-при Катара",
+    "Abu Dhabi Grand Prix": "Гран-при Абу-Даби",
+    "Emilia Romagna Grand Prix": "Гран-при Эмилии-Романьи",
+    "German Grand Prix": "Гран-при Германии",
+    "Portuguese Grand Prix": "Гран-при Португалии",
+}
+
+SPRINT_ROUNDS_2026 = {
+    "shanghai": True,
+    "miami": True,
+    "spa": True,
+    "americas": True,
+    "losail": True,
+    "interlagos": True,
+}
+
+CIRCUIT_COUNTRIES = {
+    "albert_park": "AU", "shanghai": "CN", "suzuka": "JP",
+    "bahrain": "BH", "jeddah": "SA", "miami": "US",
+    "villeneuve": "CA", "monaco": "MC", "catalunya": "ES",
+    "red_bull_ring": "AT", "silverstone": "GB", "spa": "BE",
+    "hungaroring": "HU", "zandvoort": "NL", "monza": "IT",
+    "baku": "AZ", "marina_bay": "SG", "americas": "US",
+    "rodriguez": "MX", "interlagos": "BR", "vegas": "US",
+    "losail": "QA", "yas_marina": "AE", "imola": "IT",
+}
+
+
 async def get_schedule(season: int = None) -> Dict[str, Any]:
     """Get full season schedule with enriched data."""
     s = season or CURRENT_SEASON
@@ -469,13 +519,16 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
     result = []
 
     for race in races:
+        circuit_id = race["Circuit"]["circuitId"]
+        english_name = race["raceName"]
         entry = {
             "round": int(race["round"]),
-            "name": race["raceName"],
+            "name": RACE_NAMES_RU.get(english_name, english_name),
             "circuit": race["Circuit"]["circuitName"],
-            "circuit_id": race["Circuit"]["circuitId"],
-            "circuit_image": _get_circuit_image(race["Circuit"]["circuitId"]),
+            "circuit_id": circuit_id,
+            "circuit_image": _get_circuit_image(circuit_id),
             "country": race["Circuit"]["Location"]["country"],
+            "country_code": CIRCUIT_COUNTRIES.get(circuit_id, ""),
             "locality": race["Circuit"]["Location"]["locality"],
             "lat": float(race["Circuit"]["Location"]["lat"]),
             "lng": float(race["Circuit"]["Location"]["long"]),
@@ -505,6 +558,12 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
             "date": race["date"],
             "time": race.get("time", ""),
         }
+
+        # Sprint detection: from API sessions or hardcoded for 2026
+        has_sprint = "sprint" in entry["sessions"] or "sprint_qualifying" in entry["sessions"]
+        if not has_sprint and s == 2026:
+            has_sprint = SPRINT_ROUNDS_2026.get(circuit_id, False)
+        entry["sprint"] = has_sprint
 
         # Determine status
         now = datetime.utcnow()
