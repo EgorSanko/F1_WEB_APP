@@ -1392,8 +1392,15 @@
         // ==== RACE DETAIL PAGE ====
         const RaceDetailPage = ({race, onBack}) => {
             const [tyreData, setTyreData] = useState(null);
+            const [tyreLoading, setTyreLoading] = useState(false);
             useEffect(() => {
-                if (race) api.get('/api/analytics/strategy').then(d => { if (d?.drivers?.length > 0) setTyreData(d); });
+                if (race?.round) {
+                    setTyreLoading(true);
+                    setTyreData(null);
+                    api.get(`/api/race/${race.round}/tyres`).then(d => {
+                        if (d?.drivers?.length > 0) setTyreData(d);
+                    }).finally(() => setTyreLoading(false));
+                }
             }, [race?.round]);
 
             if (!race) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
@@ -1470,26 +1477,32 @@
                     )}
 
                     {/* Tyre Strategy */}
+                    {tyreLoading && (
+                        <div className="card" style={{padding:'20px 12px', marginBottom:16, textAlign:'center'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5}}>🏎️ Загрузка стратегии шин...</div>
+                        </div>
+                    )}
                     {tyreData && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>🏎️ Стратегия шин · {tyreData.total_laps} кругов</div>
-                            <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+                            <div style={{display:'flex',gap:10,marginBottom:12,flexWrap:'wrap'}}>
                                 {['SOFT','MEDIUM','HARD','INTERMEDIATE','WET'].map(c=>(
-                                    <div key={c} style={{display:'flex',alignItems:'center',gap:3,fontSize:10}}>
-                                        <span style={{width:8,height:8,borderRadius:'50%',background:tyreColors[c],display:'inline-block'}}/>{c}
+                                    <div key={c} style={{display:'flex',alignItems:'center',gap:4,fontSize:10}}>
+                                        <span style={{width:10,height:10,borderRadius:'50%',background:tyreColors[c],display:'inline-block',border:'1px solid rgba(255,255,255,0.15)'}}/>{c[0]+c.slice(1).toLowerCase()}
                                     </div>
                                 ))}
                             </div>
                             {tyreData.drivers.map((d,i)=>(
-                                <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:4,marginBottom:3,padding:'2px 0'}}>
-                                    <div style={{width:28,fontSize:10,fontWeight:700,color:d.team_color,textAlign:'right',flexShrink:0}}>{d.code}</div>
-                                    <div style={{flex:1,display:'flex',height:18,borderRadius:3,overflow:'hidden',background:'var(--f1-gray)',gap:1}}>
+                                <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:4,marginBottom:2,padding:'3px 0'}}>
+                                    <div style={{width:22,fontSize:9,fontWeight:700,color:'var(--f1-text-muted)',textAlign:'right',flexShrink:0}}>P{d.finish_position}</div>
+                                    <div style={{width:3,height:20,borderRadius:2,background:d.team_color,flexShrink:0}}/>
+                                    <div style={{width:30,fontSize:10,fontWeight:700,color:'var(--f1-text)',textAlign:'left',flexShrink:0}}>{d.code}</div>
+                                    <div style={{flex:1,display:'flex',height:20,borderRadius:3,overflow:'hidden',background:'var(--f1-gray)',gap:1}}>
                                         {d.stints.map((s,j)=>{
-                                            const w = ((( s.lap_end||tyreData.total_laps) - (s.lap_start||1) + 1) / tyreData.total_laps) * 100;
-                                            return <div key={j} style={{width:`${w}%`,background:tyreColors[s.compound]||'#888',minWidth:2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:s.compound==='HARD'||s.compound==='MEDIUM'?'#000':'#fff',overflow:'hidden'}}>{w>10?`${Math.round(w)}%`:''}</div>;
+                                            const w = (((s.lap_end||tyreData.total_laps) - (s.lap_start||1) + 1) / tyreData.total_laps) * 100;
+                                            return <div key={j} style={{width:`${w}%`,background:tyreColors[s.compound]||'#888',minWidth:3,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:s.compound==='HARD'||s.compound==='MEDIUM'?'#000':'#fff',overflow:'hidden',transition:'width 0.3s ease'}}>{w>12?`L${s.lap_start||1}-${s.lap_end||''}`:''}</div>;
                                         })}
                                     </div>
-                                    <div style={{width:18,fontSize:9,color:'var(--f1-text-muted)',textAlign:'center',flexShrink:0}}>P{d.finish_position}</div>
                                 </div>
                             ))}
                         </div>

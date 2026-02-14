@@ -797,6 +797,18 @@ async def get_season_results(season: int):
     return f1_data.get_season_results(season)
 
 
+@app.get("/api/race/{round_num}/tyres")
+async def get_race_tyres(round_num: int):
+    """Get tyre strategy data for a specific race round."""
+    race = SEASON_2025_RESULTS.get(round_num)
+    if not race:
+        raise HTTPException(status_code=404, detail=f"Race round {round_num} not found")
+    session_key = race.get("session_key")
+    if not session_key:
+        raise HTTPException(status_code=404, detail=f"No session_key for round {round_num}")
+    return await f1_data.get_race_strategy(str(session_key))
+
+
 # ============ ANALYTICS ENDPOINTS ============
 
 @app.get("/api/analytics/strategy")

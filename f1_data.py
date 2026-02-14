@@ -1178,7 +1178,7 @@ async def get_race_strategy(session_key: str = "latest") -> Dict[str, Any]:
 
     # Total laps (max lap_end across all stints)
     total_laps = max(
-        (s.get("lap_end") or s.get("lap_start", 0) for stints in driver_stints.values() for s in stints),
+        (s.get("lap_end") or s.get("lap_start") or 0 for stints in driver_stints.values() for s in stints),
         default=0,
     )
 
