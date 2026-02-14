@@ -216,9 +216,9 @@
         };
 
         const flagEmoji = (code) => {
-            const flags = {'NL':'\u{1F1F3}\u{1F1F1}','GB':'\u{1F1EC}\u{1F1E7}','MC':'\u{1F1F2}\u{1F1E8}','AU':'\u{1F1E6}\u{1F1FA}','ES':'\u{1F1EA}\u{1F1F8}','DE':'\u{1F1E9}\u{1F1EA}','FR':'\u{1F1EB}\u{1F1F7}','CA':'\u{1F1E8}\u{1F1E6}','TH':'\u{1F1F9}\u{1F1ED}','JP':'\u{1F1EF}\u{1F1F5}','IT':'\u{1F1EE}\u{1F1F9}','NZ':'\u{1F1F3}\u{1F1FF}','BR':'\u{1F1E7}\u{1F1F7}',
-                'Bahrain':'\u{1F1E7}\u{1F1ED}','Saudi Arabia':'\u{1F1F8}\u{1F1E6}','Australia':'\u{1F1E6}\u{1F1FA}','Japan':'\u{1F1EF}\u{1F1F5}','China':'\u{1F1E8}\u{1F1F3}','USA':'\u{1F1FA}\u{1F1F8}','Italy':'\u{1F1EE}\u{1F1F9}','Monaco':'\u{1F1F2}\u{1F1E8}','Spain':'\u{1F1EA}\u{1F1F8}','Canada':'\u{1F1E8}\u{1F1E6}','Austria':'\u{1F1E6}\u{1F1F9}','UK':'\u{1F1EC}\u{1F1E7}','Hungary':'\u{1F1ED}\u{1F1FA}','Belgium':'\u{1F1E7}\u{1F1EA}','Netherlands':'\u{1F1F3}\u{1F1F1}','Azerbaijan':'\u{1F1E6}\u{1F1FF}','Singapore':'\u{1F1F8}\u{1F1EC}','Mexico':'\u{1F1F2}\u{1F1FD}','Brazil':'\u{1F1E7}\u{1F1F7}','Qatar':'\u{1F1F6}\u{1F1E6}','UAE':'\u{1F1E6}\u{1F1EA}'};
-            return flags[code] || '\u{1F3F3}\u{FE0F}';
+            const flags = {'NL':'🇳🇱','GB':'🇬🇧','MC':'🇲🇨','AU':'🇦🇺','ES':'🇪🇸','DE':'🇩🇪','FR':'🇫🇷','CA':'🇨🇦','TH':'🇹🇭','JP':'🇯🇵','IT':'🇮🇹','NZ':'🇳🇿','BR':'🇧🇷',
+                'Bahrain':'🇧🇭','Saudi Arabia':'🇸🇦','Australia':'🇦🇺','Japan':'🇯🇵','China':'🇨🇳','USA':'🇺🇸','Italy':'🇮🇹','Monaco':'🇲🇨','Spain':'🇪🇸','Canada':'🇨🇦','Austria':'🇦🇹','UK':'🇬🇧','Hungary':'🇭🇺','Belgium':'🇧🇪','Netherlands':'🇳🇱','Azerbaijan':'🇦🇿','Singapore':'🇸🇬','Mexico':'🇲🇽','Brazil':'🇧🇷','Qatar':'🇶🇦','UAE':'🇦🇪'};
+            return flags[code] || '🏳️';
         };
 
         const openLink = (url) => { if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank'); };
@@ -291,7 +291,7 @@
         const TyreIcon = ({compound}) => <span className={`tyre-dot tyre-${compound||'UNKNOWN'}`} title={compound}/>;
         const SectorBar = ({s1,s2,s3}) => <div className="sector-bar"><div className={`sb-${s1||'normal'}`}/><div className={`sb-${s2||'normal'}`}/><div className={`sb-${s3||'normal'}`}/></div>;
         const FlagIcon = ({flag}) => {
-            const map = {'GREEN':{cls:'flag-green',text:'G'},'YELLOW':{cls:'flag-yellow',text:'!'},'DOUBLE YELLOW':{cls:'flag-yellow',text:'!!'},'RED':{cls:'flag-red',text:'R'},'CHEQUERED':{cls:'flag-chequered',text:'\u{1F3C1}'}};
+            const map = {'GREEN':{cls:'flag-green',text:'G'},'YELLOW':{cls:'flag-yellow',text:'!'},'DOUBLE YELLOW':{cls:'flag-yellow',text:'!!'},'RED':{cls:'flag-red',text:'R'},'CHEQUERED':{cls:'flag-chequered',text:'🏁'}};
             const f = map[flag]||{cls:'',text:'\u2022'};
             return <span className={`flag-icon ${f.cls}`}>{f.text}</span>;
         };
@@ -319,7 +319,7 @@
                             <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
                             <div style={{position:'relative',zIndex:1}}>
                                 <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                                    \u{1F3C1} \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0433\u0440\u0430\u043D-\u043F\u0440\u0438
+                                    🏁 \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0433\u0440\u0430\u043D-\u043F\u0440\u0438
                                 </div>
                                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                                     <span style={{fontSize:32}}>{flagEmoji(nextRace.country)}</span>
@@ -349,7 +349,7 @@
                     {(streams?.videos?.length > 0 || streams?.channels?.length > 0) && (
                         <div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
-                                \u{1F4FA} \u0422\u0440\u0430\u043D\u0441\u043B\u044F\u0446\u0438\u0438 \u0438 \u0432\u0438\u0434\u0435\u043E
+                                📺 \u0422\u0440\u0430\u043D\u0441\u043B\u044F\u0446\u0438\u0438 \u0438 \u0432\u0438\u0434\u0435\u043E
                             </div>
 
                             {streams?.videos?.length > 0 && (
@@ -366,7 +366,7 @@
                                                 </div>
                                                 <div style={{padding:'10px 12px'}}>
                                                     <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{v.title}</div>
-                                                    {views && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>\u{1F441} {views}</div>}
+                                                    {views && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>👁 {views}</div>}
                                                 </div>
                                             </div>
                                         );
@@ -387,7 +387,7 @@
                                         const labels = {vk:'VK',yt:'YT',tg:'TG'};
                                         return (
                                             <div key={i} onClick={()=>openLink(ch.url)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--f1-card-solid)',borderRadius:12,border:'1px solid var(--f1-border)',flexShrink:0,transition:'transform 0.15s'}}>
-                                                <div style={{width:24,height:24,borderRadius:6,background:colors[ch.icon]||'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',flexShrink:0}}>{labels[ch.icon]||'\u{1F517}'}</div>
+                                                <div style={{width:24,height:24,borderRadius:6,background:colors[ch.icon]||'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',flexShrink:0}}>{labels[ch.icon]||'🔗'}</div>
                                                 <div style={{fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>{ch.title}</div>
                                             </div>
                                         );
@@ -488,10 +488,10 @@
 
                     {weather?.weather && (
                         <div className="weather-strip">
-                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'\u{1F327}\u{FE0F}':'\u2600\u{FE0F}'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'\u2014'}\u00b0C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F3C1}</span><span>\u0422\u0440\u0430\u0441\u0441\u0430 </span><span className="weather-pill-val">{weather.weather.track_temperature||'\u2014'}\u00b0C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F4A7}</span><span className="weather-pill-val">{weather.weather.humidity||'\u2014'}%</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>\u{1F4A8}</span><span className="weather-pill-val">{weather.weather.wind_speed||'\u2014'} \u043C/\u0441</span></div>
+                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'🌧️':'\u2600️'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'\u2014'}\u00b0C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>🏁</span><span>\u0422\u0440\u0430\u0441\u0441\u0430 </span><span className="weather-pill-val">{weather.weather.track_temperature||'\u2014'}\u00b0C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>💧</span><span className="weather-pill-val">{weather.weather.humidity||'\u2014'}%</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>💨</span><span className="weather-pill-val">{weather.weather.wind_speed||'\u2014'} \u043C/\u0441</span></div>
                         </div>
                     )}
 
@@ -519,7 +519,7 @@
                     {liveTab==='positions' && (positions?.positions?.length>0 ? (
                         <div>
                             <div className="live-row" style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5,minHeight:28,padding:'4px 12px'}}>
-                                <span>P</span><span></span><span>\u041F\u0438\u043B\u043E\u0442</span><span style={{textAlign:'center'}}>\u0412\u0440\u0435\u043C\u044F</span><span style={{textAlign:'center'}}>\u0428</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>\u{1F527}</span>
+                                <span>P</span><span></span><span>\u041F\u0438\u043B\u043E\u0442</span><span style={{textAlign:'center'}}>\u0412\u0440\u0435\u043C\u044F</span><span style={{textAlign:'center'}}>\u0428</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>🔧</span>
                             </div>
                             {positions.positions.map((p,i) => {
                                 const t = timingMap[p.driver_number]; const isExp = expandedRow===p.driver_number;
@@ -550,7 +550,7 @@
                             })}
                         </div>
                     ) : (
-                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F3CE}\u{FE0F}</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445...':'\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438'}</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043A\u043E\u0433\u0434\u0430 \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0441\u0435\u0441\u0441\u0438\u044F</div></div>
+                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445...':'\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438'}</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043A\u043E\u0433\u0434\u0430 \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0441\u0435\u0441\u0441\u0438\u044F</div></div>
                     ))}
 
                     {liveTab==='sectors' && (timing?.timing?.length>0 ? (
@@ -592,7 +592,7 @@
                                 <div className="pit-time" style={{color:p.pit_duration&&p.pit_duration<25?'#39B54A':p.pit_duration&&p.pit_duration<30?'var(--f1-text)':'#FFD700'}}>{p.pit_duration?`${p.pit_duration.toFixed(1)}s`:'\u2014'}</div>
                             </div>
                         ))}</div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F527}</div>\u041D\u0435\u0442 \u043F\u0438\u0442-\u0441\u0442\u043E\u043F\u043E\u0432</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>🔧</div>\u041D\u0435\u0442 \u043F\u0438\u0442-\u0441\u0442\u043E\u043F\u043E\u0432</div>)}
 
                     {liveTab==='radio' && (radioData?.radio?.length>0 ? (
                         <div><audio ref={audioRef}/>
@@ -606,7 +606,7 @@
                                 </div>
                             ))}
                         </div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F4FB}</div>\u041D\u0435\u0442 \u0440\u0430\u0434\u0438\u043E\u043F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043E\u0432</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>\u041D\u0435\u0442 \u0440\u0430\u0434\u0438\u043E\u043F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043E\u0432</div>)}
 
                     {liveTab==='messages' && (raceControl?.messages?.length>0 ? (
                         <div style={{padding:'4px 0'}}>{raceControl.messages.slice().reverse().map((msg,i)=>(
@@ -620,7 +620,7 @@
                                 </div>
                             </div>
                         ))}</div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>\u{1F4CB}</div>\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0434\u0438\u0440\u0435\u043A\u0446\u0438\u0438</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📋</div>\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0434\u0438\u0440\u0435\u043A\u0446\u0438\u0438</div>)}
                 </div>
             );
         };
@@ -646,7 +646,7 @@
                                     {post.text && <div style={{fontSize:14,lineHeight:1.5,whiteSpace:'pre-line',marginBottom:8}}>{post.text.length>300?post.text.slice(0,300)+'...':post.text}</div>}
                                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                                         <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date ? new Date(post.date).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
-                                        {post.views && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u{1F441} {post.views}</div>}
+                                        {post.views && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>👁 {post.views}</div>}
                                     </div>
                                     <div style={{marginTop:8,fontSize:12,color:'var(--f1-red)',fontWeight:600}}>\u0427\u0438\u0442\u0430\u0442\u044C \u0432 Telegram \u2192</div>
                                 </div>
@@ -654,7 +654,7 @@
                         ))
                     ) : (
                         <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
-                            <div style={{fontSize:48,marginBottom:12}}>\u{1F4F0}</div>
+                            <div style={{fontSize:48,marginBottom:12}}>📰</div>
                             <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>\u041D\u043E\u0432\u043E\u0441\u0442\u0438 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u044E\u0442\u0441\u044F...</div>
                             <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>\u041F\u043E\u0434\u043F\u0438\u0448\u0438\u0441\u044C \u043D\u0430 \u043A\u0430\u043D\u0430\u043B \u0434\u043B\u044F \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u043D\u043E\u0432\u043E\u0441\u0442\u0435\u0439</div>
                             <button className="btn-primary" onClick={()=>openLink('https://t.me/stanizlavsky')}>\u041E\u0442\u043A\u0440\u044B\u0442\u044C @stanizlavsky</button>
@@ -883,7 +883,7 @@
                             </div>
                         ))}
                     </>) : (
-                        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F52E}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432</div><div style={{fontSize:13}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B \u043E\u0442\u043A\u0440\u043E\u044E\u0442\u0441\u044F \u043F\u0435\u0440\u0435\u0434 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0433\u043E\u043D\u043A\u043E\u0439</div></div>
+                        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🔮</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432</div><div style={{fontSize:13}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B \u043E\u0442\u043A\u0440\u043E\u044E\u0442\u0441\u044F \u043F\u0435\u0440\u0435\u0434 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0433\u043E\u043D\u043A\u043E\u0439</div></div>
                     )}
                     {myPredictions.length>0 && (
                         <div style={{marginTop:20}}>
@@ -916,7 +916,7 @@
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:16}}>
                             <div><div style={{fontSize:24,fontWeight:900,color:'var(--f1-red)'}}>{user.points}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u041E\u0447\u043A\u0438</div></div>
                             <div><div style={{fontSize:24,fontWeight:900}}>#{user.rank||'\u2014'}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0420\u0435\u0439\u0442\u0438\u043D\u0433</div></div>
-                            <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u{1F525} \u0421\u0435\u0440\u0438\u044F</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>🔥 \u0421\u0435\u0440\u0438\u044F</div></div>
                         </div>
                     </div>
 
@@ -1158,7 +1158,7 @@
                             ))}
                         </div>
                     ) : !loading && (
-                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F3CE}\u{FE0F}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u0441\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u0438</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0433\u043E\u043D\u043A\u0438</div></div>
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u0441\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u0438</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0433\u043E\u043D\u043A\u0438</div></div>
                     ))}
 
                     {/* POSITION CHART */}
@@ -1177,7 +1177,7 @@
                             </div>
                         </div>
                     ) : !loading && (
-                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u{1F4C8}</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div><div style={{fontSize:13}}>\u0413\u0440\u0430\u0444\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>📈</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div><div style={{fontSize:13}}>\u0413\u0440\u0430\u0444\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
                     ))}
 
                     {/* LAP TIMES */}
@@ -1258,7 +1258,7 @@
 
             if (loading) return (
                 <div style={{height:'100dvh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-                    <div style={{fontSize:48}}>\u{1F3CE}\u{FE0F}</div>
+                    <div style={{fontSize:48}}>🏎️</div>
                     <div style={{fontSize:22,fontWeight:900}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></div>
                     <div style={{width:40,height:4,borderRadius:2,background:'var(--f1-gray)',overflow:'hidden'}}><div style={{width:'50%',height:'100%',background:'var(--f1-red)',borderRadius:2,animation:'shimmer 1s infinite alternate'}}/></div>
                 </div>
