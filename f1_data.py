@@ -396,7 +396,7 @@ ERGAST_TO_NUMBER = {
     "gasly": 10, "colapinto": 43, "albon": 23,
     "sainz": 55, "ocon": 31, "bearman": 87,
     "tsunoda": 22, "lawson": 30, "hulkenberg": 27,
-    "bortoleto": 5, "hadjar": 6,
+    "bortoleto": 5, "hadjar": 6, "doohan": 7,
 }
 
 
@@ -1827,8 +1827,8 @@ async def get_live_track_map() -> Dict[str, Any]:
                     try:
                         last_lap_dt = datetime.fromisoformat(
                             lap["date_start"].replace("Z", "+00:00").replace("+00:00", ""))
-                        # Last lap start + 8 min = all cars have finished, ~30s of data left
-                        date_from = (last_lap_dt + timedelta(minutes=8)).strftime("%Y-%m-%dT%H:%M:%S")
+                        # Use last lap start directly — location data exists at this time
+                        date_from = last_lap_dt.strftime("%Y-%m-%dT%H:%M:%S")
                     except (ValueError, TypeError):
                         pass
                     break

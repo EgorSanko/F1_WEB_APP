@@ -121,6 +121,8 @@ DRIVERS = {
          "photo_url": _dp("lawson"), "photo_url_large": _dp("lawson", "4col")},
     6:  {"name": "Isack Hadjar", "code": "HAD", "team": "Racing Bulls", "country": "FR",
          "photo_url": _dp("hadjar"), "photo_url_large": _dp("hadjar", "4col")},
+    7:  {"name": "Jack Doohan", "code": "DOO", "team": "Alpine", "country": "AU",
+         "photo_url": _dp("doohan"), "photo_url_large": _dp("doohan", "4col")},
     27: {"name": "Nico Hülkenberg", "code": "HUL", "team": "Kick Sauber", "country": "DE",
          "photo_url": _dp("hulkenberg"), "photo_url_large": _dp("hulkenberg", "4col")},
     5:  {"name": "Gabriel Bortoleto", "code": "BOR", "team": "Kick Sauber", "country": "BR",
