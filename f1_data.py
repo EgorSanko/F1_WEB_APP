@@ -2070,9 +2070,9 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
 
     for rnd, data in sorted(SEASON_2025_RESULTS.items()):
         winner_num = data["podium"][0]
-        winner = enrich_driver(winner_num)
-        podium = [enrich_driver(n) for n in data["podium"]]
-        top_10 = [enrich_driver(n, {"position": i + 1}) for i, n in enumerate(data.get("top_10", data["podium"]))]
+        winner = enrich_driver(winner_num, season=season)
+        podium = [enrich_driver(n, season=season) for n in data["podium"]]
+        top_10 = [enrich_driver(n, {"position": i + 1}, season=season) for i, n in enumerate(data.get("top_10", data["podium"]))]
 
         circuit_id = data.get("circuit_id", "")
         circuit_info = CIRCUITS.get(circuit_id, {})
@@ -2100,8 +2100,8 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
 
         # Sprint results for sprint weekends
         if data.get("sprint_podium"):
-            race_entry["sprint_podium"] = [enrich_driver(n) for n in data["sprint_podium"]]
-            race_entry["sprint_top_10"] = [enrich_driver(n, {"position": i + 1}) for i, n in enumerate(data.get("sprint_top_10", data["sprint_podium"]))]
+            race_entry["sprint_podium"] = [enrich_driver(n, season=season) for n in data["sprint_podium"]]
+            race_entry["sprint_top_10"] = [enrich_driver(n, {"position": i + 1}, season=season) for i, n in enumerate(data.get("sprint_top_10", data["sprint_podium"]))]
 
         races.append(race_entry)
 
