@@ -1397,10 +1397,10 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
         circuit_id = data.get("circuit_id", "")
         circuit_info = CIRCUITS.get(circuit_id, {})
 
-        # VK video: direct link if available, search in stanizlavskylive as fallback
+        # VK video: direct link if available, search stanizlavskylive channel as fallback
         vk_url = VK_DIRECT_2025.get(rnd, "")
         race_country = data["name"].replace("Гран-при ", "")
-        vk_search_url = f"https://vkvideo.ru/search?q=Формула+1+Гран-При+{race_country.replace(' ', '+')}+2025+Гонка&tab=lives"
+        vk_search_url = f"https://vkvideo.ru/search?q=stanizlavskylive+Формула+1+Гран-При+{race_country.replace(' ', '+')}+2025+Гонка"
 
         races.append({
             "round": rnd,
