@@ -56,7 +56,7 @@
             position:fixed; bottom:0; left:0; right:0;
             background:rgba(15,15,21,0.92); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
             border-top:1px solid var(--f1-border); z-index:100;
-            padding-bottom:env(safe-area-inset-bottom,0px);
+            height:auto; padding:8px 0 calc(8px + env(safe-area-inset-bottom, 12px));
         }
         .nav-item {
             display:flex; flex-direction:column; align-items:center;
@@ -92,7 +92,7 @@
         .fade-in { animation:fadeIn 0.35s ease-out; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-        .page-container { height:100dvh; padding-bottom:calc(90px + env(safe-area-inset-bottom, 16px)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .page-container { height:100dvh; padding-bottom:120px !important; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 
         .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }
         .standings-row:active { background:var(--f1-card-hover); }
@@ -247,7 +247,6 @@
             const tabs = [
                 {id:'home', icon:NavIcons.home, label:'Главная'},
                 {id:'live', icon:NavIcons.live, label:'Онлайн'},
-                {id:'analytics', icon:NavIcons.analytics, label:'Аналитика'},
                 {id:'news', icon:NavIcons.news, label:'Новости'},
                 {id:'standings', icon:NavIcons.trophy, label:'Чемпионат'},
                 {id:'predict', icon:NavIcons.predict, label:'Прогнозы'},
@@ -346,57 +345,6 @@
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    )}
-
-                    {(streams?.videos?.length > 0 || streams?.channels?.length > 0) && (
-                        <div>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
-                                📺 Трансляции и видео
-                            </div>
-
-                            {streams?.videos?.length > 0 && (
-                                <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch',marginBottom:8}}>
-                                    {streams.videos.map((v,i)=>{
-                                        const dur = v.duration ? `${Math.floor(v.duration/60)}:${String(v.duration%60).padStart(2,'0')}` : '';
-                                        const views = v.views >= 1000 ? `${(v.views/1000).toFixed(1)}K` : v.views || '';
-                                        return (
-                                            <div key={i} className="stream-card" onClick={()=>openLink(v.url)}>
-                                                <div className="stream-thumb">
-                                                    {v.thumbnail && <img src={v.thumbnail} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                                    {v.is_live && <div className="live-badge">LIVE</div>}
-                                                    {dur && !v.is_live && <div style={{position:'absolute',bottom:6,right:6,background:'rgba(0,0,0,0.75)',color:'#fff',fontSize:10,fontWeight:600,padding:'2px 6px',borderRadius:4}}>{dur}</div>}
-                                                </div>
-                                                <div style={{padding:'10px 12px'}}>
-                                                    <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{v.title}</div>
-                                                    {views && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>👁 {views}</div>}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    <div className="stream-card" onClick={()=>openLink(streams.channel_url)} style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:160}}>
-                                        <div style={{textAlign:'center',padding:20}}>
-                                            <div style={{fontSize:28,marginBottom:8}}>▶️</div>
-                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>Все видео</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {streams?.channels?.length > 0 && (
-                                <div style={{display:'flex',gap:8,overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
-                                    {streams.channels.map((ch,i)=>{
-                                        const colors = {vk:'#0077FF',yt:'#FF0000',tg:'#229ED9'};
-                                        const labels = {vk:'VK',yt:'YT',tg:'TG'};
-                                        return (
-                                            <div key={i} onClick={()=>openLink(ch.url)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--f1-card-solid)',borderRadius:12,border:'1px solid var(--f1-border)',flexShrink:0,transition:'transform 0.15s'}}>
-                                                <div style={{width:24,height:24,borderRadius:6,background:colors[ch.icon]||'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',flexShrink:0}}>{labels[ch.icon]||'🔗'}</div>
-                                                <div style={{fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>{ch.title}</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -1443,6 +1391,11 @@
 
         // ==== RACE DETAIL PAGE ====
         const RaceDetailPage = ({race, onBack}) => {
+            const [tyreData, setTyreData] = useState(null);
+            useEffect(() => {
+                if (race) api.get('/api/analytics/strategy').then(d => { if (d?.drivers?.length > 0) setTyreData(d); });
+            }, [race?.round]);
+
             if (!race) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
 
             const flag = circuitFlags[race.circuit_id] || '🏁';
@@ -1450,6 +1403,7 @@
             const podiumColors = ['#FFD700','#C0C0C0','#CD7F32'];
             const podiumHeights = [130, 100, 85];
             const podiumSizes = [64, 48, 48];
+            const tyreColors = {SOFT:'#FF3333',MEDIUM:'#FFD700',HARD:'#CCCCCC',INTERMEDIATE:'#39B54A',WET:'#0067FF',UNKNOWN:'#888'};
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
@@ -1510,6 +1464,32 @@
                                         <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{d.first_name} {d.last_name}</span>
                                     </div>
                                     <span style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Tyre Strategy */}
+                    {tyreData && (
+                        <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>🏎️ Стратегия шин · {tyreData.total_laps} кругов</div>
+                            <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+                                {['SOFT','MEDIUM','HARD','INTERMEDIATE','WET'].map(c=>(
+                                    <div key={c} style={{display:'flex',alignItems:'center',gap:3,fontSize:10}}>
+                                        <span style={{width:8,height:8,borderRadius:'50%',background:tyreColors[c],display:'inline-block'}}/>{c}
+                                    </div>
+                                ))}
+                            </div>
+                            {tyreData.drivers.map((d,i)=>(
+                                <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:4,marginBottom:3,padding:'2px 0'}}>
+                                    <div style={{width:28,fontSize:10,fontWeight:700,color:d.team_color,textAlign:'right',flexShrink:0}}>{d.code}</div>
+                                    <div style={{flex:1,display:'flex',height:18,borderRadius:3,overflow:'hidden',background:'var(--f1-gray)',gap:1}}>
+                                        {d.stints.map((s,j)=>{
+                                            const w = ((( s.lap_end||tyreData.total_laps) - (s.lap_start||1) + 1) / tyreData.total_laps) * 100;
+                                            return <div key={j} style={{width:`${w}%`,background:tyreColors[s.compound]||'#888',minWidth:2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:s.compound==='HARD'||s.compound==='MEDIUM'?'#000':'#fff',overflow:'hidden'}}>{w>10?`${Math.round(w)}%`:''}</div>;
+                                        })}
+                                    </div>
+                                    <div style={{width:18,fontSize:9,color:'var(--f1-text-muted)',textAlign:'center',flexShrink:0}}>P{d.finish_position}</div>
                                 </div>
                             ))}
                         </div>
@@ -1597,7 +1577,6 @@
                 switch(tab) {
                     case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
-                    case 'analytics': return <AnalyticsPage/>;
                     case 'news': return <NewsPage/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')}/>;
