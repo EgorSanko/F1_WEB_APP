@@ -116,6 +116,130 @@ def cache_stats() -> Dict[str, Any]:
     return {"total_keys": total, "expired": expired, "active": total - expired}
 
 
+# ============ DEMO MODE ============
+# When no live session, auto-fallback to last historical session.
+# Manual override via set_demo_session().
+
+_demo_override_key: Optional[str] = None
+
+
+async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
+    """
+    Determine which session_key to use for live endpoints.
+    Returns (session_key, is_demo, demo_session_info).
+    - Live session active → ("latest", False, None)
+    - Manual override set → (override_key, True, info)
+    - No live session → (last_session_key, True, info)
+    """
+    global _demo_override_key
+
+    # 1) Manual override via /api/demo/set
+    if _demo_override_key:
+        info = cache_get(f"demo_info:{_demo_override_key}", ttl_override=3600)
+        if not info:
+            sessions = await fetch_openf1("sessions", {"session_key": _demo_override_key})
+            if sessions:
+                s = sessions[-1] if isinstance(sessions, list) else sessions
+                if isinstance(s, list):
+                    s = s[0] if s else {}
+                info = {
+                    "session_key": s.get("session_key", int(_demo_override_key)),
+                    "session_name": s.get("session_name", ""),
+                    "session_type": s.get("session_type", ""),
+                    "meeting_name": s.get("meeting_name", ""),
+                    "circuit_short_name": s.get("circuit_short_name", ""),
+                    "date_start": s.get("date_start", ""),
+                    "date_end": s.get("date_end", ""),
+                }
+            else:
+                info = {"session_key": int(_demo_override_key), "meeting_name": f"Session {_demo_override_key}"}
+            cache_set(f"demo_info:{_demo_override_key}", info)
+        return _demo_override_key, True, info
+
+    # 2) Check cached resolution (60s TTL)
+    cached = cache_get("_fallback_resolved", ttl_override=60)
+    if cached:
+        return cached["key"], cached["is_demo"], cached.get("info")
+
+    # 3) Check if latest session is actually live
+    sessions = await fetch_openf1("sessions", {"session_key": "latest"})
+    if not sessions:
+        last_rnd = max(SEASON_2025_RESULTS.keys())
+        sk = str(SEASON_2025_RESULTS[last_rnd]["session_key"])
+        info = {"session_key": int(sk), "meeting_name": SEASON_2025_RESULTS[last_rnd]["name"],
+                "session_name": "Race", "date_start": SEASON_2025_RESULTS[last_rnd]["date"]}
+        cache_set("_fallback_resolved", {"key": sk, "is_demo": True, "info": info})
+        return sk, True, info
+
+    session = sessions[-1] if isinstance(sessions, list) and sessions else sessions
+    if isinstance(session, list):
+        session = session[0] if session else {}
+
+    now = datetime.utcnow()
+    is_live = False
+    date_start = session.get("date_start", "")
+    date_end = session.get("date_end", "")
+    if date_start and date_end:
+        try:
+            start = datetime.fromisoformat(date_start.replace("Z", "+00:00").replace("+00:00", ""))
+            end = datetime.fromisoformat(date_end.replace("Z", "+00:00").replace("+00:00", ""))
+            is_live = start <= now <= (end + timedelta(minutes=30))
+        except (ValueError, TypeError):
+            pass
+
+    if is_live:
+        cache_set("_fallback_resolved", {"key": "latest", "is_demo": False})
+        return "latest", False, None
+
+    # Not live — use this session's key
+    sk = session.get("session_key")
+    if sk:
+        info = {
+            "session_key": sk,
+            "session_name": session.get("session_name", ""),
+            "session_type": session.get("session_type", ""),
+            "meeting_name": session.get("meeting_name", ""),
+            "circuit_short_name": session.get("circuit_short_name", ""),
+            "date_start": date_start,
+            "date_end": date_end,
+        }
+        cache_set("_fallback_resolved", {"key": str(sk), "is_demo": True, "info": info})
+        return str(sk), True, info
+
+    # Absolute fallback
+    last_rnd = max(SEASON_2025_RESULTS.keys())
+    sk = str(SEASON_2025_RESULTS[last_rnd]["session_key"])
+    info = {"session_key": int(sk), "meeting_name": SEASON_2025_RESULTS[last_rnd]["name"], "session_name": "Race"}
+    cache_set("_fallback_resolved", {"key": sk, "is_demo": True, "info": info})
+    return sk, True, info
+
+
+def set_demo_session(session_key: Optional[str]):
+    """Set or clear demo session override. None = auto mode."""
+    global _demo_override_key
+    _demo_override_key = session_key
+    cache_clear("_fallback")
+    cache_clear("live_")
+    logger.info(f"Demo session {'set to ' + session_key if session_key else 'cleared'}")
+
+
+def get_demo_sessions_list() -> List[Dict]:
+    """Return available historical sessions for demo mode picker."""
+    sessions = []
+    for rnd, data in sorted(SEASON_2025_RESULTS.items(), reverse=True):
+        sk = data.get("session_key")
+        if sk:
+            sessions.append({
+                "session_key": sk,
+                "name": data["name"],
+                "date": data["date"],
+                "round": rnd,
+                "type": "Race",
+                "laps": data.get("laps", 0),
+            })
+    return sessions
+
+
 # ============ FETCH HELPERS WITH RETRY ============
 
 async def fetch_openf1(
@@ -272,7 +396,7 @@ ERGAST_TO_NUMBER = {
     "gasly": 10, "colapinto": 43, "albon": 23,
     "sainz": 55, "ocon": 31, "bearman": 87,
     "tsunoda": 22, "lawson": 30, "hulkenberg": 27,
-    "bortoleto": 5, "hadjar": 35,
+    "bortoleto": 5, "hadjar": 6,
 }
 
 
@@ -671,15 +795,22 @@ async def get_constructor_standings() -> Dict[str, Any]:
 
 # ============ LIVE DATA (OpenF1) ============
 
-async def get_live_session() -> Dict[str, Any]:
+async def get_live_session(_session_key=None) -> Dict[str, Any]:
     """Check if there's a live session and get its info."""
-    cached = cache_get("live_session")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_session:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
-    sessions = await fetch_openf1("sessions", {"session_key": "latest"})
+    sessions = await fetch_openf1("sessions", {"session_key": _session_key})
     if not sessions:
-        return {"is_live": False, "message": "No session data available"}
+        return {"is_live": False, "is_demo": _is_demo, "message": "No session data available"}
 
     session = sessions[-1] if isinstance(sessions, list) and sessions else sessions
     if isinstance(session, list):
@@ -690,17 +821,17 @@ async def get_live_session() -> Dict[str, Any]:
     date_start = session.get("date_start", "")
     date_end = session.get("date_end", "")
 
-    if date_start and date_end:
+    if not _is_demo and date_start and date_end:
         try:
             start = datetime.fromisoformat(date_start.replace("Z", "+00:00").replace("+00:00", ""))
             end = datetime.fromisoformat(date_end.replace("Z", "+00:00").replace("+00:00", ""))
-            # Add 30 min buffer after session end
             is_live = start <= now <= (end + timedelta(minutes=30))
         except (ValueError, TypeError):
             pass
 
     response = {
         "is_live": is_live,
+        "is_demo": _is_demo,
         "session_key": session.get("session_key"),
         "session_name": session.get("session_name", ""),
         "session_type": session.get("session_type", ""),
@@ -712,25 +843,34 @@ async def get_live_session() -> Dict[str, Any]:
         "country_name": session.get("country_name", ""),
         "year": session.get("year"),
     }
-    cache_set("live_session", response)
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_positions() -> Dict[str, Any]:
+async def get_live_positions(_session_key=None) -> Dict[str, Any]:
     """Get current positions with tyres and pit stop info — merged from 3 endpoints."""
-    cached = cache_get("live_positions")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_positions:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
     # Fetch all 3 sources in parallel
     positions_raw, stints_raw, pits_raw = await asyncio.gather(
-        fetch_openf1("position", {"session_key": "latest"}),
-        fetch_openf1("stints", {"session_key": "latest"}),
-        fetch_openf1("pit", {"session_key": "latest"}),
+        fetch_openf1("position", {"session_key": _session_key}),
+        fetch_openf1("stints", {"session_key": _session_key}),
+        fetch_openf1("pit", {"session_key": _session_key}),
     )
 
     if not positions_raw:
-        return {"positions": [], "count": 0}
+        return {"positions": [], "count": 0, "is_demo": _is_demo}
 
     # Latest position per driver
     latest_pos = {}
@@ -788,24 +928,33 @@ async def get_live_positions() -> Dict[str, Any]:
             "_stint_lap_start": stint.get("lap_start", 0),
         }))
 
-    response = {"positions": result, "count": len(result)}
-    cache_set("live_positions", response)
+    response = {"positions": result, "count": len(result), "is_demo": _is_demo}
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_timing() -> Dict[str, Any]:
+async def get_live_timing(_session_key=None) -> Dict[str, Any]:
     """Get timing data: laps, sectors, intervals — merged and enriched."""
-    cached = cache_get("live_timing")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_timing:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
     laps_raw, intervals_raw = await asyncio.gather(
-        fetch_openf1("laps", {"session_key": "latest"}),
-        fetch_openf1("intervals", {"session_key": "latest"}),
+        fetch_openf1("laps", {"session_key": _session_key}),
+        fetch_openf1("intervals", {"session_key": _session_key}),
     )
 
     if not laps_raw:
-        return {"timing": [], "session_best": {}}
+        return {"timing": [], "session_best": {}, "is_demo": _is_demo}
 
     # Last lap per driver
     latest_laps = {}
@@ -889,20 +1038,30 @@ async def get_live_timing() -> Dict[str, Any]:
             "lap": best_lap,
         },
         "total_laps_in_data": len(laps_raw),
+        "is_demo": _is_demo,
     }
-    cache_set("live_timing", response)
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_weather() -> Dict[str, Any]:
+async def get_live_weather(_session_key=None) -> Dict[str, Any]:
     """Get current track weather."""
-    cached = cache_get("live_weather")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_weather:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
-    data = await fetch_openf1("weather", {"session_key": "latest"})
+    data = await fetch_openf1("weather", {"session_key": _session_key})
     if not data:
-        return {"weather": None}
+        return {"weather": None, "is_demo": _is_demo}
 
     latest = data[-1] if data else {}
     response = {
@@ -915,21 +1074,31 @@ async def get_live_weather() -> Dict[str, Any]:
             "is_raining": bool(latest.get("rainfall", 0)),
             "wind_speed": latest.get("wind_speed"),
             "wind_direction": latest.get("wind_direction"),
-        }
+        },
+        "is_demo": _is_demo,
     }
-    cache_set("live_weather", response)
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_race_control() -> Dict[str, Any]:
+async def get_live_race_control(_session_key=None) -> Dict[str, Any]:
     """Get race control messages (flags, penalties, etc.)."""
-    cached = cache_get("live_race_control")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_race_control:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
-    data = await fetch_openf1("race_control", {"session_key": "latest"})
+    data = await fetch_openf1("race_control", {"session_key": _session_key})
     if not data:
-        return {"messages": []}
+        return {"messages": [], "is_demo": _is_demo}
 
     messages = []
     for msg in data[-25:]:  # last 25 messages
@@ -943,20 +1112,29 @@ async def get_live_race_control() -> Dict[str, Any]:
             "lap_number": msg.get("lap_number"),
         })
 
-    response = {"messages": messages}
-    cache_set("live_race_control", response)
+    response = {"messages": messages, "is_demo": _is_demo}
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_radio() -> Dict[str, Any]:
+async def get_live_radio(_session_key=None) -> Dict[str, Any]:
     """Get latest team radio messages."""
-    cached = cache_get("live_radio")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_radio:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
-    data = await fetch_openf1("team_radio", {"session_key": "latest"})
+    data = await fetch_openf1("team_radio", {"session_key": _session_key})
     if not data:
-        return {"radio": []}
+        return {"radio": [], "is_demo": _is_demo}
 
     radio = []
     for msg in data[-15:]:  # last 15
@@ -966,20 +1144,29 @@ async def get_live_radio() -> Dict[str, Any]:
             "recording_url": msg.get("recording_url", ""),
         }))
 
-    response = {"radio": radio}
-    cache_set("live_radio", response)
+    response = {"radio": radio, "is_demo": _is_demo}
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
-async def get_live_pit_stops() -> Dict[str, Any]:
+async def get_live_pit_stops(_session_key=None) -> Dict[str, Any]:
     """Get pit stops from the current session."""
-    cached = cache_get("live_pit_stops")
+    if _session_key is None:
+        _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    else:
+        _is_demo = (_session_key != "latest")
+        _demo_info = None
+
+    cache_key = f"live_pit_stops:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
     if cached:
         return cached
 
-    data = await fetch_openf1("pit", {"session_key": "latest"})
+    data = await fetch_openf1("pit", {"session_key": _session_key})
     if not data:
-        return {"pit_stops": []}
+        return {"pit_stops": [], "is_demo": _is_demo}
 
     pit_stops = []
     for p in data:
@@ -991,8 +1178,10 @@ async def get_live_pit_stops() -> Dict[str, Any]:
                 "pit_duration": p.get("pit_duration"),
             }))
 
-    response = {"pit_stops": pit_stops}
-    cache_set("live_pit_stops", response)
+    response = {"pit_stops": pit_stops, "is_demo": _is_demo}
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
     return response
 
 
@@ -1096,12 +1285,15 @@ async def get_home_data() -> Dict[str, Any]:
 
 async def get_live_dashboard() -> Dict[str, Any]:
     """Get all live data in a single parallel fetch, with cross-enrichment."""
+    # Resolve session key once, pass to all sub-functions
+    _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+
     session, positions, timing, weather, rc = await asyncio.gather(
-        get_live_session(),
-        get_live_positions(),
-        get_live_timing(),
-        get_live_weather(),
-        get_live_race_control(),
+        get_live_session(_session_key),
+        get_live_positions(_session_key),
+        get_live_timing(_session_key),
+        get_live_weather(_session_key),
+        get_live_race_control(_session_key),
     )
 
     # Cross-enrich: add current lap to positions for better tyre age
@@ -1110,11 +1302,16 @@ async def get_live_dashboard() -> Dict[str, Any]:
         for p in positions["positions"]:
             t = timing_by_dn.get(p["driver_number"])
             if t and t.get("lap_number"):
-                # Recalculate tyre age from actual lap number
                 stint_start = p.get("_stint_lap_start", 0)
                 if stint_start and p.get("tyre_age", 0) == 0:
                     p["tyre_age"] = max(0, t["lap_number"] - stint_start)
                 p["current_lap"] = t["lap_number"]
+
+    # Ensure is_demo is on session for frontend
+    if _is_demo and session:
+        session["is_demo"] = True
+        if _demo_info:
+            session["demo_session"] = _demo_info
 
     return {
         "session": session,
@@ -1382,6 +1579,498 @@ async def get_race_laptimes(session_key: str = "latest", driver_numbers: list = 
     return response
 
 
+# ============ ANALYTICS: TYRE DEGRADATION ============
+
+async def get_live_tyre_degradation(session_key: str = "latest", driver_numbers: list = None) -> Dict[str, Any]:
+    """Get tyre degradation analysis: corrected lap times + linear trend per stint."""
+    cache_key = f"tyre_degradation:{session_key}"
+    ttl = 30 if session_key == "latest" else 300
+    cached = cache_get(cache_key, ttl_override=ttl)
+    if cached and not driver_numbers:
+        return cached
+
+    laps_raw, stints_raw = await asyncio.gather(
+        fetch_openf1("laps", {"session_key": session_key}),
+        fetch_openf1("stints", {"session_key": session_key}),
+    )
+
+    if not laps_raw or not stints_raw:
+        return {"drivers": [], "total_laps": 0}
+
+    # Find total race laps
+    all_lap_nums = [l.get("lap_number", 0) for l in laps_raw if l.get("lap_number")]
+    total_laps = max(all_lap_nums) if all_lap_nums else 0
+
+    # Group stints by driver
+    driver_stints: Dict[int, list] = {}
+    for s in stints_raw:
+        dn = s.get("driver_number")
+        if dn is None:
+            continue
+        if driver_numbers and dn not in driver_numbers:
+            continue
+        driver_stints.setdefault(dn, []).append({
+            "compound": s.get("compound", "UNKNOWN"),
+            "lap_start": s.get("lap_start", 0),
+            "lap_end": s.get("lap_end"),
+            "stint_number": s.get("stint_number", 1),
+        })
+
+    # Group laps by driver
+    driver_laps: Dict[int, list] = {}
+    for lap in laps_raw:
+        dn = lap.get("driver_number")
+        if dn is None:
+            continue
+        if driver_numbers and dn not in driver_numbers:
+            continue
+        duration = lap.get("lap_duration")
+        if not duration:
+            continue
+        driver_laps.setdefault(dn, []).append({
+            "lap": lap.get("lap_number", 0),
+            "time": duration,
+            "is_pit_out": lap.get("is_pit_out_lap", False),
+        })
+
+    def _linear_regression(points):
+        """Manual linear regression: returns (slope, intercept) or None."""
+        n = len(points)
+        if n < 3:
+            return None
+        sum_x = sum(p[0] for p in points)
+        sum_y = sum(p[1] for p in points)
+        sum_xy = sum(p[0] * p[1] for p in points)
+        sum_x2 = sum(p[0] ** 2 for p in points)
+        denom = n * sum_x2 - sum_x ** 2
+        if denom == 0:
+            return None
+        slope = (n * sum_xy - sum_x * sum_y) / denom
+        intercept = (sum_y - slope * sum_x) / n
+        return slope, intercept
+
+    drivers = []
+    for dn, stints in driver_stints.items():
+        stints.sort(key=lambda x: x["stint_number"])
+        laps = sorted(driver_laps.get(dn, []), key=lambda x: x["lap"])
+
+        if not laps:
+            continue
+
+        stint_results = []
+        for stint in stints:
+            lap_start = stint["lap_start"] or 1
+            lap_end = stint["lap_end"] or total_laps
+
+            # Get laps in this stint
+            stint_laps = [l for l in laps if lap_start <= l["lap"] <= lap_end]
+            if not stint_laps:
+                continue
+
+            # Filter out pit out laps
+            clean_laps = [l for l in stint_laps if not l.get("is_pit_out")]
+            if len(clean_laps) < 2:
+                continue
+
+            # Calculate median for outlier filtering
+            times = sorted(l["time"] for l in clean_laps)
+            median_time = times[len(times) // 2]
+
+            # Filter outliers (>110% of median)
+            filtered = [l for l in clean_laps if l["time"] <= median_time * 1.10]
+            if len(filtered) < 2:
+                filtered = clean_laps  # fallback to unfiltered
+
+            # Fuel correction: subtract 0.03s per remaining lap
+            lap_data = []
+            for l in filtered:
+                corrected = l["time"] - 0.03 * (total_laps - l["lap"])
+                lap_data.append({
+                    "lap": l["lap"],
+                    "raw_time": round(l["time"], 3),
+                    "corrected_time": round(corrected, 3),
+                })
+
+            # Linear regression on corrected times
+            points = [(d["lap"], d["corrected_time"]) for d in lap_data]
+            reg = _linear_regression(points)
+
+            deg_rate = None
+            trend_line = []
+            if reg:
+                slope, intercept = reg
+                deg_rate = round(slope, 4)  # seconds per lap
+                first_lap = lap_data[0]["lap"]
+                last_lap = lap_data[-1]["lap"]
+                trend_line = [
+                    {"lap": first_lap, "time": round(slope * first_lap + intercept, 3)},
+                    {"lap": last_lap, "time": round(slope * last_lap + intercept, 3)},
+                ]
+
+            stint_results.append({
+                "compound": stint["compound"],
+                "stint_number": stint["stint_number"],
+                "deg_rate": deg_rate,
+                "laps": lap_data,
+                "trend_line": trend_line,
+            })
+
+        if stint_results:
+            drivers.append(enrich_driver(dn, {
+                "stints": stint_results,
+            }))
+
+    response = {"drivers": drivers, "total_laps": total_laps}
+    if not driver_numbers:
+        cache_set(cache_key, response)
+    return response
+
+
+# ============ LIVE TRACK MAP ============
+
+async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
+    """Get track outline points from one driver's one complete lap. Cached 1 hour."""
+    cache_key = f"track_outline:{session_key}"
+    cached = cache_get(cache_key, ttl_override=3600)
+    if cached:
+        return cached
+
+    # Find a completed lap with date_start from driver 1 (or first available)
+    laps = await fetch_openf1("laps", {
+        "session_key": session_key,
+        "driver_number": 1,
+    })
+    if not laps:
+        # Try another driver
+        laps = await fetch_openf1("laps", {
+            "session_key": session_key,
+            "driver_number": 44,
+        })
+    if not laps:
+        return None
+
+    # Find a complete mid-race lap (not first lap, has date_start)
+    target_lap = None
+    for lap in laps:
+        if lap.get("date_start") and lap.get("lap_number", 0) > 2 and lap.get("lap_duration"):
+            target_lap = lap
+            break
+    if not target_lap and laps:
+        # Fallback: use any lap with date_start
+        for lap in laps:
+            if lap.get("date_start"):
+                target_lap = lap
+                break
+    if not target_lap:
+        return None
+
+    # Fetch location data for that one lap
+    dn = target_lap.get("driver_number", 1)
+    date_start = target_lap["date_start"]
+    location = await fetch_openf1("location", {
+        "session_key": session_key,
+        "driver_number": dn,
+        "date>": date_start,
+    })
+    if not location:
+        return None
+
+    # Take approximately one lap worth of points (~300-500 expected)
+    # Limit to ~500 points then downsample to ~250
+    points_raw = location[:500]
+    stride = max(1, len(points_raw) // 250)
+    points = [
+        {"x": p.get("x", 0), "y": p.get("y", 0)}
+        for i, p in enumerate(points_raw) if i % stride == 0
+        if p.get("x") is not None and p.get("y") is not None
+    ]
+
+    if len(points) < 20:
+        return None
+
+    cache_set(cache_key, points)
+    return points
+
+
+async def get_live_track_map() -> Dict[str, Any]:
+    """Get track outline + current car positions for live map."""
+    _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+
+    cache_key = f"live_track_map:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else 2)
+    if cached:
+        return cached
+
+    # Get session info for date_end (needed for demo mode)
+    session = await get_live_session(_session_key)
+    session_key = session.get("session_key")
+    if not session_key:
+        return {"track": None, "cars": [], "is_demo": _is_demo, "error": "No active session"}
+
+    # Get track outline (heavily cached)
+    track_points = await _get_track_outline(str(session_key))
+
+    # For demo mode: find actual end of race location data
+    # For live mode: use last 5 seconds from now
+    if _is_demo:
+        # Get last lap to estimate when the race ended
+        laps = await fetch_openf1("laps", {
+            "session_key": session_key,
+            "driver_number": 1,
+        })
+        if not laps:
+            laps = await fetch_openf1("laps", {"session_key": session_key, "driver_number": 4})
+        date_from = None
+        if laps:
+            for lap in reversed(laps):
+                if lap.get("date_start"):
+                    try:
+                        last_lap_dt = datetime.fromisoformat(
+                            lap["date_start"].replace("Z", "+00:00").replace("+00:00", ""))
+                        # Last lap start + 8 min = all cars have finished, ~30s of data left
+                        date_from = (last_lap_dt + timedelta(minutes=8)).strftime("%Y-%m-%dT%H:%M:%S")
+                    except (ValueError, TypeError):
+                        pass
+                    break
+    else:
+        now = datetime.utcnow()
+        date_from = (now - timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    location_params = {"session_key": session_key}
+    if date_from:
+        location_params["date>"] = date_from
+    elif _is_demo:
+        # No date_end available — fetch last position per driver only
+        # Use position data to show car positions without location coords
+        location_raw = []
+        position_raw = await fetch_openf1("position", {"session_key": session_key})
+        # Skip location fetch entirely — cars will show at track positions without coords
+        response = {
+            "track": {"points": track_points} if track_points else None,
+            "cars": [],
+            "timestamp": datetime.utcnow().isoformat(),
+            "is_demo": _is_demo,
+        }
+        if _demo_info:
+            response["demo_session"] = _demo_info
+        cache_set(cache_key, response)
+        return response
+
+    location_raw, position_raw = await asyncio.gather(
+        fetch_openf1("location", location_params),
+        fetch_openf1("position", {"session_key": session_key}),
+    )
+
+    # Latest position per driver for race position info
+    latest_position = {}
+    if position_raw:
+        for entry in position_raw:
+            dn = entry.get("driver_number")
+            if dn is not None:
+                if dn not in latest_position or entry.get("date", "") > latest_position[dn].get("date", ""):
+                    latest_position[dn] = entry
+
+    # Latest (x,y) per driver from location data
+    latest_loc = {}
+    if location_raw:
+        for entry in location_raw:
+            dn = entry.get("driver_number")
+            if dn is not None and entry.get("x") is not None and entry.get("y") is not None:
+                if dn not in latest_loc or entry.get("date", "") > latest_loc[dn].get("date", ""):
+                    latest_loc[dn] = entry
+
+    # Build car list
+    cars = []
+    for dn, loc in latest_loc.items():
+        pos_entry = latest_position.get(dn, {})
+        cars.append(enrich_driver(dn, {
+            "x": loc.get("x", 0),
+            "y": loc.get("y", 0),
+            "position": pos_entry.get("position", 0),
+        }))
+
+    cars.sort(key=lambda c: c.get("position", 99))
+
+    response = {
+        "track": {"points": track_points} if track_points else None,
+        "cars": cars,
+        "timestamp": datetime.utcnow().isoformat(),
+        "is_demo": _is_demo,
+    }
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
+    return response
+
+
+# ============ RADIO TRANSCRIPTION (Whisper + Translation) ============
+
+_whisper_model = None
+_whisper_lock = None
+_whisper_last_used = 0
+_transcription_cache: Dict[str, Dict] = {}  # recording_url -> {en, ru}
+
+WHISPER_IDLE_TIMEOUT = 1800  # 30 minutes
+
+
+def _get_whisper_lock():
+    """Get or create the asyncio lock (must be in running loop)."""
+    global _whisper_lock
+    if _whisper_lock is None:
+        _whisper_lock = asyncio.Lock()
+    return _whisper_lock
+
+
+def _load_whisper_model():
+    """Load faster-whisper tiny model. Called in executor (CPU-bound)."""
+    try:
+        from faster_whisper import WhisperModel
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        logger.info("Whisper model loaded successfully (tiny/int8)")
+        return model
+    except Exception as e:
+        logger.error(f"Failed to load Whisper model: {e}")
+        return None
+
+
+async def _get_whisper_model():
+    """Get or lazy-load the whisper model. Returns model or None."""
+    global _whisper_model, _whisper_last_used
+    lock = _get_whisper_lock()
+    async with lock:
+        if _whisper_model is None:
+            loop = asyncio.get_event_loop()
+            _whisper_model = await loop.run_in_executor(None, _load_whisper_model)
+        _whisper_last_used = time.time()
+        return _whisper_model
+
+
+async def _unload_whisper_if_idle():
+    """Check and unload whisper model if idle for >30min. Called periodically."""
+    global _whisper_model, _whisper_last_used
+    if _whisper_model and time.time() - _whisper_last_used > WHISPER_IDLE_TIMEOUT:
+        lock = _get_whisper_lock()
+        async with lock:
+            if _whisper_model and time.time() - _whisper_last_used > WHISPER_IDLE_TIMEOUT:
+                _whisper_model = None
+                _whisper_last_used = 0
+                logger.info("Whisper model unloaded (idle timeout)")
+
+
+async def _transcribe_radio(recording_url: str) -> Dict[str, str]:
+    """Download, transcribe, and translate a team radio clip."""
+    if recording_url in _transcription_cache:
+        return _transcription_cache[recording_url]
+
+    try:
+        model = await _get_whisper_model()
+        if not model:
+            return {"en": "", "ru": "[модель недоступна]"}
+
+        # Download MP3
+        client = get_client()
+        resp = await client.get(recording_url, timeout=15.0)
+        if resp.status_code != 200:
+            return {"en": "", "ru": "[ошибка загрузки]"}
+
+        import tempfile
+        import os
+        # Write to tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+        tmp.write(resp.content)
+        tmp_path = tmp.name
+        tmp.close()
+
+        try:
+            # Transcribe in executor (CPU-bound)
+            loop = asyncio.get_event_loop()
+
+            def _do_transcribe():
+                segments, info = model.transcribe(tmp_path, language="en")
+                text = " ".join(seg.text.strip() for seg in segments).strip()
+                return text
+
+            en_text = await loop.run_in_executor(None, _do_transcribe)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+        if not en_text:
+            result = {"en": "", "ru": "[неразборчиво]"}
+            _transcription_cache[recording_url] = result
+            return result
+
+        # Translate EN→RU in executor
+        ru_text = en_text  # fallback
+        try:
+            def _do_translate():
+                from deep_translator import GoogleTranslator
+                return GoogleTranslator(source="en", target="ru").translate(en_text)
+
+            ru_text = await loop.run_in_executor(None, _do_translate)
+            if not ru_text:
+                ru_text = en_text
+        except Exception as e:
+            logger.warning(f"Translation failed: {e}")
+
+        result = {"en": en_text, "ru": ru_text}
+        _transcription_cache[recording_url] = result
+        return result
+
+    except Exception as e:
+        logger.error(f"Transcription error for {recording_url}: {e}")
+        result = {"en": "", "ru": "[ошибка транскрипции]"}
+        _transcription_cache[recording_url] = result
+        return result
+
+
+async def get_live_radio_enhanced() -> Dict[str, Any]:
+    """Get team radio with transcription/translation. Non-blocking: returns immediately."""
+    _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+
+    cache_key = f"live_radio_enhanced:{_session_key}"
+    cached = cache_get(cache_key, ttl_override=300 if _is_demo else None)
+    if cached:
+        return cached
+
+    data = await fetch_openf1("team_radio", {"session_key": _session_key})
+    if not data:
+        return {"radio": [], "is_demo": _is_demo}
+
+    radio = []
+    for msg in data[-15:]:  # last 15 messages
+        dn = msg.get("driver_number")
+        recording_url = msg.get("recording_url", "")
+
+        # Check if already transcribed
+        cached_transcript = _transcription_cache.get(recording_url)
+        is_transcribed = cached_transcript is not None
+
+        entry = enrich_driver(dn, {
+            "date": msg.get("date", ""),
+            "recording_url": recording_url,
+            "is_transcribed": is_transcribed,
+            "transcript_en": cached_transcript.get("en", "") if cached_transcript else "",
+            "transcript_ru": cached_transcript.get("ru", "") if cached_transcript else "",
+        })
+        radio.append(entry)
+
+        # Fire-and-forget transcription for uncached clips
+        if not is_transcribed and recording_url:
+            asyncio.create_task(_transcribe_radio(recording_url))
+
+    # Also check if whisper should be unloaded
+    asyncio.create_task(_unload_whisper_if_idle())
+
+    response = {"radio": radio, "is_demo": _is_demo}
+    if _demo_info:
+        response["demo_session"] = _demo_info
+    cache_set(cache_key, response)
+    return response
+
+
 # ============ SEASON 2025 RESULTS ============
 
 def get_season_results(season: int = 2025) -> Dict[str, Any]:
@@ -1402,7 +2091,7 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
         race_country = data["name"].replace("Гран-при ", "")
         vk_search_url = f"https://vkvideo.ru/search?q=stanizlavskylive+Формула+1+Гран-При+{race_country.replace(' ', '+')}+2025+Гонка"
 
-        races.append({
+        race_entry = {
             "round": rnd,
             "name": data["name"],
             "date": data["date"],
@@ -1416,6 +2105,13 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
             "top_10": top_10,
             "vk_url": vk_url,
             "vk_search_url": vk_search_url,
-        })
+        }
+
+        # Sprint results for sprint weekends
+        if data.get("sprint_podium"):
+            race_entry["sprint_podium"] = [enrich_driver(n) for n in data["sprint_podium"]]
+            race_entry["sprint_top_10"] = [enrich_driver(n, {"position": i + 1}) for i, n in enumerate(data.get("sprint_top_10", data["sprint_podium"]))]
+
+        races.append(race_entry)
 
     return {"season": season, "races": races, "total_races": len(races)}

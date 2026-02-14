@@ -468,19 +468,83 @@
         };
 
         // ==== LIVE PAGE ====
-        const LivePage = ({session, positions, timing, weather, raceControl}) => {
+        const DemoBanner = ({session, onPickSession}) => {
+            if (!session?.is_demo) return null;
+            const demoInfo = session.demo_session;
+            return (
+                <div style={{margin:'0 12px 8px',padding:'8px 12px',borderRadius:10,background:'linear-gradient(135deg,rgba(255,165,0,0.15),rgba(255,200,0,0.08))',border:'1px solid rgba(255,165,0,0.3)',display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                    <span style={{fontSize:16}}>{'📺'}</span>
+                    <div style={{flex:1}}>
+                        <div style={{fontWeight:700,color:'#FFA500'}}>Демо-режим</div>
+                        <div style={{color:'var(--f1-text-secondary)',fontSize:11}}>{demoInfo?.meeting_name || session.meeting_name || 'Историческая сессия'}</div>
+                    </div>
+                    <button onClick={onPickSession} style={{background:'rgba(255,165,0,0.2)',border:'1px solid rgba(255,165,0,0.4)',borderRadius:8,padding:'4px 10px',color:'#FFA500',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Выбрать</button>
+                </div>
+            );
+        };
+
+        const DemoSessionPicker = ({show, onClose, onSelect}) => {
+            const [sessions, setSessions] = useState(null);
+            useEffect(() => {
+                if (show && !sessions) api.get('/api/demo/sessions').then(d => { if (d) setSessions(d.sessions); });
+            }, [show]);
+            if (!show) return null;
+            return (
+                <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={onClose}>
+                    <div style={{width:'100%',maxWidth:480,maxHeight:'70vh',background:'var(--f1-card-solid)',borderRadius:'20px 20px 0 0',padding:'16px',overflow:'auto'}} onClick={e=>e.stopPropagation()}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                            <h3 style={{fontSize:16,fontWeight:900}}>Выбрать сессию</h3>
+                            <button onClick={async()=>{await api.get('/api/demo/clear');onClose();window.location.reload();}} style={{background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'4px 10px',color:'var(--f1-text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Авто</button>
+                        </div>
+                        {!sessions ? <div className="skeleton" style={{height:200}}/> : sessions.map(s => (
+                            <div key={s.session_key} onClick={async()=>{await api.get('/api/demo/set?session_key='+s.session_key);onSelect(s);onClose();window.location.reload();}} style={{padding:'10px 12px',borderRadius:10,marginBottom:6,background:'rgba(255,255,255,0.04)',border:'1px solid var(--f1-border)',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                                <div style={{width:28,height:28,borderRadius:'50%',background:'rgba(255,165,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#FFA500'}}>R{s.round}</div>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.date} · {s.laps} кругов</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const LivePage = ({session, positions, timing, weather, raceControl, onChange}) => {
             const [liveTab, setLiveTab] = useState('positions');
             const [expandedRow, setExpandedRow] = useState(null);
             const [radioData, setRadioData] = useState(null);
+            const [radioEnhanced, setRadioEnhanced] = useState(null);
+            const [radioLang, setRadioLang] = useState('ru');
             const [pitData, setPitData] = useState(null);
             const [audioPlaying, setAudioPlaying] = useState(null);
+            const [trackMapData, setTrackMapData] = useState(null);
+            const [selectedCar, setSelectedCar] = useState(null);
+            const [showDemoPicker, setShowDemoPicker] = useState(false);
             const audioRef = useRef(null);
             const isLive = session?.is_live;
 
             useEffect(() => {
-                if (liveTab === 'radio' && !radioData) api.get('/api/live/radio').then(setRadioData);
                 if (liveTab === 'pits' && !pitData) api.get('/api/live/pit-stops').then(setPitData);
             }, [liveTab]);
+
+            // Enhanced radio polling (10s live, 30s demo)
+            useEffect(() => {
+                if (liveTab !== 'radio') return;
+                const fetchRadio = () => api.get('/api/live/radio-enhanced').then(d => { if (d) setRadioEnhanced(d); });
+                fetchRadio();
+                const iv = setInterval(fetchRadio, session?.is_demo ? 30000 : 10000);
+                return () => clearInterval(iv);
+            }, [liveTab, session?.is_demo]);
+
+            // Track map polling (1.5s live, 30s demo — data is cached anyway)
+            useEffect(() => {
+                if (liveTab !== 'track') return;
+                const fetchTrack = () => api.get('/api/live/track-map').then(d => { if (d) setTrackMapData(d); });
+                fetchTrack();
+                const iv = setInterval(fetchTrack, session?.is_demo ? 30000 : 1500);
+                return () => clearInterval(iv);
+            }, [liveTab, session?.is_demo]);
 
             const playRadio = (url) => {
                 if (audioRef.current) audioRef.current.pause();
@@ -497,15 +561,21 @@
 
             return (
                 <div className="page-container fade-in" style={{padding:0}}>
-                    <div style={{padding:'10px 16px 0'}}>
+                    <div style={{padding:'10px 16px 0',position:'relative'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
                             {isLive && <span className="live-dot"/>}
-                            <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':'var(--f1-text-muted)'}}>{isLive?'LIVE':'Последняя сессия'}</span>
+                            <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':session?.is_demo?'#FFA500':'var(--f1-text-muted)'}}>{isLive?'LIVE':session?.is_demo?'ДЕМО':'Последняя сессия'}</span>
                             {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>Лучший: {fmtLap(timing.session_best.lap)}</span>}
                         </div>
                         <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Гран-при'}</h2>
                         <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} · {session.circuit_short_name}</div>
+                        {onChange && <button onClick={()=>onChange('analytics')} style={{position:'absolute',top:10,right:16,background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'5px 10px',color:'var(--f1-text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4}}>
+                            <span style={{width:14,height:14,display:'inline-flex'}}>{NavIcons.analytics}</span> Аналитика
+                        </button>}
                     </div>
+
+                    <DemoBanner session={session} onPickSession={()=>setShowDemoPicker(true)}/>
+                    <DemoSessionPicker show={showDemoPicker} onClose={()=>setShowDemoPicker(false)} onSelect={()=>{}}/>
 
                     {weather?.weather && (
                         <div className="weather-strip">
@@ -532,7 +602,7 @@
                     })()}
 
                     <div className="live-tabs">
-                        {[{id:'positions',label:'Позиции'},{id:'sectors',label:'Секторы'},{id:'pits',label:'Пит-стопы'},{id:'radio',label:'Радио'},{id:'messages',label:'Дирекция'}].map(t=>(
+                        {[{id:'positions',label:'Позиции'},{id:'track',label:'Трасса'},{id:'sectors',label:'Секторы'},{id:'pits',label:'Пит-стопы'},{id:'radio',label:'Радио'},{id:'messages',label:'Дирекция'}].map(t=>(
                             <button key={t.id} className={`live-tab ${liveTab===t.id?'active':''}`} onClick={()=>setLiveTab(t.id)}>{t.label}</button>
                         ))}
                     </div>
@@ -572,6 +642,77 @@
                         </div>
                     ) : (
                         <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'Загрузка данных...':'Нет активной сессии'}</div><div style={{fontSize:13}}>Данные появятся когда начнётся сессия</div></div>
+                    ))}
+
+                    {/* TRACK MAP TAB */}
+                    {liveTab==='track' && (trackMapData?.track?.points?.length > 0 ? (() => {
+                        const pts = trackMapData.track.points;
+                        const cars = trackMapData.cars || [];
+                        const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+                        const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
+                        const rangeX=maxX-minX||1, rangeY=maxY-minY||1;
+                        const pad=30, size=400;
+                        const scale=Math.min((size-2*pad)/rangeX,(size-2*pad)/rangeY);
+                        const cx=(size-(rangeX*scale))/2, cy=(size-(rangeY*scale))/2;
+                        const tx = (x) => cx + (x-minX)*scale;
+                        const ty = (y) => cy + (y-minY)*scale;
+                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${tx(p.x).toFixed(1)},${ty(p.y).toFixed(1)}`).join(' ')+'Z';
+                        const leader = cars.length > 0 ? cars[0] : null;
+                        return (
+                            <div style={{padding:'8px 12px'}}>
+                                <svg viewBox={`0 0 ${size} ${size}`} style={{width:'100%',maxWidth:400,margin:'0 auto',display:'block'}}>
+                                    {/* Track glow */}
+                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                                    {/* Track outline */}
+                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    {/* Car dots */}
+                                    {cars.map(car => {
+                                        const carX = tx(car.x), carY = ty(car.y);
+                                        const isLeader = car.driver_number === leader?.driver_number;
+                                        const isSel = selectedCar === car.driver_number;
+                                        return (
+                                            <g key={car.driver_number} style={{cursor:'pointer'}} onClick={()=>setSelectedCar(isSel?null:car.driver_number)}>
+                                                <circle cx={carX} cy={carY} r="6" fill={car.team_color||'#888'} style={{transition:'cx 0.8s ease, cy 0.8s ease'}}/>
+                                                {isLeader && <circle cx={carX} cy={carY} r="10" fill="none" stroke={car.team_color||'#888'} strokeWidth="1.5" opacity="0.6">
+                                                    <animate attributeName="r" values="10;14;10" dur="1.5s" repeatCount="indefinite"/>
+                                                    <animate attributeName="opacity" values="0.6;0.1;0.6" dur="1.5s" repeatCount="indefinite"/>
+                                                </circle>}
+                                                <text x={carX} y={carY-10} textAnchor="middle" fill="white" fontSize="8" fontWeight="700" fontFamily="Titillium Web,sans-serif" style={{transition:'x 0.8s ease, y 0.8s ease'}}>{car.code}</text>
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                                {/* Selected car popup */}
+                                {selectedCar && (() => {
+                                    const car = cars.find(c=>c.driver_number===selectedCar);
+                                    if (!car) return null;
+                                    return (
+                                        <div className="card" onClick={()=>setSelectedCar(null)} style={{margin:'12px 0',padding:12,display:'flex',alignItems:'center',gap:10,animation:'fadeIn 0.2s ease-out'}}>
+                                            <div style={{background:car.team_color,width:4,height:36,borderRadius:2}}/>
+                                            {car.photo_url && <DriverPhoto url={car.photo_url} size={36}/>}
+                                            <div style={{flex:1}}>
+                                                <div style={{fontWeight:900,fontSize:15}}>{car.code} <span style={{fontWeight:400,color:'var(--f1-text-secondary)',fontSize:13}}>{car.name}</span></div>
+                                                <div style={{fontSize:11,color:car.team_color,fontWeight:600}}>{car.team}</div>
+                                            </div>
+                                            <div style={{textAlign:'right'}}>
+                                                <PosBadge pos={car.position||0}/>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                                {/* Driver legend */}
+                                <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:8}}>
+                                    {cars.map(c=>(
+                                        <div key={c.driver_number} onClick={()=>setSelectedCar(selectedCar===c.driver_number?null:c.driver_number)}
+                                             style={{display:'flex',alignItems:'center',gap:3,fontSize:10,padding:'2px 6px',borderRadius:4,background:selectedCar===c.driver_number?`${c.team_color}33`:`${c.team_color}11`,color:c.team_color,fontWeight:600,cursor:'pointer'}}>
+                                            <span style={{width:6,height:6,borderRadius:'50%',background:c.team_color}}/>{c.code}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })() : (
+                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🗺️</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>Карта трассы загружается...</div><div style={{fontSize:13}}>Данные о положении машин появятся во время сессии</div></div>
                     ))}
 
                     {liveTab==='sectors' && (timing?.timing?.length>0 ? (
@@ -615,19 +756,44 @@
                         ))}</div>
                     ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>🔧</div>Нет пит-стопов</div>)}
 
-                    {liveTab==='radio' && (radioData?.radio?.length>0 ? (
-                        <div><audio ref={audioRef}/>
-                            {radioData.radio.slice().reverse().map((r,i)=>(
-                                <div key={i} className="radio-entry">
-                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
-                                    <div style={{flex:1}}>
-                                        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:4,height:16,borderRadius:2,background:r.team_color}}/><span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span></div>
-                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{r.team} · {r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</div>
-                                    </div>
-                                </div>
+                    {liveTab==='radio' && (<>
+                        {/* Language toggle */}
+                        <div style={{display:'flex',gap:0,padding:'4px 12px 8px',justifyContent:'flex-end'}}>
+                            {[{id:'ru',label:'RU'},{id:'en',label:'EN'},{id:'both',label:'RU+EN'}].map(l=>(
+                                <button key={l.id} onClick={()=>setRadioLang(l.id)} style={{padding:'4px 10px',fontSize:11,fontWeight:600,fontFamily:'inherit',border:'1px solid var(--f1-border)',background:radioLang===l.id?'var(--f1-red)':'transparent',color:radioLang===l.id?'white':'var(--f1-text-muted)',cursor:'pointer',borderRadius:l.id==='ru'?'6px 0 0 6px':l.id==='both'?'0 6px 6px 0':'0'}}>{l.label}</button>
                             ))}
                         </div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>)}
+                        {radioEnhanced?.radio?.length>0 ? (
+                            <div><audio ref={audioRef}/>
+                                {radioEnhanced.radio.slice().reverse().map((r,i)=>(
+                                    <div key={i} className="radio-entry" style={{padding:'12px 16px',animation:i<2?'fadeIn 0.3s ease-out':'none',alignItems:'flex-start'}}>
+                                        <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+                                                <div style={{width:4,height:20,borderRadius:2,background:r.team_color}}/>
+                                                <span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span>
+                                                <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</span>
+                                                <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
+                                            </div>
+                                            {r.is_transcribed ? (<>
+                                                {(radioLang==='ru'||radioLang==='both') && r.transcript_ru && (
+                                                    <div style={{fontSize:15,fontWeight:700,lineHeight:1.4,marginBottom:radioLang==='both'?4:0}}>{r.transcript_ru}</div>
+                                                )}
+                                                {(radioLang==='en'||radioLang==='both') && r.transcript_en && (
+                                                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',fontStyle:radioLang==='both'?'italic':'normal',lineHeight:1.4}}>{r.transcript_en}</div>
+                                                )}
+                                                {!r.transcript_ru && !r.transcript_en && <div style={{fontSize:13,color:'var(--f1-text-muted)',fontStyle:'italic'}}>[неразборчиво]</div>}
+                                            </>) : (
+                                                <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--f1-text-muted)'}}>
+                                                    <span style={{animation:'pulse 1.5s infinite'}}>🎙️</span> Расшифровка...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>}
+                    </>)}
 
                     {liveTab==='messages' && (raceControl?.messages?.length>0 ? (
                         <div style={{padding:'4px 0'}}>{raceControl.messages.slice().reverse().map((msg,i)=>(
@@ -1168,12 +1334,16 @@
             const [strategy, setStrategy] = useState(null);
             const [posChart, setPosChart] = useState(null);
             const [lapTimes, setLapTimes] = useState(null);
+            const [degradation, setDegradation] = useState(null);
             const [loading, setLoading] = useState(false);
             const [selectedDrivers, setSelectedDrivers] = useState([]);
+            const [degDrivers, setDegDrivers] = useState([]);
             const posChartRef = useRef(null);
             const lapChartRef = useRef(null);
+            const degChartRef = useRef(null);
             const posChartInstance = useRef(null);
             const lapChartInstance = useRef(null);
+            const degChartInstance = useRef(null);
 
             const tyreColors = {SOFT:'#FF3333',MEDIUM:'#FFD700',HARD:'#CCCCCC',INTERMEDIATE:'#39B54A',WET:'#0067FF',UNKNOWN:'#888888'};
 
@@ -1187,6 +1357,12 @@
                     api.get('/api/analytics/laptimes').then(d => {
                         setLapTimes(d);
                         if (d?.drivers?.length > 0) setSelectedDrivers(d.drivers.slice(0, 3).map(dr => dr.driver_number));
+                        setLoading(false);
+                    });
+                } else if (aTab === 'degradation' && !degradation) {
+                    api.get('/api/analytics/degradation').then(d => {
+                        setDegradation(d);
+                        if (d?.drivers?.length > 0) setDegDrivers(d.drivers.slice(0, 3).map(dr => dr.driver_number));
                         setLoading(false);
                     });
                 } else setLoading(false);
@@ -1294,8 +1470,82 @@
                 return () => { if (lapChartInstance.current) lapChartInstance.current.destroy(); };
             }, [lapTimes, aTab, selectedDrivers]);
 
+            // Degradation chart rendering
+            useEffect(() => {
+                if (aTab !== 'degradation' || !degradation?.drivers?.length || !degChartRef.current || !degDrivers.length) return;
+                if (degChartInstance.current) degChartInstance.current.destroy();
+                const ctx = degChartRef.current.getContext('2d');
+                const filtered = degradation.drivers.filter(d => degDrivers.includes(d.driver_number));
+                const datasets = [];
+                filtered.forEach(d => {
+                    d.stints.forEach((stint, si) => {
+                        // Scatter points colored by compound
+                        datasets.push({
+                            label: `${d.code} S${stint.stint_number} (${stint.compound})`,
+                            data: stint.laps.map(l => ({x: l.lap, y: l.corrected_time})),
+                            backgroundColor: tyreColors[stint.compound] || '#888',
+                            borderColor: 'transparent',
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            showLine: false,
+                            type: 'scatter',
+                        });
+                        // Trend line
+                        if (stint.trend_line?.length === 2) {
+                            datasets.push({
+                                label: `${d.code} trend S${stint.stint_number}`,
+                                data: stint.trend_line.map(t => ({x: t.lap, y: t.time})),
+                                borderColor: d.team_color || '#888',
+                                borderWidth: 1.5,
+                                borderDash: [6, 3],
+                                pointRadius: 0,
+                                showLine: true,
+                                fill: false,
+                                type: 'scatter',
+                            });
+                        }
+                    });
+                });
+                const allTimes = datasets.flatMap(ds => ds.data.map(p => p.y)).filter(Boolean);
+                const medTime = allTimes.sort((a,b) => a-b)[Math.floor(allTimes.length/2)] || 90;
+                const yMin = Math.max(0, medTime * 0.97);
+                const yMax = medTime * 1.06;
+                degChartInstance.current = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {datasets},
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: {display: false},
+                            tooltip: {
+                                backgroundColor: '#1E1E2C', titleColor: '#fff', bodyColor: '#9A9AAF',
+                                borderColor: '#38383F', borderWidth: 1,
+                                filter: (item) => !item.dataset.label?.includes('trend'),
+                                callbacks: {
+                                    title: (items) => items[0]?.dataset?.label || '',
+                                    label: (item) => {
+                                        const t = item.parsed.y;
+                                        const m = Math.floor(t/60), s = (t%60).toFixed(3);
+                                        return `Круг ${item.parsed.x}: ${m>0?m+':'+s.padStart(6,'0'):s}`;
+                                    },
+                                }
+                            },
+                        },
+                        scales: {
+                            x: {type:'linear',title:{display:true,text:'Круг',color:'#6B6B80',font:{family:'Titillium Web'}},ticks:{color:'#6B6B80'},grid:{color:'#38383F33'}},
+                            y: {title:{display:true,text:'Время (скорр.)',color:'#6B6B80',font:{family:'Titillium Web'}},ticks:{color:'#6B6B80',callback:v=>{const m=Math.floor(v/60);const s=(v%60).toFixed(1);return m>0?m+':'+s.padStart(4,'0'):s;}},grid:{color:'#38383F33'},min:yMin,max:yMax},
+                        },
+                        interaction: {mode:'nearest',intersect:false},
+                    },
+                });
+                return () => { if (degChartInstance.current) degChartInstance.current.destroy(); };
+            }, [degradation, aTab, degDrivers]);
+
             const toggleDriver = (dn) => {
                 setSelectedDrivers(prev => prev.includes(dn) ? prev.filter(n => n !== dn) : [...prev, dn].slice(-5));
+            };
+            const toggleDegDriver = (dn) => {
+                setDegDrivers(prev => prev.includes(dn) ? prev.filter(n => n !== dn) : [...prev, dn].slice(-5));
             };
 
             return (
@@ -1306,6 +1556,7 @@
                             <button className={`tab-switch-btn ${aTab==='strategy'?'active':''}`} onClick={()=>setATab('strategy')}>Шины</button>
                             <button className={`tab-switch-btn ${aTab==='positions'?'active':''}`} onClick={()=>setATab('positions')}>Позиции</button>
                             <button className={`tab-switch-btn ${aTab==='laptimes'?'active':''}`} onClick={()=>setATab('laptimes')}>Темпы</button>
+                            <button className={`tab-switch-btn ${aTab==='degradation'?'active':''}`} onClick={()=>setATab('degradation')}>Деградация</button>
                         </div>
                     </div>
 
@@ -1389,6 +1640,59 @@
                     ) : !loading && (
                         <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>⏱️</div><div style={{fontSize:15,fontWeight:700}}>Нет данных о кругах</div><div style={{fontSize:13}}>Данные появятся во время/после сессии</div></div>
                     ))}
+
+                    {/* TYRE DEGRADATION */}
+                    {aTab==='degradation' && !loading && (degradation?.drivers?.length > 0 ? (
+                        <div style={{padding:'0 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>Деградация шин · Выбери пилотов</div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:10,paddingLeft:4}}>
+                                {degradation.drivers.map(d=>{
+                                    const sel = degDrivers.includes(d.driver_number);
+                                    return (
+                                        <button key={d.driver_number} onClick={()=>toggleDegDriver(d.driver_number)}
+                                            style={{display:'flex',alignItems:'center',gap:3,fontSize:11,padding:'4px 8px',borderRadius:6,border:`1.5px solid ${sel?d.team_color:d.team_color+'44'}`,background:sel?`${d.team_color}33`:'transparent',color:sel?'#fff':'var(--f1-text-muted)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s'}}>
+                                            {d.code}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Deg rate cards */}
+                            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12,paddingLeft:4}}>
+                                {degradation.drivers.filter(d=>degDrivers.includes(d.driver_number)).map(d=>(
+                                    d.stints.map((stint,si)=>{
+                                        const rate = stint.deg_rate;
+                                        const color = rate===null?'var(--f1-text-muted)':rate<=0.02?'#39B54A':rate<=0.05?'#FFD700':'#FF3333';
+                                        return (
+                                            <div key={`${d.driver_number}-${si}`} style={{background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'6px 10px',minWidth:80}}>
+                                                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                                                    <span style={{width:8,height:8,borderRadius:'50%',background:tyreColors[stint.compound]||'#888'}}/>
+                                                    <span style={{fontSize:11,fontWeight:700,color:d.team_color}}>{d.code}</span>
+                                                    <span style={{fontSize:9,color:'var(--f1-text-muted)'}}>S{stint.stint_number}</span>
+                                                </div>
+                                                <div style={{fontSize:16,fontWeight:900,color,fontVariantNumeric:'tabular-nums'}}>{rate!==null?`${rate>0?'+':''}${rate.toFixed(3)}`:'-'}</div>
+                                                <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>с/круг</div>
+                                            </div>
+                                        );
+                                    })
+                                ))}
+                            </div>
+
+                            {/* Legend */}
+                            <div style={{display:'flex',gap:8,marginBottom:8,paddingLeft:4,fontSize:10,color:'var(--f1-text-muted)'}}>
+                                <span><span style={{color:'#39B54A',fontWeight:700}}>●</span> ≤0.02 отл.</span>
+                                <span><span style={{color:'#FFD700',fontWeight:700}}>●</span> ≤0.05 норм.</span>
+                                <span><span style={{color:'#FF3333',fontWeight:700}}>●</span> &gt;0.05 выс.</span>
+                                <span style={{marginLeft:8}}>--- тренд</span>
+                            </div>
+
+                            <div className="card" style={{padding:8,height:350}}>
+                                <canvas ref={degChartRef}/>
+                            </div>
+                        </div>
+                    ) : !loading && (
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>📉</div><div style={{fontSize:15,fontWeight:700}}>Нет данных о деградации</div><div style={{fontSize:13}}>Данные появятся во время/после гонки</div></div>
+                    ))}
                 </div>
             );
         };
@@ -1467,6 +1771,25 @@
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📋 Топ-10 результаты</div>
                             {race.top_10.map((d, i) => (
                                 <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.top_10.length-1?'1px solid var(--f1-border)':'none'}}>
+                                    <PosBadge pos={d.position}/>
+                                    <div style={{background:d.team_color,width:3,height:28,borderRadius:2}}/>
+                                    {d.photo_url && <DriverPhoto url={d.photo_url} size={28}/>}
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <span style={{fontWeight:700,fontSize:13}}>{d.code}</span>
+                                        <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{d.first_name} {d.last_name}</span>
+                                    </div>
+                                    <span style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Sprint top-10 results */}
+                    {race.sprint_top_10?.length > 0 && (
+                        <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
+                            <div style={{fontSize:11,color:'#FF8000',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>🏁 Спринт · Топ-10</div>
+                            {race.sprint_top_10.map((d, i) => (
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.sprint_top_10.length-1?'1px solid var(--f1-border)':'none'}}>
                                     <PosBadge pos={d.position}/>
                                     <div style={{background:d.team_color,width:3,height:28,borderRadius:2}}/>
                                     {d.photo_url && <DriverPhoto url={d.photo_url} size={28}/>}
@@ -1572,6 +1895,11 @@
                     const h = () => setTab('schedule');
                     tg.BackButton?.onClick(h);
                     return () => tg.BackButton?.offClick(h);
+                } else if (tab === 'analytics') {
+                    tg.BackButton?.show();
+                    const h = () => setTab('live');
+                    tg.BackButton?.onClick(h);
+                    return () => tg.BackButton?.offClick(h);
                 } else if (tab !== 'home') {
                     tg.BackButton?.show();
                     const h = () => setTab('home');
@@ -1593,13 +1921,14 @@
             const renderTab = () => {
                 switch(tab) {
                     case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab}/>;
-                    case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
+                    case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
                     case 'news': return <NewsPage/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
+                    case 'analytics': return <AnalyticsPage/>;
                     default: return null;
                 }
             };

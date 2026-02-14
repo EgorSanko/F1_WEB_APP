@@ -835,6 +835,58 @@ async def analytics_laptimes(session_key: str = "latest", drivers: str = ""):
     return await f1_data.get_race_laptimes(session_key, driver_numbers)
 
 
+@app.get("/api/analytics/degradation")
+async def analytics_degradation(session_key: str = "latest", drivers: str = ""):
+    """Tyre degradation analysis with fuel-corrected times and trend lines."""
+    driver_numbers = None
+    if drivers:
+        try:
+            driver_numbers = [int(x.strip()) for x in drivers.split(",") if x.strip()]
+        except ValueError:
+            pass
+    return await f1_data.get_live_tyre_degradation(session_key, driver_numbers)
+
+
+@app.get("/api/live/track-map")
+async def live_track_map():
+    """Live track map: track outline + car positions."""
+    return await f1_data.get_live_track_map()
+
+
+@app.get("/api/live/radio-enhanced")
+async def live_radio_enhanced():
+    """Team radio with AI transcription and Russian translation."""
+    return await f1_data.get_live_radio_enhanced()
+
+
+# ============ DEMO MODE ============
+
+@app.get("/api/demo/sessions")
+async def demo_sessions():
+    """List available historical sessions for demo mode."""
+    cached = f1_data.cache_get("demo_sessions")
+    if cached:
+        return cached
+    sessions = f1_data.get_demo_sessions_list()
+    response = {"sessions": sessions}
+    f1_data.cache_set("demo_sessions", response)
+    return response
+
+
+@app.get("/api/demo/set")
+async def demo_set(session_key: str):
+    """Set a specific demo session. Pass session_key from /api/demo/sessions."""
+    f1_data.set_demo_session(session_key)
+    return {"status": "ok", "session_key": session_key}
+
+
+@app.get("/api/demo/clear")
+async def demo_clear():
+    """Clear demo override, return to auto mode."""
+    f1_data.set_demo_session(None)
+    return {"status": "ok", "message": "Demo cleared, back to auto mode"}
+
+
 # ============ ADMIN ============
 
 @app.post("/api/admin/settle/{race_round}")
