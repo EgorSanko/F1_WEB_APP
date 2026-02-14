@@ -43,7 +43,6 @@ CACHE_TTL = {
     "tyre_degradation": 30,     # 30 sec for live, 300 for specific
     "live_track_map": 2,        # 2 sec — real-time car positions
     "track_outline": 3600,      # 1 hour — track shape doesn't change
-    "live_radio_enhanced": 10,  # 10 sec — radio with transcriptions
     "demo_sessions": 3600,      # 1 hour — list of available demo sessions
 }
 

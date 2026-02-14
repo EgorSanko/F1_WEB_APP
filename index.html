@@ -514,8 +514,6 @@
             const [liveTab, setLiveTab] = useState('positions');
             const [expandedRow, setExpandedRow] = useState(null);
             const [radioData, setRadioData] = useState(null);
-            const [radioEnhanced, setRadioEnhanced] = useState(null);
-            const [radioLang, setRadioLang] = useState('ru');
             const [pitData, setPitData] = useState(null);
             const [audioPlaying, setAudioPlaying] = useState(null);
             const [trackMapData, setTrackMapData] = useState(null);
@@ -528,12 +526,12 @@
                 if (liveTab === 'pits' && !pitData) api.get('/api/live/pit-stops').then(setPitData);
             }, [liveTab]);
 
-            // Enhanced radio polling (10s live, 30s demo)
+            // Radio polling (15s live, 30s demo)
             useEffect(() => {
                 if (liveTab !== 'radio') return;
-                const fetchRadio = () => api.get('/api/live/radio-enhanced').then(d => { if (d) setRadioEnhanced(d); });
+                const fetchRadio = () => api.get('/api/live/radio').then(d => { if (d) setRadioData(d); });
                 fetchRadio();
-                const iv = setInterval(fetchRadio, session?.is_demo ? 30000 : 10000);
+                const iv = setInterval(fetchRadio, session?.is_demo ? 30000 : 15000);
                 return () => clearInterval(iv);
             }, [liveTab, session?.is_demo]);
 
@@ -756,44 +754,23 @@
                         ))}</div>
                     ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>🔧</div>Нет пит-стопов</div>)}
 
-                    {liveTab==='radio' && (<>
-                        {/* Language toggle */}
-                        <div style={{display:'flex',gap:0,padding:'4px 12px 8px',justifyContent:'flex-end'}}>
-                            {[{id:'ru',label:'RU'},{id:'en',label:'EN'},{id:'both',label:'RU+EN'}].map(l=>(
-                                <button key={l.id} onClick={()=>setRadioLang(l.id)} style={{padding:'4px 10px',fontSize:11,fontWeight:600,fontFamily:'inherit',border:'1px solid var(--f1-border)',background:radioLang===l.id?'var(--f1-red)':'transparent',color:radioLang===l.id?'white':'var(--f1-text-muted)',cursor:'pointer',borderRadius:l.id==='ru'?'6px 0 0 6px':l.id==='both'?'0 6px 6px 0':'0'}}>{l.label}</button>
-                            ))}
-                        </div>
-                        {radioEnhanced?.radio?.length>0 ? (
-                            <div><audio ref={audioRef}/>
-                                {radioEnhanced.radio.slice().reverse().map((r,i)=>(
-                                    <div key={i} className="radio-entry" style={{padding:'12px 16px',animation:i<2?'fadeIn 0.3s ease-out':'none',alignItems:'flex-start'}}>
-                                        <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
-                                        <div style={{flex:1,minWidth:0}}>
-                                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-                                                <div style={{width:4,height:20,borderRadius:2,background:r.team_color}}/>
-                                                <span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span>
-                                                <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</span>
-                                                <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
-                                            </div>
-                                            {r.is_transcribed ? (<>
-                                                {(radioLang==='ru'||radioLang==='both') && r.transcript_ru && (
-                                                    <div style={{fontSize:15,fontWeight:700,lineHeight:1.4,marginBottom:radioLang==='both'?4:0}}>{r.transcript_ru}</div>
-                                                )}
-                                                {(radioLang==='en'||radioLang==='both') && r.transcript_en && (
-                                                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',fontStyle:radioLang==='both'?'italic':'normal',lineHeight:1.4}}>{r.transcript_en}</div>
-                                                )}
-                                                {!r.transcript_ru && !r.transcript_en && <div style={{fontSize:13,color:'var(--f1-text-muted)',fontStyle:'italic'}}>[неразборчиво]</div>}
-                                            </>) : (
-                                                <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--f1-text-muted)'}}>
-                                                    <span style={{animation:'pulse 1.5s infinite'}}>🎙️</span> Расшифровка...
-                                                </div>
-                                            )}
+                    {liveTab==='radio' && (radioData?.radio?.length>0 ? (
+                        <div><audio ref={audioRef}/>
+                            {radioData.radio.slice().reverse().map((r,i)=>(
+                                <div key={i} className="radio-entry" style={{padding:'12px 16px',animation:i<2?'fadeIn 0.3s ease-out':'none'}}>
+                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                                            <div style={{width:4,height:20,borderRadius:2,background:r.team_color}}/>
+                                            <span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span>
+                                            <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</span>
+                                            <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>}
-                    </>)}
+                                </div>
+                            ))}
+                        </div>
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>)}
 
                     {liveTab==='messages' && (raceControl?.messages?.length>0 ? (
                         <div style={{padding:'4px 0'}}>{raceControl.messages.slice().reverse().map((msg,i)=>(

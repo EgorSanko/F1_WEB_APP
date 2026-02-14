@@ -853,12 +853,6 @@ async def live_track_map():
     return await f1_data.get_live_track_map()
 
 
-@app.get("/api/live/radio-enhanced")
-async def live_radio_enhanced():
-    """Team radio with AI transcription and Russian translation."""
-    return await f1_data.get_live_radio_enhanced()
-
-
 # ============ DEMO MODE ============
 
 @app.get("/api/demo/sessions")
