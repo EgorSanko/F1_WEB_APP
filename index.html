@@ -92,7 +92,7 @@
         .fade-in { animation:fadeIn 0.35s ease-out; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-        .page-container { height:100dvh; padding-bottom:72px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .page-container { height:100dvh; padding-bottom:90px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 
         .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }
         .standings-row:active { background:var(--f1-card-hover); }
@@ -246,7 +246,7 @@
         const BottomNav = ({active, onChange, isLive}) => {
             const tabs = [
                 {id:'home', icon:NavIcons.home, label:'Главная'},
-                {id:'live', icon:NavIcons.live, label:'Live'},
+                {id:'live', icon:NavIcons.live, label:'Онлайн'},
                 {id:'analytics', icon:NavIcons.analytics, label:'Аналитика'},
                 {id:'news', icon:NavIcons.news, label:'Новости'},
                 {id:'standings', icon:NavIcons.trophy, label:'Чемпионат'},
@@ -400,34 +400,63 @@
                         </div>
                     )}
 
+                    {/* Last race — podium layout */}
                     {lastRace && lastRace.results && (
-                        <div className="card">
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Последний результат · {lastRace.name}</div>
-                            {lastRace.results.slice(0,5).map((r,i)=>(
-                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
-                                    <PosBadge pos={r.position}/>
-                                    <div style={{background:r.team_color,width:4,height:32,borderRadius:2}}/>
-                                    {r.photo_url && <DriverPhoto url={r.photo_url} size={28}/>}
+                        <div className="card" style={{padding:'16px 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','GP')}</div>
+                            {/* Podium — positions 2, 1, 3 */}
+                            <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:16}}>
+                                {[1,0,2].map(idx => {
+                                    const r = lastRace.results[idx]; if(!r) return null;
+                                    const heights = [120,90,80]; const photoSizes = [56,44,44];
+                                    const colors = ['#FFD700','#C0C0C0','#CD7F32'];
+                                    return (
+                                        <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
+                                            <div style={{position:'relative',marginBottom:6}}>
+                                                {r.photo_url && <img src={r.photo_url} alt="" style={{width:photoSizes[idx],height:photoSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${colors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            </div>
+                                            <div style={{fontWeight:900,fontSize:idx===0?15:13}}>{r.code || r.name?.split(' ').pop()}</div>
+                                            <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{r.team?.split(' ')[0]}</div>
+                                            <div style={{background:`${colors[idx]}22`,borderRadius:'8px 8px 0 0',padding:'10px 0',marginTop:6,height:heights[idx],display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',paddingTop:10}}>
+                                                <div style={{fontSize:24,fontWeight:900,color:colors[idx]}}>{r.position}</div>
+                                                <div style={{fontSize:10,color:'var(--f1-text-muted)',marginTop:2}}>{r.time||`${r.points} очк.`}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {/* Rest of results */}
+                            {lastRace.results.slice(3,8).map((r,i)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
+                                    <div style={{width:24,fontWeight:700,fontSize:13,color:'var(--f1-text-muted)',textAlign:'center'}}>{r.position}</div>
+                                    <div style={{background:r.team_color,width:3,height:28,borderRadius:2}}/>
+                                    {r.photo_url && <DriverPhoto url={r.photo_url} size={24}/>}
                                     <div style={{flex:1,minWidth:0}}>
-                                        <div style={{fontWeight:700,fontSize:14}}>{r.code || r.name?.split(' ').pop()}</div>
-                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{r.team}</div>
+                                        <span style={{fontWeight:700,fontSize:13}}>{r.code || r.name?.split(' ').pop()}</span>
+                                        <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{r.team?.split(' ')[0]}</span>
                                     </div>
-                                    <div style={{fontWeight:700,fontSize:14,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{r.time||(r.points?`${r.points} pts`:'')}</div>
+                                    <div style={{fontWeight:600,fontSize:12,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{r.time||''}</div>
                                 </div>
                             ))}
                         </div>
                     )}
 
+                    {/* Championship top-3 — bigger photos */}
                     {standings?.standings && (
-                        <div className="card">
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Чемпионат пилотов</div>
+                        <div className="card" style={{padding:'16px 12px'}}>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
                             {standings.standings.slice(0,3).map((s,i)=>(
-                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
-                                    <PosBadge pos={s.position}/>
-                                    <div style={{background:s.team_color,width:4,height:32,borderRadius:2}}/>
-                                    {s.photo_url && <DriverPhoto url={s.photo_url} size={28}/>}
-                                    <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{s.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div></div>
-                                    <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
+                                    <div style={{fontSize:20,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:24,textAlign:'center'}}>{s.position}</div>
+                                    {s.photo_url && <img src={s.photo_url} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontWeight:900,fontSize:15}}>{s.name}</div>
+                                        <div style={{fontSize:11,color:s.team_color,fontWeight:600}}>{s.team}</div>
+                                    </div>
+                                    <div style={{textAlign:'right'}}>
+                                        <div style={{fontWeight:900,fontSize:18,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                        <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>очков</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -485,7 +514,7 @@
                             <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':'var(--f1-text-muted)'}}>{isLive?'LIVE':'Последняя сессия'}</span>
                             {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>Лучший: {fmtLap(timing.session_best.lap)}</span>}
                         </div>
-                        <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Grand Prix'}</h2>
+                        <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Гран-при'}</h2>
                         <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} · {session.circuit_short_name}</div>
                     </div>
 
@@ -544,7 +573,7 @@
                                                 <div className={`sector-time st-${t.s2_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S2</div>{fmtSector(t.sector_2)}</div>
                                                 <div className={`sector-time st-${t.s3_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S3</div>{fmtSector(t.sector_3)}</div>
                                                 <div style={{gridColumn:'1/-1',display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--f1-text-muted)',padding:'4px 4px 0'}}>
-                                                    <span>Круг {t.lap_number}</span><span>Стинт #{p.stint_number} · {p.tyre} {p.tyre_age>0?`(${p.tyre_age} кругов)`:''}</span>{t.gap_to_leader&&<span>Gap: +{t.gap_to_leader}</span>}
+                                                    <span>Круг {t.lap_number}</span><span>Стинт #{p.stint_number} · {p.tyre} {p.tyre_age>0?`(${p.tyre_age} кругов)`:''}</span>{t.gap_to_leader&&<span>Отст.: +{t.gap_to_leader}</span>}
                                                 </div>
                                             </div>
                                         )}
@@ -638,37 +667,32 @@
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Новости</h2>
-                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{news?.channel || '@stanizlavsky'}</div>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Новости Ф-1</h2>
+                    <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16,display:'flex',alignItems:'center',gap:6}}>
+                        <span style={{width:6,height:6,borderRadius:'50%',background:'var(--f1-red)',display:'inline-block'}}/>
+                        {news?.source || 'championat.com'}
+                    </div>
 
                     {news?.posts?.length > 0 ? (
-                        news.posts.slice().reverse().map((post,i) => {
-                            const lines = (post.text||'').split('\n').filter(l=>l.trim());
-                            const title = lines[0] || '';
-                            const preview = lines.slice(1).join(' ').trim();
-                            return (
-                                <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)}>
-                                    {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                    <div className="news-card-body">
-                                        {title && <div className="news-card-title">{title}</div>}
-                                        {preview && <div className="news-card-preview">{preview}</div>}
-                                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date ? new Date(post.date).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
-                                            <div style={{display:'flex',alignItems:'center',gap:10}}>
-                                                {post.views && <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>👁 {post.views >= 1000 ? (post.views/1000).toFixed(1)+'K' : post.views}</span>}
-                                                <span style={{fontSize:12,color:'var(--f1-red)',fontWeight:600}}>Читать →</span>
-                                            </div>
-                                        </div>
+                        news.posts.map((post,i) => (
+                            <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)}>
+                                {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                <div className="news-card-body">
+                                    {post.title && <div className="news-card-title">{post.title}</div>}
+                                    {post.preview && <div className="news-card-preview">{post.preview}</div>}
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date_text || ''}</div>
+                                        <span style={{fontSize:12,color:'var(--f1-red)',fontWeight:600}}>Читать →</span>
                                     </div>
                                 </div>
-                            );
-                        })
+                            </div>
+                        ))
                     ) : (
                         <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
                             <div style={{fontSize:48,marginBottom:12}}>📰</div>
                             <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Новости загружаются...</div>
-                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>Подпишись на канал для последних новостей</div>
-                            <button className="btn-primary" onClick={()=>openLink('https://t.me/stanizlavsky')}>Открыть @stanizlavsky</button>
+                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>Последние новости Формулы-1</div>
+                            <button className="btn-primary" onClick={()=>openLink('https://www.championat.com/auto/_f1.html')}>Открыть championat.com</button>
                         </div>
                     )}
                 </div>
@@ -676,42 +700,101 @@
         };
 
         // ==== SCHEDULE PAGE ====
-        const SchedulePage = ({schedule}) => {
+        const SchedulePage = ({schedule, nextRace}) => {
             const [pastRaces, setPastRaces] = useState(null);
-            useEffect(() => { api.get('/api/past-races-vk').then(d => setPastRaces(d?.races || [])); }, []);
+            const [lastResults, setLastResults] = useState({});
+            useEffect(() => {
+                api.get('/api/past-races-vk').then(d => setPastRaces(d?.races || []));
+                // Fetch last race winner
+                api.get('/api/race/last').then(d => {
+                    if (d?.results?.length > 0) {
+                        setLastResults(prev => ({...prev, [d.round]: d.results[0]}));
+                    }
+                });
+            }, []);
 
             if (!schedule?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
             const now = new Date();
             const vkMap = {};
             if (pastRaces) pastRaces.forEach(r => { vkMap[`${r.season}-${r.round}`] = r.url; });
 
+            const pastList = schedule.races.filter(r => new Date(r.date) < now);
+            const futureList = schedule.races.filter(r => new Date(r.date) >= now);
+            const nextIdx = futureList.length > 0 ? 0 : -1;
+
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>Сезон {schedule.season||'2025'}</h2>
-                    {schedule.races.map((race,i)=>{
-                        const raceDate = new Date(race.date); const isPast = raceDate < now;
-                        const isNext = !isPast && (i===0 || new Date(schedule.races[i-1]?.date)<now);
-                        const vkUrl = vkMap[`${schedule.season||2025}-${race.round}`];
-                        return (
-                            <div key={race.round} className="card" style={{marginBottom:10,opacity:isPast?0.6:1,borderColor:isNext?'var(--f1-red)':'var(--f1-border)',borderWidth:isNext?2:1,position:'relative',overflow:'hidden'}}>
-                                {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:80,height:'100%',objectFit:'contain',opacity:0.06,pointerEvents:'none'}}/>}
-                                <div style={{display:'flex',alignItems:'center',gap:12,position:'relative'}}>
-                                    <div style={{width:40,height:40,borderRadius:10,background:isNext?'var(--f1-red)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:16,flexShrink:0}}>{race.round}</div>
-                                    <div style={{flex:1,minWidth:0}}>
-                                        <div style={{display:'flex',alignItems:'center',gap:6}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{race.name?.replace('Grand Prix','GP')}</span></div>
-                                        <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{race.circuit} · {race.date}</div>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>Сезон {schedule.season||2026}</h2>
+
+                    {/* Next race — big card */}
+                    {futureList[0] && (
+                        <div className="gradient-card" style={{marginBottom:16,minHeight:180}}>
+                            {futureList[0].circuit_image && <img src={futureList[0].circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
+                            <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
+                            <div style={{position:'relative',zIndex:1}}>
+                                <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
+                                    🏁 Следующий гран-при
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                                    <span style={{fontSize:32}}>{flagEmoji(futureList[0].country)}</span>
+                                    <div>
+                                        <div style={{fontSize:20,fontWeight:900}}>{futureList[0].name?.replace('Grand Prix','Гран-при')}</div>
+                                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{futureList[0].circuit} · Раунд {futureList[0].round}</div>
                                     </div>
-                                    {isPast && vkUrl && (
-                                        <button onClick={(e)=>{e.stopPropagation();openLink(vkUrl);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#4DA3FF',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                                            📺 Запись
-                                        </button>
-                                    )}
-                                    {isPast && !vkUrl && <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>✓</div>}
-                                    {isNext && <div style={{fontSize:10,fontWeight:700,color:'var(--f1-red)',textTransform:'uppercase',letterSpacing:1}}>NEXT</div>}
+                                </div>
+                                {futureList[0].race_datetime && <Countdown targetDate={futureList[0].race_datetime}/>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Past races */}
+                    {pastList.length > 0 && (<>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:2,marginBottom:8,paddingLeft:4}}>Прошедшие</div>
+                        {pastList.slice().reverse().map((race)=>{
+                            const vkUrl = vkMap[`${schedule.season||2026}-${race.round}`];
+                            const winner = lastResults[race.round];
+                            return (
+                                <div key={race.round} className="card" style={{marginBottom:8,padding:12,opacity:0.7}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                        <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','GP')}</span></div>
+                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.date}</div>
+                                        </div>
+                                        {winner && (
+                                            <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                                                {winner.photo_url && <img src={winner.photo_url} alt="" style={{width:24,height:24,borderRadius:'50%',objectFit:'cover',border:'2px solid #FFD700'}} onError={e=>{e.target.style.display='none'}}/>}
+                                                <span style={{fontSize:11,fontWeight:700,color:'#FFD700'}}>🏆 {winner.code}</span>
+                                            </div>
+                                        )}
+                                        {vkUrl && (
+                                            <button onClick={(e)=>{e.stopPropagation();openLink(vkUrl);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                                                📺
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div className="divider-line" style={{margin:'12px 0'}}/>
+                    </>)}
+
+                    {/* Future races */}
+                    {futureList.length > 1 && (
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:2,marginBottom:8,paddingLeft:4}}>Предстоящие</div>
+                    )}
+                    {futureList.slice(1).map((race)=>(
+                        <div key={race.round} className="card" style={{marginBottom:8,padding:12,position:'relative',overflow:'hidden'}}>
+                            {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:70,height:'100%',objectFit:'contain',opacity:0.05,pointerEvents:'none'}}/>}
+                            <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
+                                <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0}}>{race.round}</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:5}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:14}}>{race.name?.replace('Grand Prix','GP')}</span></div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit} · {race.date}</div>
                                 </div>
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
             );
         };
@@ -722,7 +805,11 @@
             const [selectedDriver, setSelectedDriver] = useState(null);
             const [driverDetail, setDriverDetail] = useState(null);
             const [allDrivers, setAllDrivers] = useState(null);
-            useEffect(() => { if (tab==='cards' && !allDrivers) api.get('/api/drivers').then(d=>setAllDrivers(d?.drivers||[])); }, [tab]);
+            const [teamsData, setTeamsData] = useState(null);
+            useEffect(() => {
+                if (tab==='cards' && !allDrivers) api.get('/api/drivers').then(d=>setAllDrivers(d?.drivers||[]));
+                if (tab==='teams' && !teamsData) api.get('/api/teams').then(d=>setTeamsData(d?.teams||[]));
+            }, [tab]);
 
             const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}`)); };
 
@@ -745,7 +832,7 @@
                         </div>
                         {stats && (<>
                             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
-                                {[{val:stats.points,label:'Очки'},{val:stats.wins,label:'Побед'},{val:stats.podiums,label:'Подиум'},{val:stats.dnfs,label:'DNF'}].map((s,i)=>(
+                                {[{val:stats.points,label:'Очки'},{val:stats.wins,label:'Побед'},{val:stats.podiums,label:'Подиум'},{val:stats.dnfs,label:'Сходы'}].map((s,i)=>(
                                     <div key={i} className="card" style={{textAlign:'center',padding:10}}><div style={{fontSize:20,fontWeight:900}}>{s.val}</div><div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{s.label}</div></div>
                                 ))}
                             </div>
@@ -773,35 +860,63 @@
             const data = tab==='drivers'?driversStandings:tab==='constructors'?constructorsStandings:null;
             const leaderPts = data?.standings?.[0]?.points || 1;
 
+            // Build large photo URL from regular photo URL
+            const largePhoto = (url) => url ? url.replace('/2col/','/4col/').replace('/1col/','/4col/') : null;
+
             return (
                 <div className="page-container fade-in">
                     <div style={{padding:'12px 16px'}}>
                         <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>Чемпионат</h2>
                         <div className="tab-switch" style={{marginBottom:16}}>
                             <button className={`tab-switch-btn ${tab==='drivers'?'active':''}`} onClick={()=>setTab('drivers')}>Пилоты</button>
-                            <button className={`tab-switch-btn ${tab==='constructors'?'active':''}`} onClick={()=>setTab('constructors')}>Команды</button>
+                            <button className={`tab-switch-btn ${tab==='constructors'?'active':''}`} onClick={()=>setTab('constructors')}>Кубок</button>
                             <button className={`tab-switch-btn ${tab==='cards'?'active':''}`} onClick={()=>setTab('cards')}>Карточки</button>
+                            <button className={`tab-switch-btn ${tab==='teams'?'active':''}`} onClick={()=>setTab('teams')}>Команды</button>
                         </div>
                     </div>
 
-                    {(tab==='drivers'||tab==='constructors') && (!data?.standings ? (
-                        <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="48px" className="mb-3"/>)}</div>
+                    {/* DRIVERS STANDINGS */}
+                    {tab==='drivers' && (!data?.standings ? (
+                        <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="64px" r="16px" className="mb-3"/>)}</div>
                     ) : (
-                        <div>
-                            {data.standings.map((s,i)=>(
-                                <React.Fragment key={i}>
-                                    {(i===3||i===10) && <div className="divider-line" style={{margin:'2px 16px'}}/>}
-                                    <div className="standings-row" onClick={()=>tab==='drivers'&&s.driver_number?openDriver(s.driver_number):null} style={{cursor:tab==='drivers'?'pointer':'default'}}>
-                                        <PosBadge pos={s.position}/>
-                                        <div style={{background:s.team_color,width:4,height:36,borderRadius:2}}/>
-                                        {tab==='drivers' && s.photo_url && <DriverPhoto url={s.photo_url} size={32}/>}
-                                        <div style={{flex:1}}>
-                                            <div style={{fontWeight:700,fontSize:14}}>{tab==='drivers'?s.name:s.team}</div>
-                                            {tab==='drivers' && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div>}
-                                            {tab==='constructors' && s.drivers && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.drivers.map(d=>d.code).join(' · ')}</div>}
-                                            <div className="progress-bar-bg" style={{marginTop:4,width:'100%',maxWidth:120}}>
-                                                <div className="progress-bar-fill" style={{width:`${Math.max(3,(s.points/leaderPts)*100)}%`,background:s.team_color}}/>
+                        <div style={{padding:'0 12px'}}>
+                            {/* Top 3 podium cards */}
+                            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>
+                                {data.standings.slice(0,3).map((s,i)=>(
+                                    <div key={i} className="gradient-card" onClick={()=>s.driver_number&&openDriver(s.driver_number)}
+                                         style={{cursor:'pointer',padding:14,background:`linear-gradient(135deg,${s.team_color}20,var(--f1-card) 70%)`,borderLeft:`4px solid ${s.team_color}`}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                            <div style={{fontSize:28,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:32,textAlign:'center',lineHeight:1}}>{s.position}</div>
+                                            {s.photo_url && <img src={s.photo_url} alt="" style={{width:56,height:56,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            <div style={{flex:1,minWidth:0}}>
+                                                <div style={{fontWeight:900,fontSize:16}}>{s.name}</div>
+                                                <div style={{fontSize:12,color:s.team_color,fontWeight:600}}>{s.team}</div>
+                                                <div className="progress-bar-bg" style={{marginTop:4,maxWidth:140}}>
+                                                    <div className="progress-bar-fill" style={{width:`${Math.max(5,(s.points/leaderPts)*100)}%`,background:s.team_color}}/>
+                                                </div>
                                             </div>
+                                            <div style={{textAlign:'right'}}>
+                                                <div style={{fontWeight:900,fontSize:22,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                                <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>очков</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="divider-line" style={{margin:'8px 4px'}}/>
+
+                            {/* Rest of grid */}
+                            {data.standings.slice(3).map((s,i)=>(
+                                <React.Fragment key={i}>
+                                    {i===7 && <div className="divider-line" style={{margin:'4px 4px'}}/>}
+                                    <div className="standings-row" onClick={()=>s.driver_number&&openDriver(s.driver_number)} style={{cursor:'pointer',padding:'10px 8px',gap:10}}>
+                                        <div style={{width:28,fontWeight:900,fontSize:15,color:'var(--f1-text-muted)',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{s.position}</div>
+                                        <div style={{background:s.team_color,width:4,height:40,borderRadius:2}}/>
+                                        {s.photo_url && <img src={s.photo_url} alt="" style={{width:40,height:40,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div>
                                         </div>
                                         <div style={{textAlign:'right'}}>
                                             <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
@@ -813,27 +928,114 @@
                         </div>
                     ))}
 
-                    {tab==='cards' && (
-                        <div style={{padding:'0 16px'}}>
-                            {!allDrivers ? (
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>{[1,2,3,4,5,6].map(i=><Skeleton key={i} h="110px" r="16px"/>)}</div>
-                            ) : (
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                                    {allDrivers.map(d=>(
-                                        <div key={d.driver_number} className="gradient-card" onClick={()=>openDriver(d.driver_number)}
-                                             style={{cursor:'pointer',padding:'14px 12px',background:`linear-gradient(135deg,${d.team_color}30,var(--f1-card) 70%)`}}>
-                                            <div style={{position:'absolute',top:8,right:10,fontSize:32,fontWeight:900,color:d.team_color,opacity:0.15,lineHeight:1}}>{d.driver_number}</div>
-                                            <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
-                                                <div style={{flex:1,paddingLeft:4,position:'relative',zIndex:1}}>
-                                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.country)} {d.first_name||d.name?.split(' ')[0]}</div>
-                                                    <div style={{fontSize:15,fontWeight:900,lineHeight:1.2}}>{d.last_name||d.name?.split(' ').slice(1).join(' ')}</div>
-                                                    <div style={{fontSize:11,color:d.team_color,fontWeight:600,marginTop:2}}>{d.team?.split(' ')[0]}</div>
+                    {/* CONSTRUCTORS STANDINGS */}
+                    {tab==='constructors' && (!constructorsStandings?.standings ? (
+                        <div style={{padding:16}}>{[1,2,3,4,5].map(i=><Skeleton key={i} h="56px" r="16px" className="mb-3"/>)}</div>
+                    ) : (
+                        <div style={{padding:'0 12px'}}>
+                            {constructorsStandings.standings.map((s,i)=>{
+                                const cLeader = constructorsStandings.standings[0]?.points || 1;
+                                return (
+                                    <div key={i} className="card" style={{marginBottom:8,padding:12,borderLeft:`4px solid ${s.team_color}`}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                            <div style={{fontSize:20,fontWeight:900,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',minWidth:28,textAlign:'center'}}>{s.position}</div>
+                                            {s.logo_url && <img src={s.logo_url} alt="" style={{width:36,height:36,objectFit:'contain',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                            <div style={{flex:1,minWidth:0}}>
+                                                <div style={{fontWeight:700,fontSize:15}}>{s.team}</div>
+                                                <div style={{display:'flex',gap:6,marginTop:4,alignItems:'center'}}>
+                                                    {s.drivers?.map((d,j)=>(
+                                                        <div key={j} style={{display:'flex',alignItems:'center',gap:3}}>
+                                                            {d.photo_url && <img src={d.photo_url} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                            <span style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>{d.code}</span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:48,height:48,borderRadius:10,objectFit:'cover',background:'transparent',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                <div className="progress-bar-bg" style={{marginTop:4,maxWidth:140}}>
+                                                    <div className="progress-bar-fill" style={{width:`${Math.max(3,(s.points/cLeader)*100)}%`,background:s.team_color}}/>
+                                                </div>
+                                            </div>
+                                            <div style={{textAlign:'right'}}>
+                                                <div style={{fontWeight:900,fontSize:18,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
+                                                {i>0 && <div style={{fontSize:10,color:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>-{constructorsStandings.standings[0].points-s.points}</div>}
                                             </div>
                                         </div>
-                                    ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+
+                    {/* DRIVER CARDS — redesigned with big photos */}
+                    {tab==='cards' && (
+                        <div style={{padding:'0 12px'}}>
+                            {!allDrivers ? (
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>{[1,2,3,4,5,6].map(i=><Skeleton key={i} h="240px" r="16px"/>)}</div>
+                            ) : (
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                    {allDrivers.map(d=>{
+                                        const bigPhoto = d.photo_url_large || largePhoto(d.photo_url);
+                                        return (
+                                            <div key={d.driver_number} onClick={()=>openDriver(d.driver_number)}
+                                                 style={{cursor:'pointer',borderRadius:16,overflow:'hidden',position:'relative',background:'var(--f1-card)',border:'1px solid var(--f1-border)',boxShadow:'0 4px 24px rgba(0,0,0,0.2)',transition:'transform 0.15s'}}>
+                                                <div style={{position:'absolute',top:10,right:10,fontSize:42,fontWeight:900,color:d.team_color,opacity:0.2,lineHeight:1,zIndex:1}}>{d.driver_number}</div>
+                                                <div style={{width:'100%',height:180,background:`linear-gradient(180deg,${d.team_color}15,${d.team_color}05)`,position:'relative',overflow:'hidden'}}>
+                                                    {bigPhoto && <img src={bigPhoto} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'60%',background:`linear-gradient(transparent,${d.team_color}CC)`}}/>
+                                                    <div style={{position:'absolute',bottom:8,left:10,right:10,zIndex:1}}>
+                                                        <div style={{fontSize:11,color:'rgba(255,255,255,0.8)'}}>{flagEmoji(d.country)} {d.first_name||d.name?.split(' ')[0]}</div>
+                                                        <div style={{fontSize:16,fontWeight:900,color:'#fff',lineHeight:1.2,textShadow:'0 1px 4px rgba(0,0,0,0.5)'}}>{d.last_name||d.name?.split(' ').slice(1).join(' ')}</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{padding:'8px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                                    <div style={{fontSize:11,color:d.team_color,fontWeight:600}}>{d.team?.replace('F1 Team','').trim()}</div>
+                                                    {d.points != null && <div style={{background:`${d.team_color}22`,color:d.team_color,padding:'2px 8px',borderRadius:6,fontSize:12,fontWeight:700}}>{d.points} очк.</div>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* TEAMS — full team cards */}
+                    {tab==='teams' && (
+                        <div style={{padding:'0 12px'}}>
+                            {!teamsData ? (
+                                <div>{[1,2,3,4,5].map(i=><Skeleton key={i} h="200px" r="16px" className="mb-3"/>)}</div>
+                            ) : (
+                                teamsData.map((team,i)=>(
+                                    <div key={i} className="card" style={{marginBottom:12,padding:0,overflow:'hidden'}}>
+                                        {team.car_url && (
+                                            <div style={{width:'100%',height:140,background:`linear-gradient(135deg,${team.team_color}15,var(--f1-card-solid))`,position:'relative',overflow:'hidden'}}>
+                                                <img src={team.car_url} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:12}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>
+                                            </div>
+                                        )}
+                                        <div style={{padding:'12px 14px'}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                                                {team.logo_url && <img src={team.logo_url} alt="" style={{width:28,height:28,objectFit:'contain'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                <div style={{flex:1}}>
+                                                    <div style={{fontWeight:700,fontSize:15,color:team.team_color}}>{team.team}</div>
+                                                </div>
+                                                <div style={{textAlign:'right'}}>
+                                                    <div style={{fontWeight:900,fontSize:18,fontVariantNumeric:'tabular-nums'}}>{team.points||'—'}</div>
+                                                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>P{team.position||i+1}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{display:'flex',gap:12}}>
+                                                {team.drivers?.map((d,j)=>(
+                                                    <div key={j} onClick={(e)=>{e.stopPropagation();d.driver_number&&openDriver(d.driver_number);}} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1,padding:'6px 8px',background:'rgba(255,255,255,0.03)',borderRadius:10,border:'1px solid var(--f1-border)'}}>
+                                                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${team.team_color}`}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                        <div>
+                                                            <div style={{fontWeight:700,fontSize:13}}>{d.code}</div>
+                                                            <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.name?.split(' ').pop()}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
                             )}
                         </div>
                     )}
@@ -1293,7 +1495,7 @@
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
                     case 'analytics': return <AnalyticsPage/>;
                     case 'news': return <NewsPage/>;
-                    case 'schedule': return <SchedulePage schedule={schedule}/>;
+                    case 'schedule': return <SchedulePage schedule={schedule} nextRace={nextRace}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;

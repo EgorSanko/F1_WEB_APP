@@ -558,80 +558,127 @@ async def leaderboard(request: Request):
     }
 
 
-# ============ NEWS (from Telegram channel) ============
+# ============ NEWS (from championat.com + Telegram fallback) ============
 
 @app.get("/api/news")
 async def get_news():
-    """Parse latest posts from public Telegram channel."""
+    """Parse F1 news from championat.com with Telegram fallback."""
     cached = f1_data.cache_get("news")
     if cached:
         return cached
 
     posts = []
+    source = "championat.com"
+
+    # --- PRIMARY: championat.com ---
     try:
         client = f1_data.get_client()
         resp = await client.get(
-            "https://t.me/s/stanizlavsky",
+            "https://www.championat.com/auto/_f1.html",
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             timeout=10.0,
         )
         if resp.status_code == 200:
             html = resp.text
-            # Parse tgme_widget_message blocks
-            msg_blocks = re.findall(
-                r'<div class="tgme_widget_message_wrap[^"]*"[^>]*>.*?</div>\s*</div>\s*</div>\s*</div>',
+            # Find all article-preview blocks
+            previews = re.finditer(
+                r'class="article-preview"[^>]*>.*?class="article-preview__details".*?</div>\s*</div>',
                 html, re.DOTALL
             )
-            for block in msg_blocks[-20:]:
+            for match in previews:
+                block = match.group(0)
                 post = {}
-                # Post ID
-                post_match = re.search(r'data-post="([^"]+)"', block)
-                if post_match:
-                    post["id"] = post_match.group(1)
-                    post["url"] = f"https://t.me/{post_match.group(1)}"
 
-                # Text
-                text_match = re.search(
-                    r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                # URL + title
+                title_match = re.search(
+                    r'<a class="article-preview__title"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
                     block, re.DOTALL
                 )
-                if text_match:
-                    text = text_match.group(1)
-                    text = re.sub(r'<br\s*/?>', '\n', text)
-                    text = re.sub(r'<[^>]+>', '', text)
-                    text = text.strip()
-                    post["text"] = text[:500]
+                if title_match:
+                    url = title_match.group(1).strip()
+                    if not url.startswith("http"):
+                        url = "https://www.championat.com" + url
+                    post["url"] = url
+                    post["title"] = re.sub(r'<[^>]+>', '', title_match.group(2)).strip()
+
+                # Subtitle / preview
+                sub_match = re.search(
+                    r'<a class="article-preview__subtitle"[^>]*>(.*?)</a>',
+                    block, re.DOTALL
+                )
+                if sub_match:
+                    post["preview"] = re.sub(r'<[^>]+>', '', sub_match.group(1)).strip()
 
                 # Photo
-                photo_match = re.search(
-                    r"background-image:url\('([^']+)'\)",
-                    block
-                )
-                if photo_match:
-                    post["photo"] = photo_match.group(1)
+                img_match = re.search(r'data-src="([^"]+)"', block)
+                if img_match:
+                    photo_url = img_match.group(1)
+                    # Use medium size for cards
+                    photo_url = re.sub(r'/s/\d+x\d+/', '/s/640x427/', photo_url)
+                    post["photo"] = photo_url
 
                 # Date
-                date_match = re.search(r'<time[^>]*datetime="([^"]+)"', block)
-                if date_match:
-                    post["date"] = date_match.group(1)
-
-                # Views
-                views_match = re.search(
-                    r'<span class="tgme_widget_message_views">([^<]+)</span>',
-                    block
+                date_match = re.search(
+                    r'class="article-preview__date"[^>]*>(.*?)</div>',
+                    block, re.DOTALL
                 )
-                if views_match:
-                    post["views"] = views_match.group(1).strip()
+                if date_match:
+                    post["date_text"] = date_match.group(1).strip()
 
-                if post.get("text") or post.get("photo"):
+                if post.get("title"):
                     posts.append(post)
+
+            if posts:
+                logger.info(f"Championat.com: parsed {len(posts)} articles")
     except Exception as e:
-        logger.error(f"News fetch error: {e}")
+        logger.error(f"Championat.com fetch error: {e}")
+
+    # --- FALLBACK: Telegram channel ---
+    if not posts:
+        source = "@stanizlavsky"
+        try:
+            client = f1_data.get_client()
+            resp = await client.get(
+                "https://t.me/s/stanizlavsky",
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                timeout=10.0,
+            )
+            if resp.status_code == 200:
+                html = resp.text
+                msg_blocks = re.findall(
+                    r'<div class="tgme_widget_message_wrap[^"]*"[^>]*>.*?</div>\s*</div>\s*</div>\s*</div>',
+                    html, re.DOTALL
+                )
+                for block in msg_blocks[-20:]:
+                    post = {}
+                    post_match = re.search(r'data-post="([^"]+)"', block)
+                    if post_match:
+                        post["url"] = f"https://t.me/{post_match.group(1)}"
+                    text_match = re.search(
+                        r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                        block, re.DOTALL
+                    )
+                    if text_match:
+                        text = re.sub(r'<br\s*/?>', '\n', text_match.group(1))
+                        text = re.sub(r'<[^>]+>', '', text).strip()
+                        lines = text.split('\n')
+                        post["title"] = lines[0][:200] if lines else text[:200]
+                        post["preview"] = ' '.join(lines[1:]).strip()[:300] if len(lines) > 1 else ''
+                    photo_match = re.search(r"background-image:url\('([^']+)'\)", block)
+                    if photo_match:
+                        post["photo"] = photo_match.group(1)
+                    date_match = re.search(r'<time[^>]*datetime="([^"]+)"', block)
+                    if date_match:
+                        post["date_text"] = date_match.group(1)
+                    if post.get("title"):
+                        posts.append(post)
+        except Exception as e:
+            logger.error(f"Telegram news fallback error: {e}")
 
     response = {
-        "posts": posts[-20:],
-        "channel": "@stanizlavsky",
-        "channel_url": "https://t.me/stanizlavsky",
+        "posts": posts[:25],
+        "source": source,
+        "source_url": "https://www.championat.com/auto/_f1.html" if source == "championat.com" else "https://t.me/stanizlavsky",
     }
     if posts:
         f1_data.cache_set("news", response)
