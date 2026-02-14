@@ -145,8 +145,12 @@ async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
                 s = sessions[-1] if isinstance(sessions, list) else sessions
                 if isinstance(s, list):
                     s = s[0] if s else {}
+                try:
+                    fallback_sk = int(_demo_override_key)
+                except (ValueError, TypeError):
+                    fallback_sk = _demo_override_key
                 info = {
-                    "session_key": s.get("session_key", int(_demo_override_key)),
+                    "session_key": s.get("session_key", fallback_sk),
                     "session_name": s.get("session_name", ""),
                     "session_type": s.get("session_type", ""),
                     "meeting_name": s.get("meeting_name", ""),
@@ -155,7 +159,11 @@ async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
                     "date_end": s.get("date_end", ""),
                 }
             else:
-                info = {"session_key": int(_demo_override_key), "meeting_name": f"Session {_demo_override_key}"}
+                try:
+                    fallback_sk = int(_demo_override_key)
+                except (ValueError, TypeError):
+                    fallback_sk = _demo_override_key
+                info = {"session_key": fallback_sk, "meeting_name": f"Session {_demo_override_key}"}
             cache_set(f"demo_info:{_demo_override_key}", info)
         return _demo_override_key, True, info
 
@@ -218,8 +226,10 @@ async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
 
 
 def set_demo_session(session_key: Optional[str]):
-    """Set or clear demo session override. None = auto mode."""
+    """Set or clear demo session override. None or 'auto' = auto mode."""
     global _demo_override_key
+    if session_key and session_key.lower() in ("auto", "clear", "none", ""):
+        session_key = None
     _demo_override_key = session_key
     cache_clear("_fallback")
     cache_clear("live_")
