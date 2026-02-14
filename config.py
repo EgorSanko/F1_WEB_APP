@@ -233,6 +233,61 @@ STREAM_LINKS = [
     },
 ]
 
+# ============ PAST RACE RECORDINGS (VK Video) ============
+_VK_CHANNEL = "https://vkvideo.ru/@stanizlavskylive"
+PAST_RACES_VK = [
+    # 2025 season
+    {"race": "Bahrain GP 2025",        "round": 1,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Saudi Arabia GP 2025",   "round": 2,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Australia GP 2025",      "round": 3,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Japan GP 2025",          "round": 4,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "China GP 2025",          "round": 5,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Miami GP 2025",          "round": 6,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Emilia Romagna GP 2025", "round": 7,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Monaco GP 2025",         "round": 8,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Spain GP 2025",          "round": 9,  "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Canada GP 2025",         "round": 10, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Austria GP 2025",        "round": 11, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Great Britain GP 2025",  "round": 12, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Hungary GP 2025",        "round": 13, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Belgium GP 2025",        "round": 14, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Netherlands GP 2025",    "round": 15, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Italy GP 2025",          "round": 16, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Azerbaijan GP 2025",     "round": 17, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Singapore GP 2025",      "round": 18, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "USA GP 2025",            "round": 19, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Mexico GP 2025",         "round": 20, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Brazil GP 2025",         "round": 21, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Las Vegas GP 2025",      "round": 22, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Qatar GP 2025",          "round": 23, "season": 2025, "url": _VK_CHANNEL},
+    {"race": "Abu Dhabi GP 2025",      "round": 24, "season": 2025, "url": _VK_CHANNEL},
+    # 2024 season
+    {"race": "Bahrain GP 2024",        "round": 1,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Saudi Arabia GP 2024",   "round": 2,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Australia GP 2024",      "round": 3,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Japan GP 2024",          "round": 4,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "China GP 2024",          "round": 5,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Miami GP 2024",          "round": 6,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Emilia Romagna GP 2024", "round": 7,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Monaco GP 2024",         "round": 8,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Canada GP 2024",         "round": 9,  "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Spain GP 2024",          "round": 10, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Austria GP 2024",        "round": 11, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Great Britain GP 2024",  "round": 12, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Hungary GP 2024",        "round": 13, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Belgium GP 2024",        "round": 14, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Netherlands GP 2024",    "round": 15, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Italy GP 2024",          "round": 16, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Azerbaijan GP 2024",     "round": 17, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Singapore GP 2024",      "round": 18, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "USA GP 2024",            "round": 19, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Mexico GP 2024",         "round": 20, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Brazil GP 2024",         "round": 21, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Las Vegas GP 2024",      "round": 22, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Qatar GP 2024",          "round": 23, "season": 2024, "url": _VK_CHANNEL},
+    {"race": "Abu Dhabi GP 2024",      "round": 24, "season": 2024, "url": _VK_CHANNEL},
+]
+
 # ============ TYRE COMPOUNDS ============
 TYRE_COLORS = {
     "SOFT": "#FF3333",

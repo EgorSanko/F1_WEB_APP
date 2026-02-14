@@ -26,7 +26,8 @@ from config import (
     TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_IDS,
     DRIVERS, TEAM_COLORS, TYRE_COLORS,
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
-    DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY
+    DEBUG, CACHE_TTL, TEAM_ASSETS, STREAM_LINKS, VK_SERVICE_KEY,
+    PAST_RACES_VK
 )
 
 # ============ LOGGING ============
@@ -694,6 +695,14 @@ async def get_streams():
     if videos:
         f1_data.cache_set("streams", response)
     return response
+
+
+# ============ PAST RACES VK ============
+
+@app.get("/api/past-races-vk")
+async def get_past_races_vk():
+    """Return list of past race VK video recording links."""
+    return {"races": PAST_RACES_VK}
 
 
 # ============ ANALYTICS ENDPOINTS ============

@@ -142,9 +142,12 @@
         .progress-bar-bg { height:4px; background:var(--f1-gray); border-radius:2px; overflow:hidden; }
         .progress-bar-fill { height:100%; border-radius:2px; transition:width 0.5s ease; }
 
-        .news-card { background:var(--f1-card); backdrop-filter:blur(20px); border:1px solid var(--f1-border); border-radius:16px; overflow:hidden; margin-bottom:12px; box-shadow:0 4px 24px rgba(0,0,0,0.2); }
-        .news-card-img { width:100%; height:180px; object-fit:cover; }
+        .news-card { background:var(--f1-card); backdrop-filter:blur(20px); border:1px solid var(--f1-border); border-radius:16px; overflow:hidden; margin-bottom:12px; box-shadow:0 4px 24px rgba(0,0,0,0.2); cursor:pointer; transition:transform 0.15s; }
+        .news-card:active { transform:scale(0.98); }
+        .news-card-img { width:100%; height:200px; object-fit:cover; }
         .news-card-body { padding:14px 16px; }
+        .news-card-title { font-size:15px; font-weight:700; line-height:1.35; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .news-card-preview { font-size:13px; color:var(--f1-text-secondary); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:10px; }
 
         .stream-card { width:220px; flex-shrink:0; background:var(--f1-card); border:1px solid var(--f1-border); border-radius:14px; overflow:hidden; cursor:pointer; transition:transform 0.15s; }
         .stream-card:active { transform:scale(0.96); }
@@ -200,9 +203,9 @@
         };
 
         // ==== HELPERS ====
-        const formatTime = (s) => { if(s==null) return '\u2014'; const m=Math.floor(s/60); const sec=(s%60).toFixed(3); return m>0?`${m}:${sec.padStart(6,'0')}`:sec; };
-        const fmtSector = (v) => v != null ? v.toFixed(3) : '\u2014';
-        const fmtLap = (v) => { if(v==null) return '\u2014'; const m=Math.floor(v/60); const s=(v%60).toFixed(3); return m>0?`${m}:${s.padStart(6,'0')}`:s; };
+        const formatTime = (s) => { if(s==null) return '—'; const m=Math.floor(s/60); const sec=(s%60).toFixed(3); return m>0?`${m}:${sec.padStart(6,'0')}`:sec; };
+        const fmtSector = (v) => v != null ? v.toFixed(3) : '—';
+        const fmtLap = (v) => { if(v==null) return '—'; const m=Math.floor(v/60); const s=(v%60).toFixed(3); return m>0?`${m}:${s.padStart(6,'0')}`:s; };
 
         const formatCountdown = (targetDate) => {
             const now = new Date();
@@ -292,7 +295,7 @@
         const SectorBar = ({s1,s2,s3}) => <div className="sector-bar"><div className={`sb-${s1||'normal'}`}/><div className={`sb-${s2||'normal'}`}/><div className={`sb-${s3||'normal'}`}/></div>;
         const FlagIcon = ({flag}) => {
             const map = {'GREEN':{cls:'flag-green',text:'G'},'YELLOW':{cls:'flag-yellow',text:'!'},'DOUBLE YELLOW':{cls:'flag-yellow',text:'!!'},'RED':{cls:'flag-red',text:'R'},'CHEQUERED':{cls:'flag-chequered',text:'🏁'}};
-            const f = map[flag]||{cls:'',text:'\u2022'};
+            const f = map[flag]||{cls:'',text:'•'};
             return <span className={`flag-icon ${f.cls}`}>{f.text}</span>;
         };
 
@@ -304,12 +307,12 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, onChange}) => {
             if (!nextRace && !lastRace) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:16}}/><CardSkeleton/></div>;
             return (
                 <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
                     <div style={{textAlign:'center',padding:'8px 0'}}>
-                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 \u00b7 2025</div>
+                        <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · 2025</div>
                         <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
                     </div>
 
@@ -319,20 +322,20 @@
                             <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
                             <div style={{position:'relative',zIndex:1}}>
                                 <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                                    🏁 \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0433\u0440\u0430\u043D-\u043F\u0440\u0438
+                                    🏁 Следующий гран-при
                                 </div>
                                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                                     <span style={{fontSize:32}}>{flagEmoji(nextRace.country)}</span>
                                     <div>
                                         <div style={{fontSize:20,fontWeight:900}}>{nextRace.name}</div>
-                                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{nextRace.circuit} \u00b7 \u0420\u0430\u0443\u043D\u0434 {nextRace.round}</div>
+                                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{nextRace.circuit} · Раунд {nextRace.round}</div>
                                     </div>
                                 </div>
                                 {nextRace.race_datetime && <div style={{marginTop:16}}><Countdown targetDate={nextRace.race_datetime}/></div>}
                                 {nextRace.sessions && (
                                     <div style={{marginTop:16,display:'flex',flexWrap:'wrap',gap:6}}>
                                         {Object.entries(nextRace.sessions).map(([key,val])=>{
-                                            const names = {fp1:'FP1',fp2:'FP2',fp3:'FP3',qualifying:'\u041A\u0412\u0410\u041B\u0418',race:'\u0413\u041E\u041D\u041A\u0410',sprint:'\u0421\u041F\u0420\u0418\u041D\u0422',sprint_qualifying:'\u0421\u041A'};
+                                            const names = {fp1:'FP1',fp2:'FP2',fp3:'FP3',qualifying:'КВАЛИ',race:'ГОНКА',sprint:'СПРИНТ',sprint_qualifying:'СК'};
                                             return (
                                                 <div key={key} style={{background:key==='race'?'var(--f1-red)':'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:600}}>
                                                     <div style={{opacity:0.7}}>{names[key]||key}</div>
@@ -349,7 +352,7 @@
                     {(streams?.videos?.length > 0 || streams?.channels?.length > 0) && (
                         <div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
-                                📺 \u0422\u0440\u0430\u043D\u0441\u043B\u044F\u0446\u0438\u0438 \u0438 \u0432\u0438\u0434\u0435\u043E
+                                📺 Трансляции и видео
                             </div>
 
                             {streams?.videos?.length > 0 && (
@@ -373,8 +376,8 @@
                                     })}
                                     <div className="stream-card" onClick={()=>openLink(streams.channel_url)} style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:160}}>
                                         <div style={{textAlign:'center',padding:20}}>
-                                            <div style={{fontSize:28,marginBottom:8}}>\u25B6\uFE0F</div>
-                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>\u0412\u0441\u0435 \u0432\u0438\u0434\u0435\u043E</div>
+                                            <div style={{fontSize:28,marginBottom:8}}>▶️</div>
+                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>Все видео</div>
                                         </div>
                                     </div>
                                 </div>
@@ -399,7 +402,7 @@
 
                     {lastRace && lastRace.results && (
                         <div className="card">
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u00b7 {lastRace.name}</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Последний результат · {lastRace.name}</div>
                             {lastRace.results.slice(0,5).map((r,i)=>(
                                 <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
                                     <PosBadge pos={r.position}/>
@@ -417,7 +420,7 @@
 
                     {standings?.standings && (
                         <div className="card">
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u0427\u0435\u043C\u043F\u0438\u043E\u043D\u0430\u0442 \u043F\u0438\u043B\u043E\u0442\u043E\u0432</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Чемпионат пилотов</div>
                             {standings.standings.slice(0,3).map((s,i)=>(
                                 <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
                                     <PosBadge pos={s.position}/>
@@ -431,15 +434,15 @@
                     )}
 
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                        <div className="gradient-card" style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(225,6,0,0.12),var(--f1-card))'}}>
+                        <div className="gradient-card" onClick={()=>onChange('predict')} style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(225,6,0,0.12),var(--f1-card))'}}>
                             <div style={{fontSize:32}}>&#x1F52E;</div>
-                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</div>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0423\u0433\u0430\u0434\u0430\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442</div>
+                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>Прогнозы</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Угадай результат</div>
                         </div>
-                        <div className="gradient-card" style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(102,146,255,0.12),var(--f1-card))'}}>
-                            <div style={{fontSize:32}}>&#x1F3AE;</div>
-                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>\u0418\u0433\u0440\u044B</div>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0417\u0430\u0440\u0430\u0431\u043E\u0442\u0430\u0439 \u043E\u0447\u043A\u0438</div>
+                        <div className="gradient-card" onClick={()=>onChange('schedule')} style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(102,146,255,0.12),var(--f1-card))'}}>
+                            <div style={{fontSize:32}}>📅</div>
+                            <div style={{fontSize:14,fontWeight:700,marginTop:6}}>Расписание</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Все гран-при</div>
                         </div>
                     </div>
                 </div>
@@ -479,19 +482,19 @@
                     <div style={{padding:'10px 16px 0'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
                             {isLive && <span className="live-dot"/>}
-                            <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':'var(--f1-text-muted)'}}>{isLive?'LIVE':'\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0441\u0435\u0441\u0441\u0438\u044F'}</span>
-                            {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>\u041B\u0443\u0447\u0448\u0438\u0439: {fmtLap(timing.session_best.lap)}</span>}
+                            <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':'var(--f1-text-muted)'}}>{isLive?'LIVE':'Последняя сессия'}</span>
+                            {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>Лучший: {fmtLap(timing.session_best.lap)}</span>}
                         </div>
                         <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Grand Prix'}</h2>
-                        <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} \u00b7 {session.circuit_short_name}</div>
+                        <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} · {session.circuit_short_name}</div>
                     </div>
 
                     {weather?.weather && (
                         <div className="weather-strip">
-                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'🌧️':'\u2600️'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'\u2014'}\u00b0C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>🏁</span><span>\u0422\u0440\u0430\u0441\u0441\u0430 </span><span className="weather-pill-val">{weather.weather.track_temperature||'\u2014'}\u00b0C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>💧</span><span className="weather-pill-val">{weather.weather.humidity||'\u2014'}%</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>💨</span><span className="weather-pill-val">{weather.weather.wind_speed||'\u2014'} \u043C/\u0441</span></div>
+                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'🌧️':'☀️'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'—'}°C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>🏁</span><span>Трасса </span><span className="weather-pill-val">{weather.weather.track_temperature||'—'}°C</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>💧</span><span className="weather-pill-val">{weather.weather.humidity||'—'}%</span></div>
+                            <div className="weather-pill"><span style={{fontSize:14}}>💨</span><span className="weather-pill-val">{weather.weather.wind_speed||'—'} м/с</span></div>
                         </div>
                     )}
 
@@ -511,7 +514,7 @@
                     })()}
 
                     <div className="live-tabs">
-                        {[{id:'positions',label:'\u041F\u043E\u0437\u0438\u0446\u0438\u0438'},{id:'sectors',label:'\u0421\u0435\u043A\u0442\u043E\u0440\u044B'},{id:'pits',label:'\u041F\u0438\u0442-\u0441\u0442\u043E\u043F\u044B'},{id:'radio',label:'\u0420\u0430\u0434\u0438\u043E'},{id:'messages',label:'\u0414\u0438\u0440\u0435\u043A\u0446\u0438\u044F'}].map(t=>(
+                        {[{id:'positions',label:'Позиции'},{id:'sectors',label:'Секторы'},{id:'pits',label:'Пит-стопы'},{id:'radio',label:'Радио'},{id:'messages',label:'Дирекция'}].map(t=>(
                             <button key={t.id} className={`live-tab ${liveTab===t.id?'active':''}`} onClick={()=>setLiveTab(t.id)}>{t.label}</button>
                         ))}
                     </div>
@@ -519,7 +522,7 @@
                     {liveTab==='positions' && (positions?.positions?.length>0 ? (
                         <div>
                             <div className="live-row" style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5,minHeight:28,padding:'4px 12px'}}>
-                                <span>P</span><span></span><span>\u041F\u0438\u043B\u043E\u0442</span><span style={{textAlign:'center'}}>\u0412\u0440\u0435\u043C\u044F</span><span style={{textAlign:'center'}}>\u0428</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>🔧</span>
+                                <span>P</span><span></span><span>Пилот</span><span style={{textAlign:'center'}}>Время</span><span style={{textAlign:'center'}}>Ш</span><span style={{textAlign:'right'}}>Gap</span><span style={{textAlign:'center'}}>🔧</span>
                             </div>
                             {positions.positions.map((p,i) => {
                                 const t = timingMap[p.driver_number]; const isExp = expandedRow===p.driver_number;
@@ -530,9 +533,9 @@
                                             <PosBadge pos={p.position}/>
                                             <div style={{background:p.team_color,width:5,height:34,borderRadius:2,alignSelf:'center'}}/>
                                             <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:14,lineHeight:1.2}}>{p.code||p.name?.split(' ').pop()}</div>{t&&<SectorBar s1={t.s1_status} s2={t.s2_status} s3={t.s3_status}/>}</div>
-                                            <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:t?.is_best_lap?'#A020F0':t?.is_personal_best?'#39B54A':'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{t?fmtLap(t.lap_duration):'\u2014'}</div>
+                                            <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:t?.is_best_lap?'#A020F0':t?.is_personal_best?'#39B54A':'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{t?fmtLap(t.lap_duration):'—'}</div>
                                             <div style={{textAlign:'center',position:'relative'}}><TyreIcon compound={p.tyre}/>{p.tyre_age>0&&<div style={{fontSize:8,color:'var(--f1-text-muted)',position:'absolute',bottom:-4,left:'50%',transform:'translateX(-50%)',fontWeight:600}}>{p.tyre_age}L</div>}</div>
-                                            <div style={{textAlign:'right',fontSize:11,fontWeight:600,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{i===0?<span style={{color:'var(--f1-text-muted)',fontSize:10}}>INT</span>:t?.interval?`+${t.interval}`:t?.gap_to_leader?`+${t.gap_to_leader}`:'\u2014'}</div>
+                                            <div style={{textAlign:'right',fontSize:11,fontWeight:600,color:'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{i===0?<span style={{color:'var(--f1-text-muted)',fontSize:10}}>INT</span>:t?.interval?`+${t.interval}`:t?.gap_to_leader?`+${t.gap_to_leader}`:'—'}</div>
                                             <div style={{textAlign:'center',fontSize:12,color:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.pit_stops||0}</div>
                                         </div>
                                         {isExp && t && (
@@ -541,7 +544,7 @@
                                                 <div className={`sector-time st-${t.s2_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S2</div>{fmtSector(t.sector_2)}</div>
                                                 <div className={`sector-time st-${t.s3_status}`}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>S3</div>{fmtSector(t.sector_3)}</div>
                                                 <div style={{gridColumn:'1/-1',display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--f1-text-muted)',padding:'4px 4px 0'}}>
-                                                    <span>\u041A\u0440\u0443\u0433 {t.lap_number}</span><span>\u0421\u0442\u0438\u043D\u0442 #{p.stint_number} \u00b7 {p.tyre} {p.tyre_age>0?`(${p.tyre_age} \u043A\u0440\u0443\u0433\u043E\u0432)`:''}</span>{t.gap_to_leader&&<span>Gap: +{t.gap_to_leader}</span>}
+                                                    <span>Круг {t.lap_number}</span><span>Стинт #{p.stint_number} · {p.tyre} {p.tyre_age>0?`(${p.tyre_age} кругов)`:''}</span>{t.gap_to_leader&&<span>Gap: +{t.gap_to_leader}</span>}
                                                 </div>
                                             </div>
                                         )}
@@ -550,13 +553,13 @@
                             })}
                         </div>
                     ) : (
-                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445...':'\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438'}</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043A\u043E\u0433\u0434\u0430 \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0441\u0435\u0441\u0441\u0438\u044F</div></div>
+                        <div style={{textAlign:'center',padding:'50px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:16,fontWeight:700,marginBottom:4}}>{isLive?'Загрузка данных...':'Нет активной сессии'}</div><div style={{fontSize:13}}>Данные появятся когда начнётся сессия</div></div>
                     ))}
 
                     {liveTab==='sectors' && (timing?.timing?.length>0 ? (
                         <div style={{padding:'0 8px'}}>
                             <div style={{display:'grid',gridTemplateColumns:'40px 1fr 64px 64px 64px 72px',gap:4,padding:'6px 8px',fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',borderBottom:'1px solid var(--f1-border)'}}>
-                                <span>\u041A\u043E\u0434</span><span></span><span style={{textAlign:'center'}}>S1</span><span style={{textAlign:'center'}}>S2</span><span style={{textAlign:'center'}}>S3</span><span style={{textAlign:'center'}}>\u041A\u0440\u0443\u0433</span>
+                                <span>Код</span><span></span><span style={{textAlign:'center'}}>S1</span><span style={{textAlign:'center'}}>S2</span><span style={{textAlign:'center'}}>S3</span><span style={{textAlign:'center'}}>Круг</span>
                             </div>
                             {(positions?.positions||[]).map((p,i) => {
                                 const t = timingMap[p.driver_number]; if(!t) return null;
@@ -573,40 +576,40 @@
                             })}
                             {timing.session_best && (
                                 <div style={{padding:'12px 8px',borderTop:'2px solid var(--f1-border)',marginTop:4}}>
-                                    <div style={{fontSize:10,color:'#A020F0',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>\u041B\u0443\u0447\u0448\u0438\u0435 \u0441\u0435\u043A\u0442\u043E\u0440\u044B \u0441\u0435\u0441\u0441\u0438\u0438</div>
+                                    <div style={{fontSize:10,color:'#A020F0',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>Лучшие секторы сессии</div>
                                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6}}>
-                                        {[{label:'S1',val:timing.session_best.sector_1},{label:'S2',val:timing.session_best.sector_2},{label:'S3',val:timing.session_best.sector_3},{label:'\u041A\u0440\u0443\u0433',val:timing.session_best.lap}].map((s,i)=>(
+                                        {[{label:'S1',val:timing.session_best.sector_1},{label:'S2',val:timing.session_best.sector_2},{label:'S3',val:timing.session_best.sector_3},{label:'Круг',val:timing.session_best.lap}].map((s,i)=>(
                                             <div key={i} className="sector-time st-best" style={{padding:8}}><div style={{fontSize:9,opacity:0.6,marginBottom:2}}>{s.label}</div>{i<3?fmtSector(s.val):fmtLap(s.val)}</div>
                                         ))}
                                     </div>
                                 </div>
                             )}
                         </div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043F\u043E \u0441\u0435\u043A\u0442\u043E\u0440\u0430\u043C</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}>Нет данных по секторам</div>)}
 
                     {liveTab==='pits' && (pitData?.pit_stops?.length>0 ? (
                         <div>{pitData.pit_stops.slice().reverse().map((p,i)=>(
                             <div key={i} className="pit-entry">
                                 <div style={{width:36,height:36,borderRadius:10,background:`${p.team_color}22`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:p.team_color,flexShrink:0}}>{p.code||p.driver_number}</div>
-                                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{p.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u041A\u0440\u0443\u0433 {p.lap_number||'?'} \u00b7 {p.team}</div></div>
-                                <div className="pit-time" style={{color:p.pit_duration&&p.pit_duration<25?'#39B54A':p.pit_duration&&p.pit_duration<30?'var(--f1-text)':'#FFD700'}}>{p.pit_duration?`${p.pit_duration.toFixed(1)}s`:'\u2014'}</div>
+                                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{p.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Круг {p.lap_number||'?'} · {p.team}</div></div>
+                                <div className="pit-time" style={{color:p.pit_duration&&p.pit_duration<25?'#39B54A':p.pit_duration&&p.pit_duration<30?'var(--f1-text)':'#FFD700'}}>{p.pit_duration?`${p.pit_duration.toFixed(1)}s`:'—'}</div>
                             </div>
                         ))}</div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>🔧</div>\u041D\u0435\u0442 \u043F\u0438\u0442-\u0441\u0442\u043E\u043F\u043E\u0432</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>🔧</div>Нет пит-стопов</div>)}
 
                     {liveTab==='radio' && (radioData?.radio?.length>0 ? (
                         <div><audio ref={audioRef}/>
                             {radioData.radio.slice().reverse().map((r,i)=>(
                                 <div key={i} className="radio-entry">
-                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'\u23F8':'\u25B6'}</button>
+                                    <button className="radio-play-btn" onClick={()=>r.recording_url&&playRadio(r.recording_url)}>{audioPlaying===r.recording_url?'⏸':'▶'}</button>
                                     <div style={{flex:1}}>
                                         <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:4,height:16,borderRadius:2,background:r.team_color}}/><span style={{fontWeight:700,fontSize:14}}>{r.code||r.name}</span></div>
-                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{r.team} \u00b7 {r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</div>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{r.team} · {r.date?new Date(r.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>\u041D\u0435\u0442 \u0440\u0430\u0434\u0438\u043E\u043F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043E\u0432</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📻</div>Нет радиопереговоров</div>)}
 
                     {liveTab==='messages' && (raceControl?.messages?.length>0 ? (
                         <div style={{padding:'4px 0'}}>{raceControl.messages.slice().reverse().map((msg,i)=>(
@@ -615,12 +618,12 @@
                                 <div style={{flex:1}}>
                                     <div style={{fontSize:13,lineHeight:1.4}}>{msg.message}</div>
                                     <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:3,display:'flex',gap:8}}>
-                                        {msg.lap_number&&<span>\u041A\u0440\u0443\u0433 {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
+                                        {msg.lap_number&&<span>Круг {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
                                     </div>
                                 </div>
                             </div>
                         ))}</div>
-                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📋</div>\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0434\u0438\u0440\u0435\u043A\u0446\u0438\u0438</div>)}
+                    ) : <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)',fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>📋</div>Нет сообщений дирекции</div>)}
                 </div>
             );
         };
@@ -635,29 +638,37 @@
 
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>\u041D\u043E\u0432\u043E\u0441\u0442\u0438</h2>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Новости</h2>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{news?.channel || '@stanizlavsky'}</div>
 
                     {news?.posts?.length > 0 ? (
-                        news.posts.slice().reverse().map((post,i) => (
-                            <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)} style={{cursor:'pointer'}}>
-                                {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                <div className="news-card-body">
-                                    {post.text && <div style={{fontSize:14,lineHeight:1.5,whiteSpace:'pre-line',marginBottom:8}}>{post.text.length>300?post.text.slice(0,300)+'...':post.text}</div>}
-                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date ? new Date(post.date).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
-                                        {post.views && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>👁 {post.views}</div>}
+                        news.posts.slice().reverse().map((post,i) => {
+                            const lines = (post.text||'').split('\n').filter(l=>l.trim());
+                            const title = lines[0] || '';
+                            const preview = lines.slice(1).join(' ').trim();
+                            return (
+                                <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)}>
+                                    {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                    <div className="news-card-body">
+                                        {title && <div className="news-card-title">{title}</div>}
+                                        {preview && <div className="news-card-preview">{preview}</div>}
+                                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date ? new Date(post.date).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+                                            <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                                {post.views && <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>👁 {post.views >= 1000 ? (post.views/1000).toFixed(1)+'K' : post.views}</span>}
+                                                <span style={{fontSize:12,color:'var(--f1-red)',fontWeight:600}}>Читать →</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{marginTop:8,fontSize:12,color:'var(--f1-red)',fontWeight:600}}>\u0427\u0438\u0442\u0430\u0442\u044C \u0432 Telegram \u2192</div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
                             <div style={{fontSize:48,marginBottom:12}}>📰</div>
-                            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>\u041D\u043E\u0432\u043E\u0441\u0442\u0438 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u044E\u0442\u0441\u044F...</div>
-                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>\u041F\u043E\u0434\u043F\u0438\u0448\u0438\u0441\u044C \u043D\u0430 \u043A\u0430\u043D\u0430\u043B \u0434\u043B\u044F \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u043D\u043E\u0432\u043E\u0441\u0442\u0435\u0439</div>
-                            <button className="btn-primary" onClick={()=>openLink('https://t.me/stanizlavsky')}>\u041E\u0442\u043A\u0440\u044B\u0442\u044C @stanizlavsky</button>
+                            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Новости загружаются...</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:16}}>Подпишись на канал для последних новостей</div>
+                            <button className="btn-primary" onClick={()=>openLink('https://t.me/stanizlavsky')}>Открыть @stanizlavsky</button>
                         </div>
                     )}
                 </div>
@@ -666,24 +677,36 @@
 
         // ==== SCHEDULE PAGE ====
         const SchedulePage = ({schedule}) => {
+            const [pastRaces, setPastRaces] = useState(null);
+            useEffect(() => { api.get('/api/past-races-vk').then(d => setPastRaces(d?.races || [])); }, []);
+
             if (!schedule?.races) return <div className="page-container fade-in" style={{padding:16}}>{[1,2,3,4].map(i=><div key={i}><CardSkeleton/><div style={{height:12}}/></div>)}</div>;
             const now = new Date();
+            const vkMap = {};
+            if (pastRaces) pastRaces.forEach(r => { vkMap[`${r.season}-${r.round}`] = r.url; });
+
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>\u0421\u0435\u0437\u043E\u043D {schedule.season||'2025'}</h2>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:16}}>Сезон {schedule.season||'2025'}</h2>
                     {schedule.races.map((race,i)=>{
                         const raceDate = new Date(race.date); const isPast = raceDate < now;
                         const isNext = !isPast && (i===0 || new Date(schedule.races[i-1]?.date)<now);
+                        const vkUrl = vkMap[`${schedule.season||2025}-${race.round}`];
                         return (
-                            <div key={race.round} className="card" style={{marginBottom:10,opacity:isPast?0.5:1,borderColor:isNext?'var(--f1-red)':'var(--f1-border)',borderWidth:isNext?2:1,position:'relative',overflow:'hidden'}}>
+                            <div key={race.round} className="card" style={{marginBottom:10,opacity:isPast?0.6:1,borderColor:isNext?'var(--f1-red)':'var(--f1-border)',borderWidth:isNext?2:1,position:'relative',overflow:'hidden'}}>
                                 {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:80,height:'100%',objectFit:'contain',opacity:0.06,pointerEvents:'none'}}/>}
                                 <div style={{display:'flex',alignItems:'center',gap:12,position:'relative'}}>
                                     <div style={{width:40,height:40,borderRadius:10,background:isNext?'var(--f1-red)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:16,flexShrink:0}}>{race.round}</div>
                                     <div style={{flex:1,minWidth:0}}>
                                         <div style={{display:'flex',alignItems:'center',gap:6}}><span>{flagEmoji(race.country)}</span><span style={{fontWeight:700,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{race.name?.replace('Grand Prix','GP')}</span></div>
-                                        <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{race.circuit} \u00b7 {race.date}</div>
+                                        <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{race.circuit} · {race.date}</div>
                                     </div>
-                                    {isPast && <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>\u2713</div>}
+                                    {isPast && vkUrl && (
+                                        <button onClick={(e)=>{e.stopPropagation();openLink(vkUrl);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#4DA3FF',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                                            📺 Запись
+                                        </button>
+                                    )}
+                                    {isPast && !vkUrl && <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>✓</div>}
                                     {isNext && <div style={{fontSize:10,fontWeight:700,color:'var(--f1-red)',textTransform:'uppercase',letterSpacing:1}}>NEXT</div>}
                                 </div>
                             </div>
@@ -707,7 +730,7 @@
                 const d = driverDetail, stats = d.season_stats;
                 return (
                     <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                        <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>\u2190 \u041D\u0430\u0437\u0430\u0434</button>
+                        <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>← Назад</button>
                         <div className="gradient-card" style={{marginBottom:16}}>
                             <div style={{position:'absolute',top:0,left:0,bottom:0,width:6,background:d.team_color,borderRadius:'16px 0 0 16px'}}/>
                             <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:12}}>
@@ -722,11 +745,11 @@
                         </div>
                         {stats && (<>
                             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
-                                {[{val:stats.points,label:'\u041E\u0447\u043A\u0438'},{val:stats.wins,label:'\u041F\u043E\u0431\u0435\u0434'},{val:stats.podiums,label:'\u041F\u043E\u0434\u0438\u0443\u043C'},{val:stats.dnfs,label:'DNF'}].map((s,i)=>(
+                                {[{val:stats.points,label:'Очки'},{val:stats.wins,label:'Побед'},{val:stats.podiums,label:'Подиум'},{val:stats.dnfs,label:'DNF'}].map((s,i)=>(
                                     <div key={i} className="card" style={{textAlign:'center',padding:10}}><div style={{fontSize:20,fontWeight:900}}>{s.val}</div><div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{s.label}</div></div>
                                 ))}
                             </div>
-                            <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u044B \u0441\u0435\u0437\u043E\u043D\u0430</div>
+                            <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Результаты сезона</div>
                                 {stats.results?.map((r,i)=>(
                                     <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:i<stats.results.length-1?'1px solid var(--f1-border)':'none'}}>
                                         <span style={{width:30,fontSize:11,color:'var(--f1-text-muted)'}}>R{r.round}</span><span style={{flex:1,fontSize:13}}>{r.race?.replace('Grand Prix','GP')}</span><PosBadge pos={r.position}/><span style={{width:36,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
@@ -736,7 +759,7 @@
                         </>)}
                         {d.teammate && (
                             <div className="card" style={{marginTop:12}}>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>\u041D\u0430\u043F\u0430\u0440\u043D\u0438\u043A</div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>Напарник</div>
                                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                                     {d.teammate.photo_url && <DriverPhoto url={d.teammate.photo_url} size={36}/>}
                                     <div><div style={{fontWeight:700,fontSize:14}}>{d.teammate.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.teammate.country)} {d.teammate.code}</div></div>
@@ -753,11 +776,11 @@
             return (
                 <div className="page-container fade-in">
                     <div style={{padding:'12px 16px'}}>
-                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>\u0427\u0435\u043C\u043F\u0438\u043E\u043D\u0430\u0442</h2>
+                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>Чемпионат</h2>
                         <div className="tab-switch" style={{marginBottom:16}}>
-                            <button className={`tab-switch-btn ${tab==='drivers'?'active':''}`} onClick={()=>setTab('drivers')}>\u041F\u0438\u043B\u043E\u0442\u044B</button>
-                            <button className={`tab-switch-btn ${tab==='constructors'?'active':''}`} onClick={()=>setTab('constructors')}>\u041A\u043E\u043C\u0430\u043D\u0434\u044B</button>
-                            <button className={`tab-switch-btn ${tab==='cards'?'active':''}`} onClick={()=>setTab('cards')}>\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0438</button>
+                            <button className={`tab-switch-btn ${tab==='drivers'?'active':''}`} onClick={()=>setTab('drivers')}>Пилоты</button>
+                            <button className={`tab-switch-btn ${tab==='constructors'?'active':''}`} onClick={()=>setTab('constructors')}>Команды</button>
+                            <button className={`tab-switch-btn ${tab==='cards'?'active':''}`} onClick={()=>setTab('cards')}>Карточки</button>
                         </div>
                     </div>
 
@@ -775,7 +798,7 @@
                                         <div style={{flex:1}}>
                                             <div style={{fontWeight:700,fontSize:14}}>{tab==='drivers'?s.name:s.team}</div>
                                             {tab==='drivers' && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div>}
-                                            {tab==='constructors' && s.drivers && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.drivers.map(d=>d.code).join(' \u00b7 ')}</div>}
+                                            {tab==='constructors' && s.drivers && <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.drivers.map(d=>d.code).join(' · ')}</div>}
                                             <div className="progress-bar-bg" style={{marginTop:4,width:'100%',maxWidth:120}}>
                                                 <div className="progress-bar-fill" style={{width:`${Math.max(3,(s.points/leaderPts)*100)}%`,background:s.team_color}}/>
                                             </div>
@@ -836,9 +859,9 @@
             if (loading) return <div className="page-container fade-in" style={{padding:16}}><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</h2>
+                    <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Прогнозы</h2>
                     {available?.available && available.race ? (<>
-                        <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{flagEmoji(available.race.country)} {available.race.name} \u00b7 \u0420\u0430\u0443\u043D\u0434 {available.race.round}</div>
+                        <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{flagEmoji(available.race.country)} {available.race.name} · Раунд {available.race.round}</div>
                         {available.predictions?.map(pred=>(
                             <div key={pred.type} className="card" style={{marginBottom:10}}>
                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -846,7 +869,7 @@
                                     <div style={{background:'rgba(225,6,0,0.15)',borderRadius:8,padding:'4px 8px',fontSize:12,fontWeight:700,color:'var(--f1-red)'}}>+{pred.max_points}</div>
                                 </div>
                                 {pred.already_predicted || selected[pred.type] ? (
-                                    <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(57,181,74,0.1)',color:'#39B54A',fontSize:13,fontWeight:600}}>\u2713 \u041F\u0440\u043E\u0433\u043D\u043E\u0437 \u0441\u0434\u0435\u043B\u0430\u043D</div>
+                                    <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(57,181,74,0.1)',color:'#39B54A',fontSize:13,fontWeight:600}}>✓ Прогноз сделан</div>
                                 ) : pred.type==='winner'||pred.type==='fastest_lap' ? (
                                     <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                                         {available.drivers?.slice(0,20).map(d=>(
@@ -856,7 +879,7 @@
                                     </div>
                                 ) : pred.type==='podium' ? (
                                     <div>
-                                        <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:6}}>\u0412\u044B\u0431\u0440\u0430\u043D\u043E: {podiumPicks.length}/3 {podiumPicks.length===3&&<span style={{color:'#39B54A',marginLeft:8}}>\u0413\u043E\u0442\u043E\u0432\u043E!</span>}</div>
+                                        <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:6}}>Выбрано: {podiumPicks.length}/3 {podiumPicks.length===3&&<span style={{color:'#39B54A',marginLeft:8}}>Готово!</span>}</div>
                                         <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                                             {available.drivers?.slice(0,20).map(d=>{
                                                 const picked=podiumPicks.includes(d.driver_number), idx=podiumPicks.indexOf(d.driver_number);
@@ -868,12 +891,12 @@
                                                 );
                                             })}
                                         </div>
-                                        {podiumPicks.length===3 && <button className="btn-primary" style={{width:'100%',marginTop:10}} onClick={()=>handlePredict('podium',podiumPicks)} disabled={submitting}>\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043F\u043E\u0434\u0438\u0443\u043C</button>}
+                                        {podiumPicks.length===3 && <button className="btn-primary" style={{width:'100%',marginTop:10}} onClick={()=>handlePredict('podium',podiumPicks)} disabled={submitting}>Подтвердить подиум</button>}
                                     </div>
                                 ) : pred.type==='safety_car' ? (
                                     <div style={{display:'flex',gap:8}}>
-                                        <button className="btn-primary" style={{flex:1}} onClick={()=>handlePredict('safety_car','yes')} disabled={submitting}>\u0414\u0430</button>
-                                        <button className="btn-primary" style={{flex:1,background:'var(--f1-gray)'}} onClick={()=>handlePredict('safety_car','no')} disabled={submitting}>\u041D\u0435\u0442</button>
+                                        <button className="btn-primary" style={{flex:1}} onClick={()=>handlePredict('safety_car','yes')} disabled={submitting}>Да</button>
+                                        <button className="btn-primary" style={{flex:1,background:'var(--f1-gray)'}} onClick={()=>handlePredict('safety_car','no')} disabled={submitting}>Нет</button>
                                     </div>
                                 ) : pred.type==='dnf_count' ? (
                                     <div style={{display:'flex',gap:6}}>{[0,1,2,3,4,5].map(n=>(
@@ -883,15 +906,15 @@
                             </div>
                         ))}
                     </>) : (
-                        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🔮</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432</div><div style={{fontSize:13}}>\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u044B \u043E\u0442\u043A\u0440\u043E\u044E\u0442\u0441\u044F \u043F\u0435\u0440\u0435\u0434 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0433\u043E\u043D\u043A\u043E\u0439</div></div>
+                        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🔮</div><div style={{fontSize:15,fontWeight:700}}>Нет доступных прогнозов</div><div style={{fontSize:13}}>Прогнозы откроются перед следующей гонкой</div></div>
                     )}
                     {myPredictions.length>0 && (
                         <div style={{marginTop:20}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u041C\u043E\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u044B</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Мои прогнозы</div>
                             {myPredictions.slice(0,10).map((p,i)=>(
                                 <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--f1-border)',fontSize:13}}>
                                     <div><span style={{fontWeight:600}}>R{p.race_round}</span><span style={{color:'var(--f1-text-muted)',marginLeft:8}}>{p.prediction_type}</span></div>
-                                    <div style={{fontWeight:700,color:p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.status==='pending'?'\u23F3':p.status==='correct'?`\u2713 +${p.points_won}`:p.status==='partial'?`~ +${p.points_won}`:'\u2717'}</div>
+                                    <div style={{fontWeight:700,color:p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.status==='pending'?'⏳':p.status==='correct'?`✓ +${p.points_won}`:p.status==='partial'?`~ +${p.points_won}`:'✗'}</div>
                                 </div>
                             ))}
                         </div>
@@ -914,19 +937,19 @@
                         <div style={{fontSize:20,fontWeight:900}}>{user.first_name}</div>
                         {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)'}}>@{user.username}</div>}
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:16}}>
-                            <div><div style={{fontSize:24,fontWeight:900,color:'var(--f1-red)'}}>{user.points}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u041E\u0447\u043A\u0438</div></div>
-                            <div><div style={{fontSize:24,fontWeight:900}}>#{user.rank||'\u2014'}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>\u0420\u0435\u0439\u0442\u0438\u043D\u0433</div></div>
-                            <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>🔥 \u0421\u0435\u0440\u0438\u044F</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900,color:'var(--f1-red)'}}>{user.points}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Очки</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900}}>#{user.rank||'—'}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Рейтинг</div></div>
+                            <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>🔥 Серия</div></div>
                         </div>
                     </div>
 
                     <div className="card" style={{marginBottom:16}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430</div>
-                        {[{label:'\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432 \u0441\u0434\u0435\u043B\u0430\u043D\u043E',value:user.predictions_total||0,max:50,color:'var(--f1-red)'},
-                          {label:'\u041F\u0440\u043E\u0433\u043D\u043E\u0437\u043E\u0432 \u0443\u0433\u0430\u0434\u0430\u043D\u043E',value:user.predictions_correct||0,max:user.predictions_total||1,color:'#39B54A'},
-                          {label:'\u0422\u043E\u0447\u043D\u043E\u0441\u0442\u044C',value:user.predictions_total?Math.round(user.predictions_correct/user.predictions_total*100)+'%':'\u2014'},
-                          {label:'\u041C\u0430\u043A\u0441. \u0441\u0435\u0440\u0438\u044F',value:user.max_streak||0},
-                          {label:'\u0418\u0433\u0440 \u0441\u044B\u0433\u0440\u0430\u043D\u043E',value:user.games_played||0,max:50,color:'#6692FF'}
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Статистика</div>
+                        {[{label:'Прогнозов сделано',value:user.predictions_total||0,max:50,color:'var(--f1-red)'},
+                          {label:'Прогнозов угадано',value:user.predictions_correct||0,max:user.predictions_total||1,color:'#39B54A'},
+                          {label:'Точность',value:user.predictions_total?Math.round(user.predictions_correct/user.predictions_total*100)+'%':'—'},
+                          {label:'Макс. серия',value:user.max_streak||0},
+                          {label:'Игр сыграно',value:user.games_played||0,max:50,color:'#6692FF'}
                         ].map((stat,i)=>(
                             <div key={i} style={{padding:'8px 0',borderBottom:i<4?'1px solid var(--f1-border)':'none'}}>
                                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:stat.max?4:0}}>
@@ -940,7 +963,7 @@
 
                     {achievements && (
                         <div style={{marginBottom:16}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u0414\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u044F ({achievements.achievements?.length||0}/{achievements.total||0})</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Достижения ({achievements.achievements?.length||0}/{achievements.total||0})</div>
                             <div style={{display:'flex',flexDirection:'column',gap:8}}>
                                 {achievements.all_achievements && Object.entries(achievements.all_achievements).map(([key,ach])=>{
                                     const unlocked = achievements.achievements?.some(a=>a.key===key);
@@ -951,7 +974,7 @@
                                                 <div style={{fontWeight:700,fontSize:14}}>{ach.name}</div>
                                                 <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{ach.desc}</div>
                                             </div>
-                                            {unlocked && <span style={{color:'#39B54A',fontSize:16,fontWeight:900}}>\u2713</span>}
+                                            {unlocked && <span style={{fontSize:16}}>✅</span>}
                                         </div>
                                     );
                                 })}
@@ -961,7 +984,7 @@
 
                     {leaderboard?.leaderboard && (
                         <div>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>\u041B\u0438\u0434\u0435\u0440\u0431\u043E\u0440\u0434</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Лидерборд</div>
                             <div className="card" style={{padding:0,overflow:'hidden'}}>
                                 {leaderboard.leaderboard.slice(0,20).map((entry,i)=>(
                                     <div key={entry.user_id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',borderBottom:'1px solid var(--f1-border)',background:entry.user_id===user.user_id?'rgba(225,6,0,0.08)':'transparent'}}>
@@ -1042,8 +1065,8 @@
                             },
                         },
                         scales: {
-                            x: {type:'linear', title:{display:true,text:'\u041A\u0440\u0443\u0433',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
-                            y: {reverse:true, title:{display:true,text:'\u041F\u043E\u0437\u0438\u0446\u0438\u044F',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',stepSize:1}, grid:{color:'#38383F33'}, min:1, max:20},
+                            x: {type:'linear', title:{display:true,text:'Круг',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
+                            y: {reverse:true, title:{display:true,text:'Позиция',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',stepSize:1}, grid:{color:'#38383F33'}, min:1, max:20},
                         },
                         interaction: {mode:'nearest',axis:'x',intersect:false},
                     },
@@ -1101,8 +1124,8 @@
                             },
                         },
                         scales: {
-                            x: {type:'linear', title:{display:true,text:'\u041A\u0440\u0443\u0433',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
-                            y: {title:{display:true,text:'\u0412\u0440\u0435\u043C\u044F (\u0441\u0435\u043A)',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',callback:v=>{const m=Math.floor(v/60);const s=(v%60).toFixed(1);return m>0?m+':'+s.padStart(4,'0'):s;}}, grid:{color:'#38383F33'}, min:yMin, max:yMax},
+                            x: {type:'linear', title:{display:true,text:'Круг',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80'}, grid:{color:'#38383F33'}},
+                            y: {title:{display:true,text:'Время (сек)',color:'#6B6B80',font:{family:'Titillium Web'}}, ticks:{color:'#6B6B80',callback:v=>{const m=Math.floor(v/60);const s=(v%60).toFixed(1);return m>0?m+':'+s.padStart(4,'0'):s;}}, grid:{color:'#38383F33'}, min:yMin, max:yMax},
                         },
                         interaction: {mode:'nearest',intersect:false},
                     },
@@ -1117,11 +1140,11 @@
             return (
                 <div className="page-container fade-in" style={{padding:'12px 0'}}>
                     <div style={{padding:'0 16px'}}>
-                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>\u0410\u043D\u0430\u043B\u0438\u0442\u0438\u043A\u0430</h2>
+                        <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>Аналитика</h2>
                         <div className="tab-switch" style={{marginBottom:16}}>
-                            <button className={`tab-switch-btn ${aTab==='strategy'?'active':''}`} onClick={()=>setATab('strategy')}>\u0428\u0438\u043D\u044B</button>
-                            <button className={`tab-switch-btn ${aTab==='positions'?'active':''}`} onClick={()=>setATab('positions')}>\u041F\u043E\u0437\u0438\u0446\u0438\u0438</button>
-                            <button className={`tab-switch-btn ${aTab==='laptimes'?'active':''}`} onClick={()=>setATab('laptimes')}>\u0422\u0435\u043C\u043F\u044B</button>
+                            <button className={`tab-switch-btn ${aTab==='strategy'?'active':''}`} onClick={()=>setATab('strategy')}>Шины</button>
+                            <button className={`tab-switch-btn ${aTab==='positions'?'active':''}`} onClick={()=>setATab('positions')}>Позиции</button>
+                            <button className={`tab-switch-btn ${aTab==='laptimes'?'active':''}`} onClick={()=>setATab('laptimes')}>Темпы</button>
                         </div>
                     </div>
 
@@ -1130,7 +1153,7 @@
                     {/* TYRE STRATEGY */}
                     {aTab==='strategy' && !loading && (strategy?.drivers?.length > 0 ? (
                         <div style={{padding:'0 12px'}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:4,paddingLeft:4}}>\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0448\u0438\u043D \u00b7 {strategy.total_laps} \u043A\u0440\u0443\u0433\u043E\u0432</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:4,paddingLeft:4}}>Стратегия шин · {strategy.total_laps} кругов</div>
                             <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',paddingLeft:4}}>
                                 {['SOFT','MEDIUM','HARD','INTERMEDIATE','WET'].map(c=>(
                                     <div key={c} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
@@ -1158,13 +1181,13 @@
                             ))}
                         </div>
                     ) : !loading && (
-                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u0441\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u0438</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0433\u043E\u043D\u043A\u0438</div></div>
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🏎️</div><div style={{fontSize:15,fontWeight:700}}>Нет данных о стратегии</div><div style={{fontSize:13}}>Данные появятся во время/после гонки</div></div>
                     ))}
 
                     {/* POSITION CHART */}
                     {aTab==='positions' && !loading && (posChart?.drivers?.length > 0 ? (
                         <div style={{padding:'0 12px'}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435 \u043F\u043E\u0437\u0438\u0446\u0438\u0439 \u043F\u043E \u043A\u0440\u0443\u0433\u0430\u043C</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>Изменение позиций по кругам</div>
                             <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:8,paddingLeft:4}}>
                                 {posChart.drivers.map(d=>(
                                     <div key={d.driver_number} style={{display:'flex',alignItems:'center',gap:3,fontSize:10,padding:'2px 6px',borderRadius:4,background:`${d.team_color}22`,color:d.team_color,fontWeight:600}}>
@@ -1177,13 +1200,13 @@
                             </div>
                         </div>
                     ) : !loading && (
-                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>📈</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div><div style={{fontSize:13}}>\u0413\u0440\u0430\u0444\u0438\u043A \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>📈</div><div style={{fontSize:15,fontWeight:700}}>Нет данных</div><div style={{fontSize:13}}>График появится во время/после сессии</div></div>
                     ))}
 
                     {/* LAP TIMES */}
                     {aTab==='laptimes' && !loading && (lapTimes?.drivers?.length > 0 ? (
                         <div style={{padding:'0 12px'}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>\u0421\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u0435 \u0442\u0435\u043C\u043F\u0430 \u00b7 \u0412\u044B\u0431\u0435\u0440\u0438 \u043F\u0438\u043B\u043E\u0442\u043E\u0432</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8,paddingLeft:4}}>Сравнение темпа · Выбери пилотов</div>
                             <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:10,paddingLeft:4}}>
                                 {lapTimes.drivers.map(d=>{
                                     const sel = selectedDrivers.includes(d.driver_number);
@@ -1196,14 +1219,14 @@
                                 })}
                             </div>
                             {lapTimes.session_best && (
-                                <div style={{fontSize:12,color:'#A020F0',fontWeight:600,paddingLeft:4,marginBottom:8}}>\u041B\u0443\u0447\u0448\u0438\u0439 \u043A\u0440\u0443\u0433: {fmtLap(lapTimes.session_best)}</div>
+                                <div style={{fontSize:12,color:'#A020F0',fontWeight:600,paddingLeft:4,marginBottom:8}}>Лучший круг: {fmtLap(lapTimes.session_best)}</div>
                             )}
                             <div className="card" style={{padding:8,height:350}}>
                                 <canvas ref={lapChartRef}/>
                             </div>
                         </div>
                     ) : !loading && (
-                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>\u23F1\uFE0F</div><div style={{fontSize:15,fontWeight:700}}>\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u043E \u043A\u0440\u0443\u0433\u0430\u0445</div><div style={{fontSize:13}}>\u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F/\u043F\u043E\u0441\u043B\u0435 \u0441\u0435\u0441\u0441\u0438\u0438</div></div>
+                        <div style={{textAlign:'center',padding:40,color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>⏱️</div><div style={{fontSize:15,fontWeight:700}}>Нет данных о кругах</div><div style={{fontSize:13}}>Данные появятся во время/после сессии</div></div>
                     ))}
                 </div>
             );
@@ -1266,7 +1289,7 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} onChange={setTab}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl}/>;
                     case 'analytics': return <AnalyticsPage/>;
                     case 'news': return <NewsPage/>;
