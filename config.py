@@ -56,6 +56,7 @@ CACHE_TTL = {
     "lap_time_series": 300,       # 5 min — all lap times
     "h2h": 900,                   # 15 min — head-to-head
     "car_data": 2,                  # 2 sec — live car telemetry
+    "points_progression": 1800,       # 30 min — cumulative points chart
 }
 
 # ============ GAME SETTINGS ============

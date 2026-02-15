@@ -1046,6 +1046,12 @@ async def live_track_map():
     return await f1_data.get_live_track_map()
 
 
+@app.get("/api/standings/points-progression")
+async def points_progression(season: int = CURRENT_SEASON):
+    """Cumulative points progression chart data."""
+    return await f1_data.get_points_progression(season)
+
+
 # ============ DEMO MODE ============
 
 @app.get("/api/demo/sessions")

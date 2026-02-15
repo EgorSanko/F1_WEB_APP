@@ -172,10 +172,14 @@ async def broadcast(app: Application, text: str, keyboard=None):
 
 # ============ SCHEDULED JOBS ============
 
+# Track which reminders we already sent (session_key:window -> True)
+_sent_reminders = {}
+
+
 async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
     """
-    Runs every 10 minutes. Check if any F1 session starts in ~30 minutes
-    and send a reminder to all users.
+    Runs every 5 minutes. Check if any F1 session starts soon and
+    send reminders at 24h, 1h, and 10min before.
     """
     try:
         import requests
@@ -188,6 +192,19 @@ async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
             return
 
         now = datetime.utcnow()
+        session_names = {
+            "fp1": "FP1", "fp2": "FP2", "fp3": "FP3",
+            "qualifying": "Квалификация", "race": "ГОНКА",
+            "sprint": "Спринт", "sprint_qualifying": "Спринт-квалификация",
+        }
+
+        # Define reminder windows: (label, min_seconds, max_seconds, emoji)
+        windows = [
+            ("24h", 23*3600, 25*3600, "📅"),
+            ("1h", 55*60, 65*60, "⏰"),
+            ("10min", 8*60, 12*60, "🚦"),
+        ]
+
         for session_key, session_info in race.get("sessions", {}).items():
             if not session_info.get("date") or not session_info.get("time"):
                 continue
@@ -199,26 +216,101 @@ async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
             except (ValueError, TypeError):
                 continue
 
-            # If session starts in 25-35 minutes
             diff = (session_dt - now).total_seconds()
-            if 25 * 60 <= diff <= 35 * 60:
-                session_names = {
-                    "fp1": "FP1", "fp2": "FP2", "fp3": "FP3",
-                    "qualifying": "Квалификация", "race": "ГОНКА",
-                    "sprint": "Спринт", "sprint_qualifying": "Спринт-квалификация",
-                }
-                name = session_names.get(session_key, session_key)
-                text = (
-                    f"🏁 *{name}* начинается через 30 минут!\n\n"
-                    f"🏎️ {race.get('name', 'Гран-при')}\n"
-                    f"📍 {race.get('circuit', '')}"
-                )
-                keyboard = [[InlineKeyboardButton("🏎️ Смотреть Live", web_app={"url": WEBAPP_URL})]]
-                await broadcast(context.application, text, keyboard)
-                logger.info(f"Sent reminder for {name}")
+            name = session_names.get(session_key, session_key)
+
+            for window_label, min_s, max_s, emoji in windows:
+                reminder_key = f"{session_key}:{session_info['date']}:{window_label}"
+
+                if min_s <= diff <= max_s and reminder_key not in _sent_reminders:
+                    # Only send 24h reminder for race/qualifying/sprint
+                    if window_label == "24h" and session_key not in ("race", "qualifying", "sprint"):
+                        continue
+
+                    time_text = {"24h": "через 24 часа", "1h": "через 1 час", "10min": "через 10 минут"}[window_label]
+
+                    text = (
+                        f"{emoji} *{name}* {time_text}!\n\n"
+                        f"🏎️ {race.get('name', 'Гран-при')}\n"
+                        f"📍 {race.get('circuit', '')}"
+                    )
+
+                    if window_label == "10min":
+                        text += "\n\n_Приготовься! Lights out and away we go!_ 🏁"
+
+                    keyboard = [[InlineKeyboardButton("🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL})]]
+                    await broadcast(context.application, text, keyboard)
+                    _sent_reminders[reminder_key] = True
+                    logger.info(f"Sent {window_label} reminder for {name}")
+
+        # Clean up old reminders (older than 48 hours)
+        keys_to_remove = []
+        for key in _sent_reminders:
+            parts = key.split(":")
+            if len(parts) >= 2:
+                try:
+                    d = datetime.fromisoformat(parts[1])
+                    if (now - d).total_seconds() > 48 * 3600:
+                        keys_to_remove.append(key)
+                except ValueError:
+                    pass
+        for key in keys_to_remove:
+            del _sent_reminders[key]
 
     except Exception as e:
         logger.error(f"Session reminder error: {e}")
+
+
+async def check_prediction_results(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Runs every 30 minutes. Check if any predictions were recently settled
+    and notify users of their results.
+    """
+    try:
+        # Get users with recently settled predictions (last 2 hours)
+        settled = db.execute(
+            "SELECT DISTINCT user_id FROM predictions "
+            "WHERE status != 'pending' AND settled_at > datetime('now', '-2 hours')"
+        )
+        if not settled:
+            return
+
+        for row in settled:
+            uid = row["user_id"]
+            # Check if we already notified (use a simple flag in context)
+            notify_key = f"pred_notify:{uid}"
+            if context.bot_data.get(notify_key):
+                continue
+
+            recent = db.execute(
+                "SELECT prediction_type, status, points_won, race_round "
+                "FROM predictions WHERE user_id = ? AND status != 'pending' "
+                "AND settled_at > datetime('now', '-2 hours') "
+                "ORDER BY settled_at DESC LIMIT 5",
+                (uid,)
+            )
+            if not recent:
+                continue
+
+            correct = sum(1 for p in recent if p["status"] == "correct")
+            total_pts = sum(p.get("points_won", 0) or 0 for p in recent)
+
+            text = f"🔮 *Результаты прогнозов*\n\n"
+            for p in recent:
+                emoji = "✅" if p["status"] == "correct" else "❌" if p["status"] == "incorrect" else "🟡"
+                pts = f"+{p.get('points_won', 0)}" if p.get("points_won", 0) else "0"
+                text += f"{emoji} R{p['race_round']} {p['prediction_type']}: {pts} очков\n"
+
+            if total_pts > 0:
+                text += f"\n🎯 Итого: *+{total_pts} очков*"
+
+            keyboard = [[InlineKeyboardButton("🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL})]]
+            await send_notification(context.application, uid, text, keyboard)
+            context.bot_data[notify_key] = True
+            logger.info(f"Sent prediction results to user {uid}")
+
+    except Exception as e:
+        logger.error(f"Prediction results notification error: {e}")
 
 
 async def update_leaderboard_job(context: ContextTypes.DEFAULT_TYPE):
@@ -262,8 +354,10 @@ def main():
     # Schedule jobs
     job_queue = app.job_queue
     if job_queue:
-        # Check for session reminders every 10 minutes
-        job_queue.run_repeating(check_session_reminder, interval=600, first=60)
+        # Check for session reminders every 5 minutes (24h, 1h, 10min before)
+        job_queue.run_repeating(check_session_reminder, interval=300, first=60)
+        # Check for prediction results every 30 minutes
+        job_queue.run_repeating(check_prediction_results, interval=1800, first=300)
         # Update leaderboard every 30 minutes
         job_queue.run_repeating(update_leaderboard_job, interval=1800, first=120)
 

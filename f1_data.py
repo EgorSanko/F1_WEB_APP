@@ -2997,3 +2997,81 @@ async def get_live_car_data(driver_number: int) -> Dict[str, Any]:
     }
     cache_set(cache_key, result)
     return result
+
+
+# ============ POINTS PROGRESSION ============
+
+async def get_points_progression(season: int = None) -> Dict[str, Any]:
+    """Get cumulative points per driver across all rounds of a season."""
+    s = season or CURRENT_SEASON
+    cache_key = f"points_progression:{s}"
+    cached = cache_get(cache_key, ttl_override=1800)
+    if cached:
+        return cached
+
+    # Fetch all race results with high limit (Ergast default is 30)
+    await _ergast_limiter.acquire()
+    client = get_client()
+    url = f"{ERGAST_API}/{s}/results.json?limit=600"
+    try:
+        resp = await client.get(url)
+        if resp.status_code != 200:
+            return {"error": "Failed to fetch results", "drivers": []}
+        data = resp.json().get("MRData", {})
+    except Exception as e:
+        logger.error(f"Points progression fetch error: {e}")
+        return {"error": "Failed to fetch results", "drivers": []}
+
+    races = data.get("RaceTable", {}).get("Races", [])
+    if not races:
+        return {"drivers": [], "rounds": [], "not_started": True}
+
+    # Build cumulative points per driver
+    driver_cumulative = {}  # driver_id -> {info, points_by_round: []}
+    round_labels = []
+
+    for race in races:
+        round_num = int(race["round"])
+        round_labels.append(round_num)
+
+        for result in race.get("Results", []):
+            driver_id = result["Driver"]["driverId"]
+            pts = float(result.get("points", 0))
+            driver_num = int(result.get("number", 0))
+
+            if driver_id not in driver_cumulative:
+                info = enrich_driver(driver_num, season=s)
+                driver_cumulative[driver_id] = {
+                    "driver_number": driver_num,
+                    "code": info.get("code", driver_id[:3].upper()),
+                    "name": info.get("name", result["Driver"].get("familyName", "")),
+                    "team": info.get("team", result.get("Constructor", {}).get("name", "")),
+                    "team_color": info.get("team_color", "#888"),
+                    "points": [],
+                    "cumulative": 0,
+                }
+            driver_cumulative[driver_id]["cumulative"] += pts
+            driver_cumulative[driver_id]["points"].append({
+                "round": round_num,
+                "cumulative": driver_cumulative[driver_id]["cumulative"],
+            })
+
+    # Sort by final cumulative points (descending)
+    drivers = sorted(driver_cumulative.values(), key=lambda d: d["cumulative"], reverse=True)
+
+    # Only include top-10 for chart readability
+    drivers_out = []
+    for d in drivers[:10]:
+        drivers_out.append({
+            "driver_number": d["driver_number"],
+            "code": d["code"],
+            "name": d["name"],
+            "team": d["team"],
+            "team_color": d["team_color"],
+            "total_points": d["cumulative"],
+            "progression": d["points"],
+        })
+
+    response = {"drivers": drivers_out, "rounds": round_labels, "season": s}
+    cache_set(cache_key, response)
+    return response
