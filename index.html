@@ -3034,6 +3034,37 @@
             );
         };
 
+        const REACTION_FACTS = [
+            {time:150,text:'Пилот F1 (среднее)',source:'FIA'},
+            {time:200,text:'Макс Ферстаппен (лучший старт)',source:'2021 Абу-Даби'},
+            {time:100,text:'Муха реагирует на опасность',source:'Наука'},
+            {time:250,text:'Средний человек',source:'Исследования'},
+            {time:80,text:'Стрекоза ловит добычу',source:'Наука'},
+            {time:170,text:'Вратарь на пенальти',source:'Футбол'},
+            {time:160,text:'Шарль Леклер (лучший старт)',source:'2022 Бахрейн'},
+            {time:120,text:'Боксёр на удар',source:'Спорт'},
+            {time:190,text:'Льюис Хэмилтон (лучший старт)',source:'2015'},
+            {time:300,text:'Средний водитель на торможение',source:'ПДД'},
+            {time:140,text:'Ландо Норрис (лучший старт)',source:'2024'},
+            {time:215,text:'Спринтер на выстрел стартового пистолета',source:'Олимпиада'},
+            {time:50,text:'Тараканы реагируют на движение воздуха',source:'Наука'},
+            {time:180,text:'Теннисист на подачу 200 км/ч',source:'ATP'},
+            {time:230,text:'Фернандо Алонсо — самый медленный старт',source:'2023'},
+            {time:350,text:'Время фальстарта в F1 (порог)',source:'FIA'},
+            {time:155,text:'Оскар Пиастри (лучший старт)',source:'2024 Венгрия'},
+            {time:270,text:'Пешеход замечает машину',source:'Безопасность'},
+            {time:130,text:'Кошка хватает мышь',source:'Наука'},
+            {time:400,text:'Реакция после 24ч без сна',source:'Медицина'},
+            {time:500,text:'Человек за рулём с телефоном',source:'Исследования'},
+            {time:175,text:'Джордж Расселл (лучший старт)',source:'2024'},
+            {time:320,text:'Реакция мотоциклиста в городе',source:'ПДД'},
+            {time:90,text:'Хамелеон стреляет языком',source:'Наука'},
+            {time:110,text:'Бейсболист на подачу',source:'MLB'},
+            {time:210,text:'Карлос Сайнс (лучший старт)',source:'2023'},
+            {time:450,text:'Реакция после 3 бокалов вина',source:'Медицина'},
+            {time:165,text:'Серхио Перес (лучший старт)',source:'2023 Баку'},
+        ];
+
         const ReactionGame = ({onBack}) => {
             const [state, setState] = useState('ready');
             const [lights, setLights] = useState(0);
@@ -3042,6 +3073,17 @@
             const [result, setResult] = useState(null);
             const timeoutRef = useRef(null);
             const lightsRef = useRef([]);
+            const usedFactsRef = useRef(new Set());
+
+            const getReactionFact = (rt) => {
+                const available = REACTION_FACTS.filter(f => !usedFactsRef.current.has(f.text));
+                const pool = available.length > 0 ? available : REACTION_FACTS;
+                const sorted = [...pool].sort((a,b) => Math.abs(a.time - rt) - Math.abs(b.time - rt));
+                const top5 = sorted.slice(0, Math.min(5, sorted.length));
+                const fact = top5[Math.floor(Math.random() * top5.length)];
+                usedFactsRef.current.add(fact.text);
+                return fact;
+            };
 
             const startSequence = () => {
                 setState('lights'); setLights(0); setResult(null);
@@ -3106,12 +3148,26 @@
                             <div onClick={e=>{e.stopPropagation();setState('ready');setLights(0);}} className="btn-primary" style={{display:'inline-block',padding:'12px 24px',marginTop:20}}>Попробовать снова</div>
                         </div>
                     )}
-                    {state==='finished' && (
+                    {state==='finished' && (() => {
+                        const fact = getReactionFact(reaction);
+                        const diff = reaction - fact.time;
+                        return (
                         <div>
                             <div style={{fontSize:48,marginBottom:12}}>{reaction<200?'⚡':reaction<300?'🏎️':'👍'}</div>
                             <div style={{fontSize:40,fontWeight:800,fontFamily:'monospace',color:'#27F4D2'}}>{reaction}ms</div>
                             <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>
                                 {reaction<200?'Нечеловеческая реакция!':reaction<300?'Отличная реакция!':reaction<500?'Неплохо!':'Можно лучше!'}
+                            </div>
+                            <div style={{background:'rgba(255,255,255,0.06)',borderRadius:14,padding:16,margin:'16px 0',textAlign:'left'}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>Сравнение</div>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                                    <div style={{fontSize:14,fontWeight:600}}>{fact.text}</div>
+                                    <div style={{fontSize:16,fontWeight:800,fontFamily:'monospace',color:'#FF8000'}}>{fact.time}ms</div>
+                                </div>
+                                <div style={{fontSize:13,color:diff<=0?'#27F4D2':'#ff6b6b',fontWeight:700}}>
+                                    {diff<=0 ? `⚡ Ты быстрее на ${Math.abs(diff)}ms!` : `📊 Медленнее на ${diff}ms`}
+                                </div>
+                                <div style={{fontSize:10,color:'var(--f1-text-muted)',marginTop:4}}>{fact.source}</div>
                             </div>
                             {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
                             {result?.new_achievements?.length>0 && <div style={{fontSize:14,color:'#27F4D2',marginTop:8}}>🏅 Новое достижение!</div>}
@@ -3120,22 +3176,28 @@
                                 <div onClick={e=>{e.stopPropagation();onBack();}} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             );
         };
 
         const TRACKS_QUIZ = [
-            {name:'Монца',country:'IT',svg:'M30,80 L35,60 L50,40 L70,35 L85,50 L80,70 L60,85 Z'},
-            {name:'Спа',country:'BE',svg:'M20,70 L30,30 L45,20 L55,35 L50,55 L65,60 L80,40 L85,65 L70,80 Z'},
-            {name:'Сильверстоун',country:'GB',svg:'M25,50 L35,25 L55,20 L70,30 L75,50 L65,70 L45,75 L30,65 Z'},
-            {name:'Монако',country:'MC',svg:'M30,30 L50,25 L70,35 L75,55 L60,70 L40,75 L25,60 Z'},
-            {name:'Сузука',country:'JP',svg:'M20,50 L30,25 L50,20 L60,35 L55,50 L65,55 L75,40 L80,60 L65,75 L40,80 Z'},
-            {name:'Интерлагос',country:'BR',svg:'M25,40 L45,20 L70,25 L80,45 L75,65 L55,80 L30,75 L20,55 Z'},
-            {name:'Баку',country:'AZ',svg:'M30,80 L25,50 L35,25 L55,20 L65,35 L60,60 L70,75 L50,85 Z'},
-            {name:'Джидда',country:'SA',svg:'M20,70 L25,35 L40,20 L60,25 L70,15 L80,30 L75,55 L65,70 L45,80 Z'},
-            {name:'Мельбурн',country:'AU',svg:'M30,30 L55,20 L75,30 L80,55 L70,75 L45,80 L25,65 L20,45 Z'},
-            {name:'Барселона',country:'ES',svg:'M25,45 L40,20 L65,25 L75,45 L70,65 L50,75 L30,70 Z'},
+            {name:'Монца',country:'IT',svg:'M50,10 L52,18 L55,28 L53,38 L48,42 L44,48 L42,55 L45,62 L50,65 L56,62 L60,55 L62,48 L65,42 L70,38 L72,30 L68,22 L60,18 L55,25 L50,30 L45,25 L48,18 Z'},
+            {name:'Спа',country:'BE',svg:'M15,75 L20,65 L18,55 L22,45 L30,40 L38,42 L42,38 L48,30 L55,25 L62,28 L68,22 L75,18 L82,22 L85,30 L80,38 L72,42 L65,48 L60,55 L55,62 L48,68 L40,72 L30,78 L22,80 Z'},
+            {name:'Сильверстоун',country:'GB',svg:'M35,25 L45,20 L55,22 L62,18 L70,22 L75,30 L78,40 L75,48 L68,52 L60,50 L55,55 L48,58 L40,55 L35,48 L30,42 L25,35 L28,28 Z'},
+            {name:'Монако',country:'MC',svg:'M25,35 L30,28 L38,22 L48,20 L58,22 L65,28 L70,35 L72,45 L68,55 L60,60 L52,62 L45,58 L40,52 L38,45 L35,40 L30,42 L28,38 Z'},
+            {name:'Сузука',country:'JP',svg:'M20,50 L25,40 L32,32 L40,28 L48,30 L52,36 L48,42 L42,46 L45,52 L52,55 L60,52 L65,45 L70,38 L75,32 L80,35 L78,45 L72,55 L65,62 L55,65 L45,62 L35,58 L28,55 Z'},
+            {name:'Интерлагос',country:'BR',svg:'M30,35 L38,28 L48,25 L58,28 L65,35 L68,45 L65,52 L58,56 L50,58 L42,55 L38,48 L35,42 L32,38 Z'},
+            {name:'Баку',country:'AZ',svg:'M30,80 L28,70 L25,60 L28,50 L32,42 L38,35 L45,30 L52,28 L58,32 L62,38 L60,48 L55,55 L58,62 L62,70 L58,78 L50,82 L40,82 Z'},
+            {name:'Джидда',country:'SA',svg:'M18,72 L20,60 L22,48 L25,38 L30,28 L38,20 L48,15 L58,18 L65,25 L70,18 L78,22 L82,32 L78,42 L72,50 L68,60 L62,68 L55,75 L45,78 L35,76 L25,74 Z'},
+            {name:'Мельбурн',country:'AU',svg:'M28,30 L35,22 L45,18 L55,20 L62,25 L68,32 L72,42 L70,52 L65,60 L58,65 L50,68 L42,65 L35,60 L30,52 L25,42 L26,35 Z'},
+            {name:'Барселона',country:'ES',svg:'M25,45 L30,35 L38,28 L48,22 L58,25 L65,32 L70,40 L72,50 L68,58 L60,62 L52,60 L45,55 L38,52 L32,50 Z'},
+            {name:'Шанхай',country:'CN',svg:'M30,40 L35,30 L42,24 L50,22 L58,25 L62,32 L58,40 L52,44 L55,50 L62,54 L68,50 L72,42 L75,35 L78,40 L75,50 L68,58 L58,62 L48,60 L38,55 L32,48 Z'},
+            {name:'Марина Бэй',country:'SG',svg:'M25,35 L32,25 L42,22 L52,25 L60,22 L68,28 L72,38 L70,48 L65,55 L58,60 L48,62 L38,58 L32,50 L28,42 Z'},
+            {name:'Хунгароринг',country:'HU',svg:'M30,30 L40,22 L52,20 L62,24 L68,32 L72,42 L70,52 L64,58 L55,62 L45,60 L38,55 L32,48 L28,40 L26,34 Z'},
+            {name:'Зандворт',country:'NL',svg:'M25,45 L30,35 L38,28 L48,25 L55,28 L60,35 L58,42 L52,48 L55,55 L62,58 L68,52 L72,45 L70,38 L65,32 L68,28 L72,35 L70,48 L62,58 L52,62 L42,58 L35,52 L28,48 Z'},
+            {name:'Лусаил',country:'QA',svg:'M28,40 L35,30 L45,24 L55,22 L65,26 L72,34 L75,44 L72,54 L65,60 L55,62 L48,58 L42,52 L38,46 L35,50 L30,48 Z'},
         ];
 
         const GuessTrackGame = ({onBack}) => {
@@ -3191,7 +3253,14 @@
                         <div>
                             <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
                             <svg viewBox="0 0 100 100" style={{width:200,height:200,margin:'0 auto 24px',display:'block'}}>
-                                <path d={questions[qIdx].track.svg} fill="none" stroke="#e10600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                                <defs>
+                                    <filter id="trackGlow">
+                                        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                    </filter>
+                                </defs>
+                                <path d={questions[qIdx].track.svg} fill="none" stroke="rgba(225,6,0,0.25)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d={questions[qIdx].track.svg} fill="none" stroke="#e10600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="url(#trackGlow)"/>
                             </svg>
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,maxWidth:320,margin:'0 auto'}}>
                                 {questions[qIdx].options.map(opt => {
@@ -3226,36 +3295,68 @@
             );
         };
 
+        const QUIZ_BANK = [
+            {q:'Кто выиграл первый чемпионат мира F1 в 1950?',o:['Хуан Мануэль Фанхио','Джузеппе Фарина','Альберто Аскари','Стирлинг Мосс'],a:1,d:1},
+            {q:'Сколько чемпионских титулов у Михаэля Шумахера?',o:['5','6','7','8'],a:2,d:1},
+            {q:'Какая команда выиграла больше всего Кубков конструкторов?',o:['McLaren','Mercedes','Ferrari','Williams'],a:2,d:1},
+            {q:'В каком году Льюис Хэмилтон стал чемпионом впервые?',o:['2007','2008','2010','2014'],a:1,d:1},
+            {q:'Какой гран-при считается самым престижным?',o:['Монако','Сильверстоун','Монца','Спа'],a:0,d:1},
+            {q:'Сколько очков даётся за победу в гонке (2025)?',o:['20','25','30','50'],a:1,d:1},
+            {q:'Какой цвет флага означает конец гонки?',o:['Красный','Жёлтый','Клетчатый','Синий'],a:2,d:1},
+            {q:'Кто самый молодой чемпион мира F1?',o:['Льюис Хэмилтон','Фернандо Алонсо','Себастьян Феттель','Макс Ферстаппен'],a:3,d:1},
+            {q:'Какая максимальная скорость болида F1 (примерно)?',o:['280 км/ч','320 км/ч','370 км/ч','420 км/ч'],a:2,d:2},
+            {q:'Что такое DRS в Формуле 1?',o:['Система торможения','Подвижное заднее крыло','Система рекуперации','Ограничитель скорости'],a:1,d:2},
+            {q:'Сколько поворотов на трассе Монако?',o:['14','17','19','22'],a:2,d:2},
+            {q:'Какой пилот имеет рекорд по количеству побед?',o:['Шумахер','Хэмилтон','Ферстаппен','Сенна'],a:1,d:2},
+            {q:'Что означает синий флаг?',o:['Опасность','Пропусти быструю машину','Конец сессии','Мокрая трасса'],a:1,d:2},
+            {q:'Какой минимальный вес болида F1 (2025)?',o:['650 кг','722 кг','798 кг','850 кг'],a:2,d:2},
+            {q:'Сколько передач в коробке болида F1?',o:['6','7','8','10'],a:2,d:2},
+            {q:'Что такое пейс-кар (Safety Car)?',o:['Запасной болид','Машина безопасности','Машина врача','Машина судьи'],a:1,d:2},
+            {q:'Кто выиграл последний чемпионат с Ferrari до 2025?',o:['Шумахер (2004)','Райкконен (2007)','Алонсо (2006)','Феттель (2013)'],a:1,d:3},
+            {q:'Какой пилот погиб в Имоле в 1994?',o:['Ники Лауда','Жиль Вильнёв','Айртон Сенна','Ронни Петерсон'],a:2,d:3},
+            {q:'На какой трассе самый длинный круг в календаре 2025?',o:['Джидда','Спа','Баку','Лас-Вегас'],a:1,d:3},
+            {q:'Сколько цилиндров в двигателе F1 (с 2014)?',o:['4','6','8','10'],a:1,d:3},
+            {q:'Какую перегрузку испытывает пилот при торможении?',o:['2G','4G','6G','8G'],a:2,d:3},
+            {q:'Кто единственный выиграл чемпионат посмертно?',o:['Сенна','Риндт','Кларк','Хоторн'],a:1,d:3},
+            {q:'В каком году FIA ввела систему гало?',o:['2016','2017','2018','2019'],a:2,d:3},
+            {q:'Какой рекорд Ферстаппена в 2023 — побед за сезон?',o:['15','17','19','21'],a:2,d:3},
+        ];
+
         const QuizGame = ({onBack}) => {
             const [state, setState] = useState('ready');
-            const [question, setQuestion] = useState(null);
+            const [questions, setQuestions] = useState([]);
+            const [qIdx, setQIdx] = useState(0);
             const [selected, setSelected] = useState(null);
-            const [correctIdx, setCorrectIdx] = useState(null);
             const [score, setScore] = useState(0);
-            const [qNum, setQNum] = useState(0);
             const [result, setResult] = useState(null);
             const totalQ = 5;
 
-            const loadQuestion = () => { api.get('/api/quiz/question').then(q=>{setQuestion(q);setSelected(null);setCorrectIdx(null);}); };
-            const startGame = () => { setScore(0);setQNum(1);setResult(null);setState('playing');loadQuestion(); };
+            const generateQuestions = () => {
+                const easy = QUIZ_BANK.filter(q=>q.d===1).sort(()=>Math.random()-0.5).slice(0,2);
+                const med = QUIZ_BANK.filter(q=>q.d===2).sort(()=>Math.random()-0.5).slice(0,2);
+                const hard = QUIZ_BANK.filter(q=>q.d===3).sort(()=>Math.random()-0.5).slice(0,1);
+                return [...easy,...med,...hard];
+            };
+
+            const startGame = () => { setQuestions(generateQuestions()); setQIdx(0); setScore(0); setSelected(null); setResult(null); setState('playing'); };
 
             const answer = (idx) => {
                 if (selected!==null) return;
                 setSelected(idx);
-                api.post('/api/quiz/answer',{question_id:question.question_id||question.id,answer:idx}).then(r=>{
-                    setCorrectIdx(r.correct_answer);
-                    const isCorrect = r.correct;
-                    if(isCorrect) setScore(s=>s+1);
-                    setTimeout(()=>{
-                        if (qNum<totalQ) { setQNum(n=>n+1); loadQuestion(); }
-                        else {
-                            setState('finished');
-                            const finalScore = score + (isCorrect?1:0);
-                            api.post('/api/games/result',{game_type:'quiz',score:finalScore}).then(res=>setResult(res));
-                        }
-                    }, 1500);
-                });
+                const isCorrect = idx===questions[qIdx].a;
+                const newScore = score + (isCorrect?1:0);
+                if(isCorrect) setScore(s=>s+1);
+                setTimeout(()=>{
+                    if (qIdx+1<totalQ) { setQIdx(i=>i+1); setSelected(null); }
+                    else {
+                        setState('finished');
+                        api.post('/api/games/result',{game_type:'quiz',score:newScore}).then(res=>setResult(res));
+                    }
+                }, 1200);
             };
+
+            const diffLabel = (d) => d===1?'Легко':d===2?'Средне':'Сложно';
+            const diffColor = (d) => d===1?'#27F4D2':d===2?'#FF8000':'#e10600';
 
             return (
                 <div className="page-container fade-in" style={{padding:'20px 16px'}}>
@@ -3267,17 +3368,21 @@
                     {state==='ready' && (
                         <div style={{textAlign:'center'}}>
                             <div style={{fontSize:60,marginBottom:20}}>🧠</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:24}}>{totalQ} вопросов об истории F1</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>{totalQ} вопросов об истории F1</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>2 лёгких · 2 средних · 1 сложный</div>
                             <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#6692FF',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
                         </div>
                     )}
-                    {state==='playing' && question && (
+                    {state==='playing' && questions[qIdx] && (
                         <div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12,textAlign:'center'}}>Вопрос {qNum}/{totalQ} · Счёт: {score}</div>
-                            <div style={{fontSize:16,fontWeight:700,marginBottom:20,textAlign:'center',lineHeight:1.4}}>{question.question}</div>
-                            {question.options.map((opt,idx)=>{
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                                <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
+                                <div style={{fontSize:10,fontWeight:700,color:diffColor(questions[qIdx].d),background:`${diffColor(questions[qIdx].d)}22`,padding:'3px 8px',borderRadius:6}}>{diffLabel(questions[qIdx].d)}</div>
+                            </div>
+                            <div style={{fontSize:16,fontWeight:700,marginBottom:20,textAlign:'center',lineHeight:1.4}}>{questions[qIdx].q}</div>
+                            {questions[qIdx].o.map((opt,idx)=>{
                                 let bg = 'rgba(255,255,255,0.06)';
-                                if (selected!==null) { if(idx===correctIdx) bg='rgba(0,200,0,0.2)'; else if(idx===selected) bg='rgba(255,0,0,0.2)'; }
+                                if (selected!==null) { if(idx===questions[qIdx].a) bg='rgba(0,200,0,0.2)'; else if(idx===selected) bg='rgba(255,0,0,0.2)'; }
                                 return (
                                     <div key={idx} onClick={()=>answer(idx)} style={{padding:'14px 16px',marginBottom:8,borderRadius:12,background:bg,cursor:selected!==null?'default':'pointer',fontWeight:600,fontSize:14,transition:'all 0.2s'}}>
                                         {opt}
