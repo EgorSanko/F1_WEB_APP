@@ -1354,7 +1354,7 @@
             const largePhoto = (url) => url ? url.replace('/2col/','/4col/').replace('/1col/','/4col/') : null;
 
             return (
-                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         {ptr.indicatorEl}
@@ -1370,7 +1370,7 @@
                     </div>
 
                     {/* Scrollable content */}
-                    <div ref={ptr.containerRef} onTouchStart={ptr.onTouchStart} onTouchMove={ptr.onTouchMove} onTouchEnd={ptr.onTouchEnd} style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:120}}>
+                    <div ref={ptr.containerRef} onTouchStart={ptr.onTouchStart} onTouchMove={ptr.onTouchMove} onTouchEnd={ptr.onTouchEnd} style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:80}}>
 
                     {/* Not started placeholder */}
                     {notStarted && (
@@ -2199,7 +2199,7 @@
             }, [aTab, weatherRadar]);
 
             return (
-                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>Аналитика</h2>
@@ -2211,7 +2211,7 @@
                     </div>
 
                     {/* Scrollable content */}
-                    <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:120}}>
+                    <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:80}}>
 
                     {loading && <div style={{padding:16}}><TyreLoader text="Загрузка аналитики..."/></div>}
 
