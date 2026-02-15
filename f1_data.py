@@ -21,6 +21,7 @@ from config import (
     SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025,
     DRIVERS_2025, DRIVERS_2026, TEAM_COLORS_2025, TEAM_COLORS_2026,
     get_drivers, get_team_colors, CURRENT_SEASON, GROQ_API_KEY,
+    CIRCUIT_LAPS, CIRCUIT_BASE_LAP,
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -2290,6 +2291,43 @@ def _downsample(data: list, target: int = 200) -> list:
     return [data[int(i * stride)] for i in range(target)]
 
 
+async def get_session_drivers(session_key: str = "latest") -> Dict[str, Any]:
+    """Get list of drivers that participated in a session (from laps data)."""
+    # Resolve session key
+    if session_key == "latest":
+        sk, is_demo, demo_info = await get_fallback_session_key()
+    else:
+        sk = session_key
+        is_demo = True
+        demo_info = None
+
+    cache_key = f"session_drivers:{sk}"
+    cached = cache_get(cache_key, ttl_override=300)
+    if cached:
+        return cached
+
+    laps = await fetch_openf1("laps", {"session_key": sk})
+    if not laps:
+        return {"drivers": [], "session_key": str(sk)}
+
+    _season = _live_season(is_demo, demo_info, session_key=str(sk))
+
+    # Get unique driver numbers with lap count for sorting
+    driver_laps = {}
+    for l in laps:
+        dn = l.get("driver_number")
+        if dn is not None:
+            driver_laps[dn] = driver_laps.get(dn, 0) + 1
+
+    # Sort by lap count (most laps first = most active)
+    sorted_dns = sorted(driver_laps.keys(), key=lambda dn: driver_laps[dn], reverse=True)
+    drivers = [enrich_driver(dn, season=_season) for dn in sorted_dns]
+
+    result = {"drivers": drivers, "session_key": str(sk)}
+    cache_set(cache_key, result)
+    return result
+
+
 async def get_telemetry_comparison(session_key: str, driver1: int, driver2: int) -> Dict[str, Any]:
     """Compare telemetry of two drivers' best laps."""
     cache_key = f"telemetry_comparison:{session_key}:{driver1}:{driver2}"
@@ -2387,11 +2425,11 @@ async def get_telemetry_comparison(session_key: str, driver1: int, driver2: int)
 # ============ STRATEGY PREDICTION ============
 
 TYRE_WEAR_RATES = {
-    "SOFT": 0.045,
-    "MEDIUM": 0.030,
-    "HARD": 0.020,
+    "SOFT": 0.065,
+    "MEDIUM": 0.040,
+    "HARD": 0.025,
 }
-PIT_STOP_LOSS = 22  # seconds
+PIT_STOP_LOSS = 23  # seconds
 
 
 def _simulate_strategy(total_laps: int, stints: list, num_stops: int, base_lap: float = 90.0) -> float:
@@ -2413,26 +2451,37 @@ async def get_strategy_prediction(session_key: str, driver_number: int = None) -
     if cached:
         return cached
 
-    # Get session data to determine total laps and base lap time
-    laps_raw, stints_raw = await asyncio.gather(
+    # Get session info, laps, stints in parallel
+    sessions_raw, laps_raw, stints_raw = await asyncio.gather(
+        fetch_openf1("sessions", {"session_key": session_key}),
         fetch_openf1("laps", {"session_key": session_key}),
         fetch_openf1("stints", {"session_key": session_key}),
     )
 
-    # Total laps
-    total_laps = 50  # default
-    if laps_raw:
+    # Determine circuit and session type
+    session_info = sessions_raw[0] if sessions_raw and isinstance(sessions_raw, list) else {}
+    session_type = session_info.get("session_type", "")
+    circuit_name = (session_info.get("circuit_short_name") or "").lower().strip()
+
+    # Total laps: use CIRCUIT_LAPS for non-Race sessions, real data for Race
+    total_laps = 57  # default
+    if session_type == "Race" and laps_raw:
         all_laps = [l.get("lap_number", 0) for l in laps_raw if l.get("lap_number")]
         if all_laps:
             total_laps = max(all_laps)
+    else:
+        total_laps = CIRCUIT_LAPS.get(circuit_name, 57)
 
-    # Estimate base lap time from median
-    base_lap = 90.0
+    # Base lap time: from circuit config, refined by real data if available
+    base_lap = CIRCUIT_BASE_LAP.get(circuit_name, 90.0)
     if laps_raw:
         valid_times = sorted(l["lap_duration"] for l in laps_raw
                              if l.get("lap_duration") and l.get("lap_number", 0) > 1)
         if valid_times:
-            base_lap = valid_times[len(valid_times) // 2]
+            # Use median, but only if it's reasonable (within 50% of circuit default)
+            median = valid_times[len(valid_times) // 2]
+            if base_lap * 0.7 <= median <= base_lap * 1.5:
+                base_lap = median
 
     # Calculate actual wear rates from real data if available
     actual_wear = dict(TYRE_WEAR_RATES)  # copy defaults
@@ -2646,11 +2695,15 @@ async def get_weather_radar(session_key: str) -> Dict[str, Any]:
     elif humidity > 60:
         rain_probability = "medium"
 
+    # Interactive radar map URL (RainViewer embedded)
+    radar_url = f"https://www.rainviewer.com/map.html?loc={lat},{lon},8&oCS=1&c=1&o=83&lm=0&layer=radar&sm=1&sn=1"
+
     result = {
         "circuit": circuit_name,
         "lat": lat,
         "lon": lon,
         "frames": frames,
+        "radar_url": radar_url,
         "rain_probability": rain_probability,
         "weather": {
             "temperature": latest.get("air_temperature"),

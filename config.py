@@ -250,6 +250,38 @@ CIRCUITS = {
     "madring":       {"lat": 40.4168, "lon": -3.7038, "name": "Circuito de Madrid"},
 }
 
+# Race laps per circuit (OpenF1 circuit_short_name lowercase → race lap count)
+CIRCUIT_LAPS = {
+    "sakhir": 57, "bahrain": 57, "jeddah": 50, "albert_park": 58, "albert park": 58,
+    "shanghai": 56, "suzuka": 53, "miami": 57, "imola": 63,
+    "monaco": 78, "barcelona": 66, "catalunya": 66, "montreal": 70, "villeneuve": 70,
+    "spielberg": 71, "red_bull_ring": 71, "silverstone": 52, "spa": 44,
+    "spa-francorchamps": 44, "budapest": 70, "hungaroring": 70,
+    "zandvoort": 72, "monza": 53, "baku": 51,
+    "marina bay": 62, "marina_bay": 62, "singapore": 62,
+    "austin": 56, "cota": 56, "americas": 56,
+    "mexico city": 71, "rodriguez": 71, "interlagos": 71, "são paulo": 71,
+    "las vegas": 50, "vegas": 50,
+    "losail": 57, "lusail": 57, "yas marina": 58, "yas_marina": 58,
+    "madrid": 66, "madring": 66,
+}
+
+# Base lap time per circuit (seconds, approximate race pace)
+CIRCUIT_BASE_LAP = {
+    "sakhir": 92, "bahrain": 92, "jeddah": 88, "albert_park": 80, "albert park": 80,
+    "shanghai": 96, "suzuka": 91, "miami": 92, "imola": 78,
+    "monaco": 73, "barcelona": 78, "catalunya": 78, "montreal": 74, "villeneuve": 74,
+    "spielberg": 66, "red_bull_ring": 66, "silverstone": 88, "spa": 105,
+    "spa-francorchamps": 105, "budapest": 78, "hungaroring": 78,
+    "zandvoort": 72, "monza": 82, "baku": 103,
+    "marina bay": 100, "marina_bay": 100, "singapore": 100,
+    "austin": 97, "cota": 97, "americas": 97,
+    "mexico city": 79, "rodriguez": 79, "interlagos": 72, "são paulo": 72,
+    "las vegas": 94, "vegas": 94,
+    "losail": 84, "lusail": 84, "yas marina": 87, "yas_marina": 87,
+    "madrid": 78, "madring": 78,
+}
+
 # ============ CIRCUIT TRACK IMAGES ============
 # Maps Ergast circuitId → F1 media track outline image name
 CIRCUIT_IMAGES = {

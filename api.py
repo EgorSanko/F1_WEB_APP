@@ -865,6 +865,12 @@ async def analytics_degradation(session_key: str = "latest", drivers: str = ""):
     return await f1_data.get_live_tyre_degradation(session_key, driver_numbers)
 
 
+@app.get("/api/analytics/telemetry/drivers")
+async def telemetry_drivers(session_key: str = "latest"):
+    """List drivers available in a session for telemetry comparison."""
+    return await f1_data.get_session_drivers(session_key)
+
+
 @app.get("/api/analytics/telemetry")
 async def analytics_telemetry(session_key: str = "latest", driver1: int = 0, driver2: int = 0):
     """Telemetry comparison of two drivers' best laps."""
