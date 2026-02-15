@@ -337,6 +337,22 @@ async def fetch_ergast(
     return None
 
 
+# ============ LIVE SESSION SEASON HELPER ============
+
+def _live_season(is_demo=False, demo_info=None, session_key=None):
+    """Determine season for live/analytics data enrichment."""
+    if demo_info:
+        ds = demo_info.get("date_start", "")
+        return 2026 if "2026" in ds else 2025
+    if is_demo:
+        return 2025  # All existing demo data is 2025
+    if session_key and str(session_key) != "latest":
+        for r in SEASON_2025_RESULTS.values():
+            if str(r.get("session_key")) == str(session_key) or str(r.get("sprint_session_key")) == str(session_key):
+                return 2025
+    return CURRENT_SEASON
+
+
 # ============ DRIVER ENRICHMENT ============
 
 def enrich_driver(driver_number: int, extra: dict = None, season: int = None) -> dict:
@@ -479,6 +495,9 @@ RACE_NAMES_RU = {
     "Emilia Romagna Grand Prix": "Гран-при Эмилии-Романьи",
     "German Grand Prix": "Гран-при Германии",
     "Portuguese Grand Prix": "Гран-при Португалии",
+    "Barcelona Grand Prix": "Гран-при Барселоны",
+    "Brazilian Grand Prix": "Гран-при Бразилии",
+    "Madrid Grand Prix": "Гран-при Мадрида",
 }
 
 SPRINT_ROUNDS_2026 = {
@@ -499,7 +518,73 @@ CIRCUIT_COUNTRIES = {
     "baku": "AZ", "marina_bay": "SG", "americas": "US",
     "rodriguez": "MX", "interlagos": "BR", "vegas": "US",
     "losail": "QA", "yas_marina": "AE", "imola": "IT",
+    "madring": "ES",
 }
+
+# Race control message translations (exact match first, then partial)
+RACE_CONTROL_RU = {
+    # Exact phrases
+    "GREEN LIGHT - PIT EXIT OPEN": "ЗЕЛЁНЫЙ СВЕТ — ВЫЕЗД С ПИТОВ ОТКРЫТ",
+    "RED LIGHT - PIT EXIT CLOSED": "КРАСНЫЙ СВЕТ — ВЫЕЗД С ПИТОВ ЗАКРЫТ",
+    "PIT LANE ENTRY CLOSED": "ВЪЕЗД НА ПИТ-ЛЕЙН ЗАКРЫТ",
+    "PIT LANE ENTRY OPEN": "ВЪЕЗД НА ПИТ-ЛЕЙН ОТКРЫТ",
+    "DRS ENABLED": "DRS ВКЛЮЧЕНА",
+    "DRS DISABLED": "DRS ОТКЛЮЧЕНА",
+    "SAFETY CAR IN THIS LAP": "СЕЙФТИ-КАР ЗАЕДЕТ НА ЭТОМ КРУГЕ",
+    "SAFETY CAR DEPLOYED": "СЕЙФТИ-КАР НА ТРАССЕ",
+    "VIRTUAL SAFETY CAR DEPLOYED": "ВИРТУАЛЬНЫЙ СЕЙФТИ-КАР",
+    "VIRTUAL SAFETY CAR ENDING": "ВИРТУАЛЬНЫЙ СЕЙФТИ-КАР ЗАВЕРШАЕТСЯ",
+    "RED FLAG": "КРАСНЫЙ ФЛАГ",
+    "CHEQUERED FLAG": "КЛЕТЧАТЫЙ ФЛАГ",
+    "ROLLING START": "СТАРТ С ХОДА",
+    "STANDING START": "СТАРТ С МЕСТА",
+}
+
+# Partial patterns for race control translation
+RACE_CONTROL_PATTERNS = [
+    ("DELETED", "УДАЛЁН"),
+    ("REINSTATED", "ВОССТАНОВЛЕН"),
+    ("UNDER INVESTIGATION", "ПОД РАССЛЕДОВАНИЕМ"),
+    ("NO FURTHER INVESTIGATION", "БЕЗ ДАЛЬНЕЙШЕГО РАССЛЕДОВАНИЯ"),
+    ("NO INVESTIGATION NECESSARY", "РАССЛЕДОВАНИЕ НЕ ТРЕБУЕТСЯ"),
+    ("PENALTY", "ШТРАФ"),
+    ("TIME PENALTY", "ШТРАФ ПО ВРЕМЕНИ"),
+    ("WARNING", "ПРЕДУПРЕЖДЕНИЕ"),
+    ("REPRIMAND", "ВЫГОВОР"),
+    ("BLACK AND WHITE FLAG", "ЧЁРНО-БЕЛЫЙ ФЛАГ"),
+    ("BLACK AND ORANGE FLAG", "ЧЁРНО-ОРАНЖЕВЫЙ ФЛАГ (МЕХАНИЧЕСКАЯ ПРОБЛЕМА)"),
+    ("BLUE FLAG", "СИНИЙ ФЛАГ"),
+    ("TRACK LIMITS", "ПРЕДЕЛЫ ТРАССЫ"),
+    ("TURN", "ПОВОРОТ"),
+    ("LAP TIME", "ВРЕМЯ КРУГА"),
+    ("EXCEEDING", "ПРЕВЫШЕНИЕ"),
+    ("FORCED OFF", "ВЫТЕСНЕН"),
+    ("CAUSING A COLLISION", "СТАЛ ПРИЧИНОЙ СТОЛКНОВЕНИЯ"),
+    ("UNSAFE RELEASE", "ОПАСНЫЙ ВЫПУСК"),
+    ("RETIRED", "СОШЁЛ"),
+    ("STOPPED", "ОСТАНОВИЛСЯ"),
+    ("OFF TRACK", "ЗА ПРЕДЕЛАМИ ТРАССЫ"),
+    ("SPINNING", "РАЗВЕРНУЛО"),
+    ("SLOW CAR", "МЕДЛЕННАЯ МАШИНА"),
+]
+
+
+def translate_race_control(message: str) -> str:
+    """Translate race control message to Russian."""
+    if not message:
+        return ""
+    msg_upper = message.upper().strip()
+    # Exact match
+    if msg_upper in RACE_CONTROL_RU:
+        return RACE_CONTROL_RU[msg_upper]
+    # Partial pattern match — collect all matching translations
+    parts = []
+    for en_pattern, ru_pattern in RACE_CONTROL_PATTERNS:
+        if en_pattern in msg_upper:
+            parts.append(ru_pattern)
+    if parts:
+        return " | ".join(parts)
+    return message
 
 
 async def get_schedule(season: int = None) -> Dict[str, Any]:
@@ -1022,6 +1107,7 @@ async def get_live_positions(_session_key=None) -> Dict[str, Any]:
     # Build sorted result
     sorted_positions = sorted(latest_pos.values(), key=lambda x: x.get("position", 99))
     result = []
+    _season = _live_season(_is_demo, _demo_info)
 
     for pos in sorted_positions:
         dn = pos["driver_number"]
@@ -1045,7 +1131,7 @@ async def get_live_positions(_session_key=None) -> Dict[str, Any]:
             "stint_number": stint.get("stint_number", 1),
             "pit_stops": pit_counts.get(dn, 0),
             "_stint_lap_start": stint.get("lap_start", 0),
-        }))
+        }, season=_season))
 
     response = {"positions": result, "count": len(result), "is_demo": _is_demo}
     if _demo_info:
@@ -1126,6 +1212,7 @@ async def get_live_timing(_session_key=None) -> Dict[str, Any]:
     best_lap = min(l["lap_duration"] for l in all_laps) if all_laps else None
 
     timing = []
+    _season = _live_season(_is_demo, _demo_info)
     for dn, lap in latest_laps.items():
         interval = latest_intervals.get(dn, {})
         s1 = lap.get("duration_sector_1")
@@ -1146,7 +1233,7 @@ async def get_live_timing(_session_key=None) -> Dict[str, Any]:
             "is_best_lap": lap_dur == best_lap if lap_dur else False,
             "gap_to_leader": interval.get("gap_to_leader"),
             "interval": interval.get("interval"),
-        }))
+        }, season=_season))
 
     response = {
         "timing": timing,
@@ -1221,11 +1308,13 @@ async def get_live_race_control(_session_key=None) -> Dict[str, Any]:
 
     messages = []
     for msg in data[-25:]:  # last 25 messages
+        en_msg = msg.get("message", "")
         messages.append({
             "date": msg.get("date", ""),
             "category": msg.get("category", ""),
             "flag": msg.get("flag", ""),
-            "message": msg.get("message", ""),
+            "message": en_msg,
+            "message_ru": translate_race_control(en_msg),
             "scope": msg.get("scope", ""),
             "driver_number": msg.get("driver_number"),
             "lap_number": msg.get("lap_number"),
@@ -1256,12 +1345,13 @@ async def get_live_radio(_session_key=None) -> Dict[str, Any]:
         return {"radio": [], "is_demo": _is_demo}
 
     radio = []
+    _season = _live_season(_is_demo, _demo_info)
     for msg in data[-15:]:  # last 15
         dn = msg.get("driver_number")
         radio.append(enrich_driver(dn, {
             "date": msg.get("date", ""),
             "recording_url": msg.get("recording_url", ""),
-        }))
+        }, season=_season))
 
     response = {"radio": radio, "is_demo": _is_demo}
     if _demo_info:
@@ -1288,6 +1378,7 @@ async def get_live_pit_stops(_session_key=None) -> Dict[str, Any]:
         return {"pit_stops": [], "is_demo": _is_demo}
 
     pit_stops = []
+    _season = _live_season(_is_demo, _demo_info)
     for p in data:
         dn = p.get("driver_number")
         if dn:
@@ -1295,7 +1386,7 @@ async def get_live_pit_stops(_session_key=None) -> Dict[str, Any]:
                 "date": p.get("date", ""),
                 "lap_number": p.get("lap_number"),
                 "pit_duration": p.get("pit_duration"),
-            }))
+            }, season=_season))
 
     response = {"pit_stops": pit_stops, "is_demo": _is_demo}
     if _demo_info:
@@ -1558,6 +1649,7 @@ async def get_race_strategy(session_key: str = "latest") -> Dict[str, Any]:
     )
 
     # Build result
+    _season = _live_season(session_key=session_key)
     drivers = []
     for dn, stints in driver_stints.items():
         stints.sort(key=lambda x: x["stint_number"])
@@ -1565,7 +1657,7 @@ async def get_race_strategy(session_key: str = "latest") -> Dict[str, Any]:
             "stints": stints,
             "pit_stops": pit_map.get(dn, []),
             "finish_position": final_pos.get(dn, 99),
-        }))
+        }, season=_season))
 
     drivers.sort(key=lambda d: d["finish_position"])
 
@@ -1647,6 +1739,7 @@ async def get_race_position_chart(session_key: str = "latest") -> Dict[str, Any]
                 driver_positions.setdefault(dn, {})
 
     # Build result
+    _season = _live_season(session_key=session_key)
     drivers = []
     for dn, lap_positions in driver_positions.items():
         if not lap_positions:
@@ -1657,7 +1750,7 @@ async def get_race_position_chart(session_key: str = "latest") -> Dict[str, Any]
         ]
         drivers.append(enrich_driver(dn, {
             "positions": positions_array,
-        }))
+        }, season=_season))
 
     response = {"drivers": drivers, "total_laps": max_lap}
     cache_set(cache_key, response)
@@ -1737,6 +1830,7 @@ async def get_race_laptimes(session_key: str = "latest", driver_numbers: list = 
     # Session best lap
     best_lap = min(all_durations) if all_durations else None
 
+    _season = _live_season(session_key=session_key)
     drivers = []
     for dn, laps in driver_laps.items():
         laps.sort(key=lambda x: x["lap"])
@@ -1745,7 +1839,7 @@ async def get_race_laptimes(session_key: str = "latest", driver_numbers: list = 
         drivers.append(enrich_driver(dn, {
             "laps": laps,
             "personal_best": personal_best,
-        }))
+        }, season=_season))
 
     response = {
         "drivers": drivers,
@@ -1774,6 +1868,8 @@ async def get_live_tyre_degradation(session_key: str = "latest", driver_numbers:
 
     if not laps_raw or not stints_raw:
         return {"drivers": [], "total_laps": 0}
+
+    _season = _live_season(session_key=session_key)
 
     # Find total race laps
     all_lap_nums = [l.get("lap_number", 0) for l in laps_raw if l.get("lap_number")]
@@ -1896,7 +1992,7 @@ async def get_live_tyre_degradation(session_key: str = "latest", driver_numbers:
         if stint_results:
             drivers.append(enrich_driver(dn, {
                 "stints": stint_results,
-            }))
+            }, season=_season))
 
     response = {"drivers": drivers, "total_laps": total_laps}
     if not driver_numbers:
@@ -2026,6 +2122,7 @@ async def get_live_track_map() -> Dict[str, Any]:
                     latest_position[dn] = entry
 
     # Distribute cars along track outline based on race position
+    _season = _live_season(_is_demo, _demo_info)
     cars = []
     total_points = len(track_points) if track_points else 0
     sorted_drivers = sorted(latest_position.values(), key=lambda x: x.get("position", 99))
@@ -2046,7 +2143,7 @@ async def get_live_track_map() -> Dict[str, Any]:
             "x": x,
             "y": y,
             "position": pos.get("position", 0),
-        }))
+        }, season=_season))
 
     cars.sort(key=lambda c: c.get("position", 99))
 

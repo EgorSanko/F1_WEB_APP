@@ -244,6 +244,7 @@ CIRCUITS = {
     "americas":      {"lat": 30.1328, "lon": -97.6411, "name": "Circuit of the Americas"},
     "vegas":         {"lat": 36.1147, "lon": -115.173, "name": "Las Vegas Street Circuit"},
     "losail":        {"lat": 25.4900, "lon": 51.4542, "name": "Lusail International Circuit"},
+    "madring":       {"lat": 40.4168, "lon": -3.7038, "name": "Circuito de Madrid"},
 }
 
 # ============ CIRCUIT TRACK IMAGES ============

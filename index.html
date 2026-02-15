@@ -224,7 +224,7 @@
             return flags[code] || '🏳️';
         };
 
-        const openLink = (url) => { if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank'); };
+        const openLink = (url) => { if (tg?.openLink) tg.openLink(url, {try_instant_view: false}); else window.open(url, '_blank'); };
 
         // ==== SVG NAV ICONS ====
         const NavIcons = {
@@ -832,7 +832,8 @@
                             <div key={i} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 16px',borderBottom:'1px solid var(--f1-border)'}}>
                                 <FlagIcon flag={msg.flag||'GREEN'}/>
                                 <div style={{flex:1}}>
-                                    <div style={{fontSize:13,lineHeight:1.4}}>{msg.message}</div>
+                                    <div style={{fontSize:13,lineHeight:1.4}}>{msg.message_ru && msg.message_ru !== msg.message ? msg.message_ru : msg.message}</div>
+                                    {msg.message_ru && msg.message_ru !== msg.message && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,fontStyle:'italic'}}>{msg.message}</div>}
                                     <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:3,display:'flex',gap:8}}>
                                         {msg.lap_number&&<span>Круг {msg.lap_number}</span>}{msg.driver_number&&<span>#{msg.driver_number}</span>}{msg.category&&<span>{{Other:'Другое',Flag:'Флаг',SafetyCar:'Сейфти-кар',VirtualSafetyCar:'Виртуальный СК',DRS:'DRS',SessionStatus:'Статус'}[msg.category]||msg.category}</span>}{msg.date&&<span>{new Date(msg.date).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>}
                                     </div>
@@ -893,7 +894,8 @@
             'catalunya':'🇪🇸','villeneuve':'🇨🇦','red_bull_ring':'🇦🇹','silverstone':'🇬🇧',
             'spa':'🇧🇪','hungaroring':'🇭🇺','zandvoort':'🇳🇱','monza':'🇮🇹',
             'baku':'🇦🇿','marina_bay':'🇸🇬','cota':'🇺🇸','americas':'🇺🇸','rodriguez':'🇲🇽',
-            'interlagos':'🇧🇷','las_vegas':'🇺🇸','vegas':'🇺🇸','lusail':'🇶🇦','losail':'🇶🇦','yas_marina':'🇦🇪'
+            'interlagos':'🇧🇷','las_vegas':'🇺🇸','vegas':'🇺🇸','lusail':'🇶🇦','losail':'🇶🇦','yas_marina':'🇦🇪',
+            'madring':'🇪🇸'
         };
 
         const countryFlag = (code) => {
