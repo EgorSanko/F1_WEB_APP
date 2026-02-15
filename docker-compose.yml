@@ -1,22 +1,21 @@
-version: '3.8'
-
 services:
   api:
     build: .
     container_name: f1hub-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8002:8000"
     volumes:
       - ./data:/app/data
       - ./index.html:/app/index.html:ro
       - ./static/drivers:/app/static/drivers:ro
     env_file: .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
 
   bot:
     build: .
@@ -29,16 +28,3 @@ services:
     depends_on:
       api:
         condition: service_healthy
-
-  nginx:
-    image: nginx:alpine
-    container_name: f1hub-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - api
