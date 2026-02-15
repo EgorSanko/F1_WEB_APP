@@ -44,30 +44,6 @@
 
 ---
 
-## 📸 А как оно выглядит?
-
-<div align="center">
-<table>
-<tr>
-<td align="center"><b>🏠 Главная</b><br/><sub>Таймер, чемпионат, ближайшие гонки</sub><br/><img src="screenshots/home.png" width="250"/></td>
-<td align="center"><b>🏁 Live</b><br/><sub>Позиции, секторы, шины, погода</sub><br/><img src="screenshots/live.png" width="250"/></td>
-<td align="center"><b>🃏 Карточки</b><br/><sub>Все 22 пилота с фото и цветами</sub><br/><img src="screenshots/cards.png" width="250"/></td>
-</tr>
-<tr>
-<td align="center"><b>🧠 AI Стратегия</b><br/><sub>5 вариантов пит-стопов, деградация</sub><br/><img src="screenshots/strategy.png" width="250"/></td>
-<td align="center"><b>🌧 Радар</b><br/><sub>RainViewer + погода с трассы</sub><br/><img src="screenshots/weather.png" width="250"/></td>
-<td align="center"><b>📅 Календарь 2026</b><br/><sub>Флаги, фоны трасс, время МСК</sub><br/><img src="screenshots/schedule.png" width="250"/></td>
-</tr>
-<tr>
-<td align="center"><b>🏆 Standings</b><br/><sub>Пилоты и конструкторы</sub><br/><img src="screenshots/standings.png" width="250"/></td>
-<td align="center"><b>📋 Детали ГП</b><br/><sub>Сессии, стратегия, результаты</sub><br/><img src="screenshots/race_detail.png" width="250"/></td>
-<td align="center"><b>📅 Сезон 2025</b><br/><sub>Все результаты с фото</sub><br/><img src="screenshots/schedule_2025.png" width="250"/></td>
-</tr>
-</table>
-</div>
-
----
-
 ## 🚀 Фичи (их много)
 
 ### 🏠 Главная
