@@ -408,8 +408,7 @@ F1_PHOTO_CODES_2026 = {
 }
 
 CUSTOM_DRIVER_PHOTOS = {
-    # Override CDN photo for specific drivers (e.g. bad crop)
-    # 77: "/static/drivers/77_custom.jpg",
+    77: "/static/drivers/77_custom.jpg",  # Bottas — custom photo
 }
 
 def get_f1_cdn_photo(driver_number, season=2026, width=200):

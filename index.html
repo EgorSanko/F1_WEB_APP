@@ -2052,11 +2052,12 @@
             const [tyreData, setTyreData] = useState(null);
             const [tyreLoading, setTyreLoading] = useState(false);
             const [revealed, setRevealed] = useState(false);
+            const isPastRace = race && race.date && new Date(race.date) < new Date();
             useEffect(() => {
                 setRevealed(false);
-                if (race?.round) {
+                setTyreData(null);
+                if (race?.round && isPastRace) {
                     setTyreLoading(true);
-                    setTyreData(null);
                     api.get(`/api/race/${race.round}/tyres`).then(d => {
                         if (d?.drivers?.length > 0) setTyreData(d);
                     }).finally(() => setTyreLoading(false));
