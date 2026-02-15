@@ -2668,7 +2668,7 @@
                     api.get(`/api/race/${race.round}/tyres`).then(d => {
                         if (d?.drivers?.length > 0) setTyreData(d);
                     }).finally(() => setTyreLoading(false));
-                    api.get(`/api/race/${race.round}/qualifying`).then(d => {
+                    api.get(`/api/race/${race.round}/qualifying?season=${season}`).then(d => {
                         if (d?.results?.length > 0) setQualiData(d);
                     });
                 }

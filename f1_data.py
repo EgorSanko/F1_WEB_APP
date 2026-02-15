@@ -855,7 +855,7 @@ async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str
             "q1": q.get("Q1", ""),
             "q2": q.get("Q2", ""),
             "q3": q.get("Q3", ""),
-        }))
+        }, season=s))
 
     response = {
         "round": int(race["round"]),
@@ -3117,6 +3117,6 @@ async def get_points_progression(season: int = None) -> Dict[str, Any]:
             "progression": d["points"],
         })
 
-    response = {"drivers": drivers_out, "rounds": all_rounds, "season": s}
+    response = {"drivers": drivers_out, "rounds": all_rounds, "total_rounds": len(all_rounds), "season": s}
     cache_set(cache_key, response)
     return response
