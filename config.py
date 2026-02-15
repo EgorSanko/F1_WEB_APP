@@ -318,8 +318,102 @@ CIRCUIT_IMAGES = {
 
 CIRCUIT_IMAGE_BASE = "https://media.formula1.com/image/upload/f_auto/q_auto/v1677245035/content/dam/fom-website/2018-redesign-assets/Track%20outline%20702x405"
 
+# ============ CIRCUIT CARD IMAGES (race promo cards) ============
+CIRCUIT_CARD_IMAGES = {
+    "albert_park": "australia",
+    "shanghai": "china",
+    "suzuka": "japan",
+    "bahrain": "bahrain",
+    "jeddah": "saudi-arabia",
+    "miami": "miami",
+    "villeneuve": "canada",
+    "monaco": "monaco",
+    "catalunya": "spain",
+    "red_bull_ring": "austria",
+    "silverstone": "great-britain",
+    "spa": "belgium",
+    "hungaroring": "hungary",
+    "zandvoort": "netherlands",
+    "monza": "italy",
+    "baku": "azerbaijan",
+    "marina_bay": "singapore",
+    "americas": "united-states",
+    "rodriguez": "mexico",
+    "interlagos": "brazil",
+    "las_vegas": "las-vegas",
+    "losail": "qatar",
+    "yas_marina": "abu-dhabi",
+}
+
+def get_circuit_card_url(circuit_id, width=720):
+    """Get race promo card image URL from formula1.com CDN."""
+    slug = CIRCUIT_CARD_IMAGES.get(circuit_id, "")
+    if not slug:
+        return ""
+    return f"https://media.formula1.com/image/upload/c_lfill,w_{width}/q_auto/v1740000000/fom-website/static-assets/2026/races/card/{slug}.webp"
+
 # ============ DRIVER PHOTO URL ============
 DRIVER_PHOTO_BASE = "https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers"
+
+# ============ F1 CDN DRIVER PHOTO CODES ============
+# Format: driver_number -> (team_slug, driver_code)
+F1_PHOTO_CODES_2025 = {
+    1:  ("redbullracing", "maxver01"),     # Verstappen
+    22: ("redbullracing", "yuktsu01"),     # Tsunoda (moved to RBR mid-season)
+    44: ("ferrari", "lewham01"),           # Hamilton
+    16: ("ferrari", "chalec01"),           # Leclerc
+    4:  ("mclaren", "lannor01"),           # Norris
+    81: ("mclaren", "oscpia01"),           # Piastri
+    63: ("mercedes", "georus01"),          # Russell
+    12: ("mercedes", "andant01"),          # Antonelli
+    14: ("astonmartin", "feralo01"),       # Alonso
+    18: ("astonmartin", "lanstr01"),       # Stroll
+    10: ("alpine", "piegas01"),            # Gasly
+    43: ("alpine", "fracol01"),            # Colapinto
+    23: ("williams", "alealb01"),          # Albon
+    55: ("williams", "carsai01"),          # Sainz
+    31: ("haasf1team", "estoco01"),        # Ocon
+    87: ("haasf1team", "olibea01"),        # Bearman
+    30: ("racingbulls", "lialaw01"),       # Lawson
+    6:  ("racingbulls", "isahad01"),       # Hadjar
+    7:  ("alpine", "jacdoo01"),            # Doohan
+    27: ("kicksauber", "nichul01"),        # Hulkenberg
+    5:  ("kicksauber", "gabbor01"),        # Bortoleto
+}
+
+F1_PHOTO_CODES_2026 = {
+    1:  ("mclaren", "lannor01"),           # Norris
+    81: ("mclaren", "oscpia01"),           # Piastri
+    63: ("mercedes", "georus01"),          # Russell
+    12: ("mercedes", "andant01"),          # Antonelli
+    3:  ("redbullracing", "maxver01"),     # Verstappen
+    6:  ("redbullracing", "isahad01"),     # Hadjar
+    44: ("ferrari", "lewham01"),           # Hamilton
+    16: ("ferrari", "chalec01"),           # Leclerc
+    14: ("astonmartin", "feralo01"),       # Alonso
+    18: ("astonmartin", "lanstr01"),       # Stroll
+    23: ("williams", "alealb01"),          # Albon
+    55: ("williams", "carsai01"),          # Sainz
+    10: ("alpine", "piegas01"),            # Gasly
+    43: ("alpine", "fracol01"),            # Colapinto
+    31: ("haasf1team", "estoco01"),        # Ocon
+    87: ("haasf1team", "olibea01"),        # Bearman
+    30: ("racingbulls", "lialaw01"),       # Lawson  (Note: kept for mapping)
+    22: ("racingbulls", "yuktsu01"),       # Tsunoda
+    41: ("racingbulls", "arvlin01"),       # Lindblad
+    27: ("audi", "nichul01"),             # Hulkenberg
+    5:  ("audi", "gabbor01"),             # Bortoleto
+    77: ("cadillac", "valbot01"),          # Bottas
+    11: ("cadillac", "serper01"),          # Perez
+}
+
+def get_f1_cdn_photo(driver_number, season=2026, width=200):
+    """Get driver photo URL from formula1.com CDN."""
+    codes = F1_PHOTO_CODES_2026 if season == 2026 else F1_PHOTO_CODES_2025
+    if driver_number not in codes:
+        return ""
+    team, code = codes[driver_number]
+    return f"https://media.formula1.com/image/upload/c_lfill,w_{width}/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
 
 # ============ TEAM ASSETS (logos, car photos) ============
 TEAM_ASSETS = {

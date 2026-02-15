@@ -22,6 +22,7 @@ from config import (
     DRIVERS_2025, DRIVERS_2026, TEAM_COLORS_2025, TEAM_COLORS_2026,
     get_drivers, get_team_colors, CURRENT_SEASON, GROQ_API_KEY,
     CIRCUIT_LAPS, CIRCUIT_BASE_LAP,
+    get_f1_cdn_photo, get_circuit_card_url,
 )
 
 logger = logging.getLogger("f1hub.data")
@@ -368,6 +369,10 @@ def enrich_driver(driver_number: int, extra: dict = None, season: int = None) ->
         info = other.get(driver_number, {})
     team = info.get("team", "")
 
+    # CDN photo with local fallback
+    cdn_photo = get_f1_cdn_photo(driver_number, season=s, width=200)
+    photo_url = cdn_photo or info.get("photo_url", "")
+
     result = {
         "driver_number": driver_number,
         "name": info.get("name", f"Пилот {driver_number}"),
@@ -377,7 +382,7 @@ def enrich_driver(driver_number: int, extra: dict = None, season: int = None) ->
         "team": team,
         "team_color": colors.get(team, TEAM_COLORS.get(team, "#888888")),
         "country": info.get("country", ""),
-        "photo_url": info.get("photo_url", ""),
+        "photo_url": photo_url,
         "photo_url_large": info.get("photo_url_large", ""),
     }
     if extra:
@@ -612,7 +617,7 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
             "name": RACE_NAMES_RU.get(english_name, english_name),
             "circuit": race["Circuit"]["circuitName"],
             "circuit_id": circuit_id,
-            "circuit_image": _get_circuit_image(circuit_id),
+            "circuit_image": get_circuit_card_url(circuit_id) or _get_circuit_image(circuit_id),
             "country": race["Circuit"]["Location"]["country"],
             "country_code": CIRCUIT_COUNTRIES.get(circuit_id, ""),
             "locality": race["Circuit"]["Location"]["locality"],
@@ -2186,7 +2191,7 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
             "date": data["date"],
             "circuit_id": circuit_id,
             "circuit_name": circuit_info.get("name", ""),
-            "circuit_image": _get_circuit_image(circuit_id),
+            "circuit_image": get_circuit_card_url(circuit_id) or _get_circuit_image(circuit_id),
             "laps": data.get("laps", 0),
             "sprint": data.get("sprint", False),
             "winner": winner,
