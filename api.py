@@ -258,16 +258,16 @@ async def get_next_race(season: int = CURRENT_SEASON):
 
 
 @app.get("/api/race/{round_num}/results")
-async def get_race_results(round_num: int):
-    result = await f1_data.get_race_results(round_num)
+async def get_race_results(round_num: int, season: int = CURRENT_SEASON):
+    result = await f1_data.get_race_results(round_num, season=season)
     if "error" in result and "not found" in result.get("error", "").lower():
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 
 @app.get("/api/race/{round_num}/qualifying")
-async def get_qualifying(round_num: int):
-    result = await f1_data.get_qualifying_results(round_num)
+async def get_qualifying(round_num: int, season: int = CURRENT_SEASON):
+    result = await f1_data.get_qualifying_results(round_num, season=season)
     if "error" in result and "not found" in result.get("error", "").lower():
         raise HTTPException(status_code=404, detail=result["error"])
     return result

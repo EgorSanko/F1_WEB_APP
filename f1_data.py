@@ -300,10 +300,16 @@ async def fetch_openf1(
         return None
 
 
+def ergast_season(season: int) -> str:
+    """Return 'current' for the actual current year, explicit number for past seasons."""
+    return "current" if season == datetime.now().year else str(season)
+
+
 async def fetch_ergast(
     endpoint: str,
     retries: int = 2,
     retry_delay: float = 1.0,
+    limit: int = None,
 ) -> Optional[Dict]:
     """
     Fetch from Ergast/Jolpica API with rate limiting and retry.
@@ -312,6 +318,8 @@ async def fetch_ergast(
     await _ergast_limiter.acquire()
     client = get_client()
     url = f"{ERGAST_API}/{endpoint}.json"
+    if limit:
+        url += f"?limit={limit}"
 
     for attempt in range(retries + 1):
         try:
@@ -604,7 +612,7 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
     if cached:
         return cached
 
-    endpoint = "current" if s == 2025 else str(s)
+    endpoint = ergast_season(s)
     data = await fetch_ergast(endpoint)
     if not data:
         return {"season": str(s), "races": [], "error": "Failed to fetch schedule"}
@@ -714,14 +722,16 @@ async def get_next_race(season: int = None) -> Dict[str, Any]:
     return {"message": "No upcoming races", "races_total": len(schedule.get("races", []))}
 
 
-async def get_race_results(round_num: int) -> Dict[str, Any]:
+async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]:
     """Get race results for a specific round, enriched with our data."""
-    cache_key = f"race_results:{round_num}"
+    s = season or CURRENT_SEASON
+    cache_key = f"race_results:{s}:{round_num}"
     cached = cache_get(cache_key)
     if cached:
         return cached
 
-    data = await fetch_ergast(f"current/{round_num}/results")
+    prefix = ergast_season(s)
+    data = await fetch_ergast(f"{prefix}/{round_num}/results")
     if not data:
         return {"error": "Failed to fetch results", "round": round_num}
 
@@ -780,7 +790,8 @@ async def get_last_race() -> Dict[str, Any]:
     if cached:
         return cached
 
-    data = await fetch_ergast("current/last/results")
+    prefix = ergast_season(CURRENT_SEASON)
+    data = await fetch_ergast(f"{prefix}/last/results")
     if not data:
         return {"error": "Failed to fetch last race"}
 
@@ -812,14 +823,16 @@ async def get_last_race() -> Dict[str, Any]:
     return response
 
 
-async def get_qualifying_results(round_num: int) -> Dict[str, Any]:
+async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str, Any]:
     """Get qualifying results for a specific round."""
-    cache_key = f"qualifying_results:{round_num}"
+    s = season or CURRENT_SEASON
+    cache_key = f"qualifying_results:{s}:{round_num}"
     cached = cache_get(cache_key)
     if cached:
         return cached
 
-    data = await fetch_ergast(f"current/{round_num}/qualifying")
+    prefix = ergast_season(s)
+    data = await fetch_ergast(f"{prefix}/{round_num}/qualifying")
     if not data:
         return {"error": "Failed to fetch qualifying", "round": round_num}
 
@@ -858,7 +871,7 @@ async def get_driver_standings(season: int = None) -> Dict[str, Any]:
     if cached:
         return cached
 
-    endpoint = "current/driverStandings" if s == 2025 else f"{s}/driverStandings"
+    endpoint = f"{ergast_season(s)}/driverStandings"
     data = await fetch_ergast(endpoint)
     if not data:
         return {"standings": [], "error": "Failed to fetch standings"}
@@ -934,7 +947,7 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
     if cached:
         return cached
 
-    endpoint = "current/constructorStandings" if s == 2025 else f"{s}/constructorStandings"
+    endpoint = f"{ergast_season(s)}/constructorStandings"
     data = await fetch_ergast(endpoint)
     if not data:
         return {"standings": [], "error": "Failed to fetch constructor standings"}
@@ -1433,7 +1446,7 @@ async def get_driver_profile(driver_number: int, season: int = None) -> Dict[str
         return driver
 
     # Get driver's season results from API
-    endpoint = f"current/drivers/{ergast_id}/results" if s == 2025 else f"{s}/drivers/{ergast_id}/results"
+    endpoint = f"{ergast_season(s)}/drivers/{ergast_id}/results"
     data = await fetch_ergast(endpoint)
     if data:
         races = data.get("RaceTable", {}).get("Races", [])
@@ -3010,16 +3023,9 @@ async def get_points_progression(season: int = None) -> Dict[str, Any]:
         return cached
 
     # Fetch all race results with high limit (Ergast default is 30)
-    await _ergast_limiter.acquire()
-    client = get_client()
-    url = f"{ERGAST_API}/{s}/results.json?limit=600"
-    try:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            return {"error": "Failed to fetch results", "drivers": []}
-        data = resp.json().get("MRData", {})
-    except Exception as e:
-        logger.error(f"Points progression fetch error: {e}")
+    prefix = ergast_season(s)
+    data = await fetch_ergast(f"{prefix}/results", limit=600)
+    if not data:
         return {"error": "Failed to fetch results", "drivers": []}
 
     races = data.get("RaceTable", {}).get("Races", [])
