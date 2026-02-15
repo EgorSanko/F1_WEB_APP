@@ -2268,3 +2268,382 @@ async def transcribe_radio_groq(audio_url: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Transcription error: {e}")
         return {"text_en": None, "text_ru": None, "error": str(e)}
+
+
+# ============ TELEMETRY COMPARISON ============
+
+def _parse_iso(dt_str: str) -> Optional[datetime]:
+    """Parse ISO datetime string safely."""
+    if not dt_str:
+        return None
+    try:
+        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _downsample(data: list, target: int = 200) -> list:
+    """Downsample a list to ~target points via stride."""
+    if len(data) <= target:
+        return data
+    stride = len(data) / target
+    return [data[int(i * stride)] for i in range(target)]
+
+
+async def get_telemetry_comparison(session_key: str, driver1: int, driver2: int) -> Dict[str, Any]:
+    """Compare telemetry of two drivers' best laps."""
+    cache_key = f"telemetry_comparison:{session_key}:{driver1}:{driver2}"
+    cached = cache_get(cache_key, ttl_override=300)
+    if cached:
+        return cached
+
+    _season = _live_season(session_key=session_key)
+
+    # Fetch laps for both drivers in parallel
+    laps1, laps2 = await asyncio.gather(
+        fetch_openf1("laps", {"session_key": session_key, "driver_number": driver1}),
+        fetch_openf1("laps", {"session_key": session_key, "driver_number": driver2}),
+    )
+
+    # Find best lap (exclude first lap and laps without duration/date_start)
+    def find_best(laps):
+        valid = [l for l in (laps or [])
+                 if l.get("lap_duration") and l.get("lap_number", 0) > 1 and l.get("date_start")]
+        return min(valid, key=lambda l: l["lap_duration"]) if valid else None
+
+    best1 = find_best(laps1)
+    best2 = find_best(laps2)
+
+    if not best1 or not best2:
+        return {"error": "no_lap_data"}
+
+    # Fetch car_data for each best lap (time-bounded)
+    async def get_car_data(driver_num, best_lap):
+        start_dt = _parse_iso(best_lap["date_start"])
+        if not start_dt:
+            return []
+        end_dt = start_dt + timedelta(seconds=best_lap["lap_duration"] + 2)
+        data = await fetch_openf1("car_data", {
+            "session_key": session_key,
+            "driver_number": driver_num,
+            "date>": best_lap["date_start"],
+            "date<": end_dt.isoformat(),
+        })
+        if not data:
+            return []
+        # Build telemetry points with normalized distance (0-100%)
+        total = len(data)
+        points = []
+        for i, d in enumerate(data):
+            points.append({
+                "pct": round(i / max(total - 1, 1) * 100, 1),
+                "speed": d.get("speed", 0),
+                "throttle": d.get("throttle", 0),
+                "brake": d.get("brake", 0),
+                "gear": d.get("n_gear", 0),
+                "rpm": d.get("rpm", 0),
+                "drs": d.get("drs", 0),
+            })
+        return _downsample(points)
+
+    tel1, tel2 = await asyncio.gather(
+        get_car_data(driver1, best1),
+        get_car_data(driver2, best2),
+    )
+
+    if not tel1 and not tel2:
+        return {"error": "no_car_data"}
+
+    # Build speed delta (driver2 baseline, positive = driver1 faster)
+    delta_points = []
+    if tel1 and tel2:
+        len_min = min(len(tel1), len(tel2))
+        for i in range(len_min):
+            delta_points.append({
+                "pct": tel1[i]["pct"],
+                "delta_speed": tel1[i]["speed"] - tel2[i]["speed"],
+            })
+
+    result = {
+        "driver1": enrich_driver(driver1, {
+            "best_lap": best1["lap_duration"],
+            "lap_number": best1["lap_number"],
+            "sectors": [best1.get("duration_sector_1"), best1.get("duration_sector_2"), best1.get("duration_sector_3")],
+            "telemetry": tel1,
+        }, season=_season),
+        "driver2": enrich_driver(driver2, {
+            "best_lap": best2["lap_duration"],
+            "lap_number": best2["lap_number"],
+            "sectors": [best2.get("duration_sector_1"), best2.get("duration_sector_2"), best2.get("duration_sector_3")],
+            "telemetry": tel2,
+        }, season=_season),
+        "delta": round(best1["lap_duration"] - best2["lap_duration"], 3),
+        "speed_delta": delta_points,
+    }
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ STRATEGY PREDICTION ============
+
+TYRE_WEAR_RATES = {
+    "SOFT": 0.045,
+    "MEDIUM": 0.030,
+    "HARD": 0.020,
+}
+PIT_STOP_LOSS = 22  # seconds
+
+
+def _simulate_strategy(total_laps: int, stints: list, num_stops: int, base_lap: float = 90.0) -> float:
+    """Simulate total race time for a strategy."""
+    total = num_stops * PIT_STOP_LOSS
+    for compound, start, end in stints:
+        wear_rate = TYRE_WEAR_RATES.get(compound, 0.030)
+        for lap in range(start, end + 1):
+            lap_in_stint = lap - start + 1
+            degradation = wear_rate * lap_in_stint
+            total += base_lap + degradation
+    return round(total, 1)
+
+
+async def get_strategy_prediction(session_key: str, driver_number: int = None) -> Dict[str, Any]:
+    """Calculate optimal pit stop strategies."""
+    cache_key = f"strategy_prediction:{session_key}"
+    cached = cache_get(cache_key, ttl_override=600)
+    if cached:
+        return cached
+
+    # Get session data to determine total laps and base lap time
+    laps_raw, stints_raw = await asyncio.gather(
+        fetch_openf1("laps", {"session_key": session_key}),
+        fetch_openf1("stints", {"session_key": session_key}),
+    )
+
+    # Total laps
+    total_laps = 50  # default
+    if laps_raw:
+        all_laps = [l.get("lap_number", 0) for l in laps_raw if l.get("lap_number")]
+        if all_laps:
+            total_laps = max(all_laps)
+
+    # Estimate base lap time from median
+    base_lap = 90.0
+    if laps_raw:
+        valid_times = sorted(l["lap_duration"] for l in laps_raw
+                             if l.get("lap_duration") and l.get("lap_number", 0) > 1)
+        if valid_times:
+            base_lap = valid_times[len(valid_times) // 2]
+
+    # Calculate actual wear rates from real data if available
+    actual_wear = dict(TYRE_WEAR_RATES)  # copy defaults
+    if stints_raw and laps_raw:
+        compound_deltas = {}
+        # Group laps by driver+stint
+        driver_stints = {}
+        for s in stints_raw:
+            dn = s.get("driver_number")
+            if dn is not None:
+                driver_stints.setdefault(dn, []).append(s)
+
+        for dn, stints_list in driver_stints.items():
+            for stint in stints_list:
+                compound = stint.get("compound", "UNKNOWN")
+                ls = stint.get("lap_start", 0)
+                le = stint.get("lap_end")
+                if not le or compound == "UNKNOWN":
+                    continue
+                stint_laps = [l for l in laps_raw
+                              if l.get("driver_number") == dn
+                              and l.get("lap_duration")
+                              and ls <= l.get("lap_number", 0) <= le
+                              and not l.get("is_pit_out_lap")]
+                if len(stint_laps) >= 4:
+                    times = sorted(l["lap_duration"] for l in stint_laps)
+                    # Remove outliers (>110% of median)
+                    median = times[len(times) // 2]
+                    clean = [t for t in times if t <= median * 1.10]
+                    if len(clean) >= 3:
+                        # Simple slope: (last - first) / n
+                        slope = (clean[-1] - clean[0]) / max(len(clean) - 1, 1)
+                        compound_deltas.setdefault(compound, []).append(max(0.005, slope))
+
+        for compound, rates in compound_deltas.items():
+            if rates:
+                actual_wear[compound] = round(sum(rates) / len(rates), 4)
+
+    # Simulate 1-stop strategies
+    strategies = []
+    one_stop_combos = [("MEDIUM", "HARD"), ("HARD", "MEDIUM"), ("SOFT", "HARD"), ("SOFT", "MEDIUM")]
+    for c1, c2 in one_stop_combos:
+        best_time = float('inf')
+        best_pit = 0
+        for pit_lap in range(max(5, int(total_laps * 0.25)), int(total_laps * 0.75), 2):
+            t = _simulate_strategy(total_laps, [(c1, 1, pit_lap), (c2, pit_lap + 1, total_laps)], 1, base_lap)
+            if t < best_time:
+                best_time = t
+                best_pit = pit_lap
+        strategies.append({
+            "stops": 1,
+            "stints": [
+                {"compound": c1, "start": 1, "end": best_pit, "laps": best_pit},
+                {"compound": c2, "start": best_pit + 1, "end": total_laps, "laps": total_laps - best_pit},
+            ],
+            "total_time": best_time,
+            "pit_laps": [best_pit],
+        })
+
+    # Simulate 2-stop strategies
+    two_stop_combos = [("SOFT", "MEDIUM", "HARD"), ("SOFT", "HARD", "MEDIUM"),
+                        ("MEDIUM", "MEDIUM", "HARD"), ("SOFT", "SOFT", "MEDIUM")]
+    for c1, c2, c3 in two_stop_combos:
+        best_time = float('inf')
+        best_p1, best_p2 = 0, 0
+        for p1 in range(max(5, int(total_laps * 0.15)), int(total_laps * 0.45), 3):
+            for p2 in range(p1 + 5, int(total_laps * 0.80), 3):
+                t = _simulate_strategy(total_laps, [(c1, 1, p1), (c2, p1 + 1, p2), (c3, p2 + 1, total_laps)], 2, base_lap)
+                if t < best_time:
+                    best_time = t
+                    best_p1 = p1
+                    best_p2 = p2
+        strategies.append({
+            "stops": 2,
+            "stints": [
+                {"compound": c1, "start": 1, "end": best_p1, "laps": best_p1},
+                {"compound": c2, "start": best_p1 + 1, "end": best_p2, "laps": best_p2 - best_p1},
+                {"compound": c3, "start": best_p2 + 1, "end": total_laps, "laps": total_laps - best_p2},
+            ],
+            "total_time": best_time,
+            "pit_laps": [best_p1, best_p2],
+        })
+
+    # Sort and pick top 5
+    strategies.sort(key=lambda s: s["total_time"])
+    top = strategies[:5]
+    if top:
+        top[0]["optimal"] = True
+        best_time = top[0]["total_time"]
+        for s in top:
+            s["delta"] = round(s["total_time"] - best_time, 1)
+
+    result = {
+        "total_laps": total_laps,
+        "pit_loss": PIT_STOP_LOSS,
+        "base_lap": round(base_lap, 3),
+        "wear_rates": actual_wear,
+        "strategies": top,
+    }
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ WEATHER RADAR ============
+
+def _lat_lon_to_tile(lat: float, lon: float, zoom: int) -> Tuple[int, int]:
+    """Convert lat/lon to tile coordinates."""
+    import math
+    n = 2 ** zoom
+    x = int((lon + 180) / 360 * n)
+    lat_rad = math.radians(lat)
+    y = int((1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2 * n)
+    return x, y
+
+
+async def get_weather_radar(session_key: str) -> Dict[str, Any]:
+    """Get rain radar data for current circuit using RainViewer API."""
+    cache_key = f"weather_radar:{session_key}"
+    cached = cache_get(cache_key, ttl_override=120)
+    if cached:
+        return cached
+
+    # Get session info to find circuit
+    sessions = await fetch_openf1("sessions", {"session_key": session_key})
+    if not sessions:
+        return {"error": "no_session"}
+
+    session_info = sessions[0] if isinstance(sessions, list) else sessions
+    circuit_name = session_info.get("circuit_short_name", "")
+
+    # Find coordinates from CIRCUITS config
+    lat, lon = 0.0, 0.0
+    # Try matching circuit_short_name to our CIRCUITS dict
+    circuit_key_lower = circuit_name.lower().replace(" ", "_")
+    for key, coords in CIRCUITS.items():
+        if key == circuit_key_lower or circuit_name.lower() in key or key in circuit_name.lower():
+            lat = coords.get("lat", 0)
+            lon = coords.get("lon", 0)
+            break
+
+    if not lat:
+        # Fallback: try circuit_key from session
+        ck = session_info.get("circuit_key", "")
+        for key, coords in CIRCUITS.items():
+            if str(ck) in key:
+                lat = coords.get("lat", 0)
+                lon = coords.get("lon", 0)
+                break
+
+    if not lat:
+        return {"error": "no_coordinates", "circuit": circuit_name}
+
+    # Fetch RainViewer radar tiles
+    client = get_client()
+    try:
+        rv_resp = await client.get("https://api.rainviewer.com/public/weather-maps.json", timeout=5.0)
+        if rv_resp.status_code != 200:
+            return {"error": "rainviewer_unavailable"}
+        rv_data = rv_resp.json()
+    except Exception as e:
+        logger.warning(f"RainViewer API error: {e}")
+        return {"error": "rainviewer_unavailable"}
+
+    # Build tile URLs
+    zoom = 8
+    tile_x, tile_y = _lat_lon_to_tile(lat, lon, zoom)
+
+    past_frames = rv_data.get("radar", {}).get("past", [])[-3:]
+    forecast_frames = rv_data.get("radar", {}).get("nowcast", [])[:3]
+
+    frames = []
+    for frame in past_frames:
+        frames.append({
+            "timestamp": frame["time"],
+            "url": f"https://tilecache.rainviewer.com{frame['path']}/256/{zoom}/{tile_x}/{tile_y}/2/1_1.png",
+            "is_forecast": False,
+        })
+    for frame in forecast_frames:
+        frames.append({
+            "timestamp": frame["time"],
+            "url": f"https://tilecache.rainviewer.com{frame['path']}/256/{zoom}/{tile_x}/{tile_y}/2/1_1.png",
+            "is_forecast": True,
+        })
+
+    # Current weather from OpenF1
+    weather = await fetch_openf1("weather", {"session_key": session_key})
+    latest = weather[-1] if weather else {}
+
+    humidity = latest.get("humidity", 0) or 0
+    rainfall = latest.get("rainfall", 0) or 0
+    rain_probability = "low"
+    if rainfall > 0:
+        rain_probability = "raining"
+    elif humidity > 80:
+        rain_probability = "high"
+    elif humidity > 60:
+        rain_probability = "medium"
+
+    result = {
+        "circuit": circuit_name,
+        "lat": lat,
+        "lon": lon,
+        "frames": frames,
+        "rain_probability": rain_probability,
+        "weather": {
+            "temperature": latest.get("air_temperature"),
+            "humidity": humidity,
+            "wind_speed": latest.get("wind_speed"),
+            "wind_direction": latest.get("wind_direction"),
+            "rainfall": rainfall,
+        },
+    }
+    cache_set(cache_key, result)
+    return result

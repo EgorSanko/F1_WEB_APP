@@ -47,6 +47,9 @@ CACHE_TTL = {
     "track_outline": 3600,      # 1 hour — track shape doesn't change
     "demo_sessions": 3600,      # 1 hour — list of available demo sessions
     "radio_transcript": 86400,  # 24 hours — transcriptions don't change
+    "telemetry_comparison": 300,  # 5 min — best lap comparison
+    "strategy_prediction": 600,   # 10 min — strategy simulation
+    "weather_radar": 120,         # 2 min — radar updates every 5 min
 }
 
 # ============ GAME SETTINGS ============

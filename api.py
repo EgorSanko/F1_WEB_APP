@@ -865,6 +865,26 @@ async def analytics_degradation(session_key: str = "latest", drivers: str = ""):
     return await f1_data.get_live_tyre_degradation(session_key, driver_numbers)
 
 
+@app.get("/api/analytics/telemetry")
+async def analytics_telemetry(session_key: str = "latest", driver1: int = 0, driver2: int = 0):
+    """Telemetry comparison of two drivers' best laps."""
+    if not driver1 or not driver2:
+        return {"error": "specify driver1 and driver2"}
+    return await f1_data.get_telemetry_comparison(session_key, driver1, driver2)
+
+
+@app.get("/api/analytics/strategy-prediction")
+async def analytics_strategy_prediction(session_key: str = "latest"):
+    """AI strategy prediction with optimal pit windows."""
+    return await f1_data.get_strategy_prediction(session_key)
+
+
+@app.get("/api/analytics/weather-radar")
+async def analytics_weather_radar(session_key: str = "latest"):
+    """Weather radar with rain overlay tiles."""
+    return await f1_data.get_weather_radar(session_key)
+
+
 @app.get("/api/live/track-map")
 async def live_track_map():
     """Live track map: track outline + car positions."""
