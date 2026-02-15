@@ -2082,21 +2082,47 @@
                     <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>← Расписание</button>
 
                     {/* Race header */}
-                    <div className="gradient-card" style={{marginBottom:16,minHeight:120}}>
-                        {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
-                        <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
+                    <div className="gradient-card" style={{marginBottom:16,minHeight:120,background:race.circuit_image?`linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.85)), url(${race.circuit_image})`:'var(--f1-card)',backgroundSize:'cover',backgroundPosition:'center'}}>
                         <div style={{position:'relative',zIndex:1}}>
                             <div style={{display:'flex',alignItems:'center',gap:10}}>
                                 {race.country_code ? <FlagImg code={race.country_code} size={32}/> : <span style={{fontSize:36}}>{flag}</span>}
                                 <div>
                                     <div style={{fontSize:20,fontWeight:900}}>{race.name}</div>
-                                    <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{race.circuit_name} · Раунд {race.round}</div>
-                                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>{dateStr} · {race.laps} кругов</div>
+                                    <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{race.circuit_name || race.circuit} · Раунд {race.round}</div>
+                                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>{dateStr}{race.laps ? ` · ${race.laps} кругов` : ''}</div>
                                 </div>
                             </div>
                             {race.sprint && <div style={{marginTop:8,display:'inline-block',background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6}}>Спринт-уикенд</div>}
                         </div>
                     </div>
+
+                    {/* Sessions schedule (for future races) */}
+                    {race.sessions && !race.podium && (() => {
+                        const sessionNames = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
+                        const sessionOrder = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
+                        const entries = typeof race.sessions === 'object' && !Array.isArray(race.sessions) ? Object.entries(race.sessions).sort((a,b)=>sessionOrder.indexOf(a[0])-sessionOrder.indexOf(b[0])) : [];
+                        if (!entries.length) return null;
+                        return (
+                            <div className="card" style={{padding:'16px 12px',marginBottom:16}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📅 Расписание сессий</div>
+                                {entries.map(([key,val],i) => {
+                                    const dt = val.date ? new Date(val.date+'T'+(val.time||'00:00:00').replace('Z','')) : null;
+                                    const msk = dt ? new Date(dt.getTime() + 3*3600000) : null;
+                                    const dayStr = msk ? msk.toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'}) : '';
+                                    const timeStr = msk ? msk.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
+                                    return (
+                                        <div key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:i<entries.length-1?'1px solid var(--f1-border)':'none'}}>
+                                            <span style={{fontSize:13,fontWeight:key==='race'?700:400,color:key==='race'?'var(--f1-red)':'var(--f1-text)'}}>{sessionNames[key]||key}</span>
+                                            <div style={{textAlign:'right'}}>
+                                                <div style={{fontSize:12,color:'var(--f1-text-secondary)'}}>{dayStr}</div>
+                                                {timeStr && <div style={{fontSize:13,fontWeight:600}}>{timeStr} МСК</div>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
 
                     {/* Spoiler reveal button */}
                     {isSpoilerHidden && (
@@ -2301,7 +2327,7 @@
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
                     case 'news': return <NewsPage/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
-                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races}/>;
+                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
