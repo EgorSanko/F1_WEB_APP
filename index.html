@@ -92,7 +92,8 @@
         .fade-in { animation:fadeIn 0.35s ease-out; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-        .page-container { height:100dvh; padding-bottom:120px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .page-container { height:100dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .page-container:not(.flex-layout)::after { content:''; display:block; height:80px; flex-shrink:0; }
 
         .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }
         .standings-row:active { background:var(--f1-card-hover); }
@@ -1234,6 +1235,12 @@
                                         )}
                                     </>)}
                                 </div>
+                                {isPast && !shouldHide && (
+                                    <div style={{display:'flex',gap:6,marginTop:8}} onClick={e=>e.stopPropagation()}>
+                                        <button onClick={()=>onRaceClick(race.round,'race')} style={{flex:1,padding:'6px 0',borderRadius:8,border:'none',fontFamily:'inherit',fontWeight:600,fontSize:11,cursor:'pointer',background:'rgba(225,6,0,0.12)',color:'var(--f1-red)'}}>🏁 Результаты</button>
+                                        <button onClick={()=>onRaceClick(race.round,'qualifying')} style={{flex:1,padding:'6px 0',borderRadius:8,border:'none',fontFamily:'inherit',fontWeight:600,fontSize:11,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-secondary)'}}>⏱️ Квали</button>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -1358,7 +1365,7 @@
             const largePhoto = (url) => url ? url.replace('/2col/','/4col/').replace('/1col/','/4col/') : null;
 
             return (
-                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
+                <div className="page-container fade-in flex-layout" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         {ptr.indicatorEl}
@@ -1814,7 +1821,10 @@
                                 {leaderboard.leaderboard.slice(0,20).map((entry,i)=>(
                                     <div key={entry.user_id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',borderBottom:'1px solid var(--f1-border)',background:entry.user_id===user.user_id?'rgba(225,6,0,0.08)':'transparent'}}>
                                         <div style={{width:28,fontWeight:900,fontSize:14,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{entry.rank}</div>
-                                        <div style={{width:36,height:36,borderRadius:'50%',background:i<3?`linear-gradient(135deg,${['#FFD700','#C0C0C0','#CD7F32'][i]}33,var(--f1-gray))`:'var(--f1-gray)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14}}>{entry.first_name?.[0]||'?'}</div>
+                                        {entry.photo_url ? (
+                                            <img src={entry.photo_url} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',border:i<3?`2px solid ${['#FFD700','#C0C0C0','#CD7F32'][i]}`:'2px solid transparent'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
+                                        ) : null}
+                                        <div style={{width:36,height:36,borderRadius:'50%',background:i<3?`linear-gradient(135deg,${['#FFD700','#C0C0C0','#CD7F32'][i]}33,var(--f1-gray))`:'var(--f1-gray)',display:entry.photo_url?'none':'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14,color:'rgba(255,255,255,0.5)'}}>{(entry.first_name||entry.username||'?')[0].toUpperCase()}</div>
                                         <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{entry.first_name}</div>{entry.username&&<div style={{fontSize:11,color:'var(--f1-text-muted)'}}>@{entry.username}</div>}</div>
                                         <div style={{fontWeight:900,fontSize:16,fontVariantNumeric:'tabular-nums'}}>{entry.total_points}</div>
                                     </div>
@@ -2203,7 +2213,7 @@
             }, [aTab, weatherRadar]);
 
             return (
-                <div className="page-container fade-in" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
+                <div className="page-container fade-in flex-layout" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         <h2 style={{fontSize:22,fontWeight:900,marginBottom:12}}>Аналитика</h2>
@@ -2640,17 +2650,19 @@
         };
 
         // ==== RACE DETAIL PAGE ====
-        const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces}) => {
+        const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab}) => {
             const [tyreData, setTyreData] = useState(null);
             const [tyreLoading, setTyreLoading] = useState(false);
             const [revealed, setRevealed] = useState(false);
             const [qualiData, setQualiData] = useState(null);
             const [qualiSegment, setQualiSegment] = useState('q3');
+            const [raceTab, setRaceTab] = useState(defaultTab || 'race');
             const isPastRace = race && race.date && new Date(race.date) < new Date();
             useEffect(() => {
                 setRevealed(false);
                 setTyreData(null);
                 setQualiData(null);
+                setRaceTab(defaultTab || 'race');
                 if (race?.round && isPastRace) {
                     setTyreLoading(true);
                     api.get(`/api/race/${race.round}/tyres`).then(d => {
@@ -2695,6 +2707,17 @@
                         </div>
                     </div>
 
+                    {/* Race/Qualifying tabs for past races */}
+                    {isPastRace && (
+                        <div style={{display:'flex',gap:6,marginBottom:16}}>
+                            {['race','qualifying'].map(t=>(
+                                <button key={t} onClick={()=>setRaceTab(t)} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
+                                    {t==='race'?'🏁 Гонка':'⏱️ Квалификация'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Sessions schedule (for future races) */}
                     {race.sessions && !race.podium && (() => {
                         const sessionNames = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
@@ -2732,6 +2755,7 @@
                         </div>
                     )}
 
+                    {raceTab === 'race' && (<>
                     {/* Podium */}
                     {race.podium?.length >= 3 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16, position:'relative', overflow:'hidden'}}>
@@ -2800,8 +2824,10 @@
                         </div>
                     )}
 
+                    </>)}
+
                     {/* Qualifying Results */}
-                    {qualiData?.results?.length > 0 && (
+                    {raceTab === 'qualifying' && qualiData?.results?.length > 0 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
                             <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>КВАЛИФИКАЦИЯ · {qualiData.race_name || ''}</div>
@@ -2850,6 +2876,14 @@
                         </div>
                     )}
 
+                    {raceTab === 'qualifying' && (!qualiData || !qualiData.results?.length) && (
+                        <div className="card" style={{padding:'30px 20px',marginBottom:16,textAlign:'center'}}>
+                            <div style={{fontSize:36,marginBottom:8}}>⏱️</div>
+                            <div style={{fontSize:14,fontWeight:600,color:'var(--f1-text-muted)'}}>Нет данных квалификации</div>
+                        </div>
+                    )}
+
+                    {raceTab === 'race' && (<>
                     {/* Tyre Strategy */}
                     {tyreLoading && (
                         <div style={{padding:'20px 12px', marginBottom:16, textAlign:'center'}}>
@@ -2888,6 +2922,7 @@
                             {race.vk_url ? '📺 Смотреть запись гонки' : '🔍 Найти трансляцию на VK'}
                         </button>
                     )}
+                    </>)}
                 </div>
             );
         };
@@ -2911,6 +2946,7 @@
             const [streams, setStreams] = useState(null);
             const [seasonResults, setSeasonResults] = useState(null);
             const [selectedRound, setSelectedRound] = useState(null);
+            const [raceDetailTab, setRaceDetailTab] = useState('race');
             const [selectedArticle, setSelectedArticle] = useState(null);
             const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
             const isLive = session?.is_live;
@@ -2977,12 +3013,12 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
                     case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
                     case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
-                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
-                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races}/>;
+                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
+                    case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
