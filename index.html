@@ -845,8 +845,54 @@
             );
         };
 
+        // ==== ARTICLE PAGE ====
+        const ArticlePage = ({ articleUrl, onBack }) => {
+            const [article, setArticle] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                if (!articleUrl) return;
+                api.get('/api/news/article?url=' + encodeURIComponent(articleUrl))
+                    .then(d => { setArticle(d); setLoading(false); })
+                    .catch(() => setLoading(false));
+            }, [articleUrl]);
+
+            if (loading) return <div className="page-container fade-in" style={{padding:16}}><div style={{height:200,borderRadius:12,background:'var(--f1-card)',marginBottom:16}}/><CardSkeleton/><div style={{height:12}}/><CardSkeleton/></div>;
+            if (!article || article.error) return (
+                <div className="page-container fade-in" style={{padding:20,textAlign:'center'}}>
+                    <div style={{fontSize:48,marginBottom:12}}>😕</div>
+                    <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Не удалось загрузить статью</div>
+                    <button className="btn-primary" onClick={()=>openLink(articleUrl)}>Открыть на сайте ↗</button>
+                </div>
+            );
+
+            const fmtDate = article.date ? new Date(article.date).toLocaleDateString('ru-RU', {day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : '';
+
+            return (
+                <div className="page-container fade-in" style={{paddingBottom:80}}>
+                    {article.image && <img src={article.image} style={{width:'100%',maxHeight:250,objectFit:'cover',borderRadius:'0 0 12px 12px'}} onError={e=>{e.target.style.display='none'}}/>}
+                    <div style={{padding:'16px 16px 0'}}>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginBottom:8}}>{article.source} · {fmtDate}</div>
+                        <h1 style={{fontSize:22,fontWeight:800,lineHeight:1.3,margin:'0 0 16px 0'}}>{article.title}</h1>
+                        <div style={{fontSize:15,lineHeight:1.7,color:'rgba(255,255,255,0.85)'}}>
+                            {article.paragraphs?.map((p,i) => (
+                                <p key={i} style={{margin:'0 0 14px 0'}} dangerouslySetInnerHTML={{__html:p}}/>
+                            ))}
+                        </div>
+                        {article.quotes?.length > 0 && article.quotes.map((q,i) => (
+                            <div key={'q'+i} style={{borderLeft:'3px solid var(--f1-red)',padding:'8px 14px',margin:'12px 0',background:'rgba(255,255,255,0.03)',borderRadius:'0 8px 8px 0',fontSize:14,fontStyle:'italic',color:'rgba(255,255,255,0.7)',lineHeight:1.6}}>{q}</div>
+                        ))}
+                        <div style={{marginTop:24,padding:16,background:'rgba(255,255,255,0.05)',borderRadius:12,textAlign:'center'}}>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:8}}>Источник</div>
+                            <a href={article.source_url} onClick={e=>{e.preventDefault();openLink(article.source_url);}} style={{color:'var(--f1-red)',fontSize:14,fontWeight:600,textDecoration:'none'}}>Открыть на championat.com ↗</a>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // ==== NEWS PAGE ====
-        const NewsPage = () => {
+        const NewsPage = ({ onArticleClick }) => {
             const [news, setNews] = useState(null);
             const [loading, setLoading] = useState(true);
             useEffect(() => { api.get('/api/news').then(d => { setNews(d); setLoading(false); }); }, []);
@@ -863,7 +909,7 @@
 
                     {news?.posts?.length > 0 ? (
                         news.posts.map((post,i) => (
-                            <div key={i} className="news-card" onClick={()=>post.url && openLink(post.url)}>
+                            <div key={i} className="news-card" onClick={()=>{if(post.url && onArticleClick) onArticleClick(post.url); else if(post.url) openLink(post.url);}}>
                                 {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                 <div className="news-card-body">
                                     {post.title && <div className="news-card-title">{post.title}</div>}
@@ -2256,6 +2302,7 @@
             const [streams, setStreams] = useState(null);
             const [seasonResults, setSeasonResults] = useState(null);
             const [selectedRound, setSelectedRound] = useState(null);
+            const [selectedArticle, setSelectedArticle] = useState(null);
             const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
             const isLive = session?.is_live;
             const toggleSpoiler = () => { const v = !spoilerFree; setSpoilerFree(v); localStorage.setItem('f1hub_spoiler_free', String(v)); };
@@ -2287,7 +2334,12 @@
 
             useEffect(() => {
                 if (!tg) return;
-                if (tab === 'raceDetail') {
+                if (tab === 'article') {
+                    tg.BackButton?.show();
+                    const h = () => { setSelectedArticle(null); setTab('news'); };
+                    tg.BackButton?.onClick(h);
+                    return () => tg.BackButton?.offClick(h);
+                } else if (tab === 'raceDetail') {
                     tg.BackButton?.show();
                     const h = () => setTab('schedule');
                     tg.BackButton?.onClick(h);
@@ -2319,7 +2371,8 @@
                 switch(tab) {
                     case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
-                    case 'news': return <NewsPage/>;
+                    case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
+                    case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason}/>;

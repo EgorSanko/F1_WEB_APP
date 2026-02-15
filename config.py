@@ -50,6 +50,7 @@ CACHE_TTL = {
     "telemetry_comparison": 300,  # 5 min — best lap comparison
     "strategy_prediction": 600,   # 10 min — strategy simulation
     "weather_radar": 120,         # 2 min — radar updates every 5 min
+    "article": 3600,              # 1 hour — articles don't change
 }
 
 # ============ GAME SETTINGS ============

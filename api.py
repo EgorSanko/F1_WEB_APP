@@ -747,6 +747,112 @@ async def get_news():
     return response
 
 
+@app.get("/api/news/article")
+async def get_article(url: str):
+    """Parse full article text from championat.com."""
+    if not url:
+        return {"error": "no_url"}
+
+    cache_key = f"article:{url}"
+    cached = f1_data.cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        client = f1_data.get_client()
+        resp = await client.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=10.0,
+            follow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return {"error": "not_found"}
+
+        html = resp.text
+
+        # Title
+        title_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
+        title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip() if title_match else ""
+
+        # Date
+        date_match = re.search(r'<time[^>]*datetime="([^"]*)"', html)
+        date = date_match.group(1) if date_match else ""
+
+        # OG image
+        og_image = re.search(r'<meta property="og:image" content="([^"]*)"', html)
+        image = og_image.group(1) if og_image else ""
+
+        # Article content — extract from article-content div with proper nesting
+        content_html = ""
+        for marker in ["article-content", "article__content", "content__body"]:
+            start = html.find(marker)
+            if start < 0:
+                continue
+            # Find the > that closes the opening tag
+            tag_end = html.find(">", start)
+            if tag_end < 0:
+                continue
+            pos = tag_end + 1
+            depth = 1
+            while depth > 0 and pos < len(html):
+                next_open = html.find("<div", pos)
+                next_close = html.find("</div>", pos)
+                if next_close == -1:
+                    break
+                if next_open != -1 and next_open < next_close:
+                    depth += 1
+                    pos = next_open + 4
+                else:
+                    depth -= 1
+                    if depth == 0:
+                        content_html = html[tag_end + 1:next_close]
+                    pos = next_close + 6
+            if content_html:
+                break
+
+        if not content_html:
+            # Fallback: collect all meaningful <p> tags
+            paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+            paragraphs = [p for p in paragraphs if len(re.sub(r'<[^>]+>', '', p).strip()) > 50]
+            content_html = '\n'.join(f'<p>{p}</p>' for p in paragraphs[:30])
+
+        # Clean: remove scripts, styles, ads, iframes
+        for tag in ['script', 'style', 'iframe']:
+            content_html = re.sub(rf'<{tag}[^>]*>.*?</{tag}>', '', content_html, flags=re.DOTALL)
+        for cls in ['banner', 'advert', 'promo', 'related']:
+            content_html = re.sub(rf'<div[^>]*class="[^"]*{cls}[^"]*"[^>]*>.*?</div>', '', content_html, flags=re.DOTALL)
+
+        # Extract clean paragraphs
+        raw_paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', content_html, re.DOTALL)
+        clean_paragraphs = []
+        for p in raw_paragraphs:
+            text = re.sub(r'<(?!/?(?:strong|em|b|i|a)\b)[^>]+>', '', p).strip()
+            if text and len(text) > 10:
+                clean_paragraphs.append(text)
+
+        # Also extract blockquotes
+        quotes = re.findall(r'<blockquote[^>]*>(.*?)</blockquote>', content_html, re.DOTALL)
+        clean_quotes = [re.sub(r'<[^>]+>', '', q).strip() for q in quotes if len(re.sub(r'<[^>]+>', '', q).strip()) > 10]
+
+        result = {
+            "title": title,
+            "date": date,
+            "image": image,
+            "paragraphs": clean_paragraphs,
+            "quotes": clean_quotes,
+            "source_url": url,
+            "source": "championat.com",
+        }
+
+        f1_data.cache_set(cache_key, result)
+        return result
+
+    except Exception as e:
+        logger.error(f"Article parse error: {e}")
+        return {"error": str(e)}
+
+
 # ============ STREAMS (from VK Video) ============
 
 @app.get("/api/streams")
