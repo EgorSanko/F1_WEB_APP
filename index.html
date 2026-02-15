@@ -103,7 +103,7 @@
         .tab-switch-btn.active { background:var(--f1-red); color:white; }
 
         .live-row {
-            display:grid; grid-template-columns:30px 5px 1fr 80px 26px 50px 22px;
+            display:grid; grid-template-columns:30px 5px 28px 1fr 70px 26px 46px 22px;
             align-items:center; gap:6px; padding:8px 12px;
             border-bottom:1px solid var(--f1-border); font-variant-numeric:tabular-nums;
             transition:background 0.3s; min-height:48px;
@@ -375,13 +375,12 @@
                                 </div>
                                 <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
                                     {pastRaces.map((race, ri) => {
-                                        const flag = countryFlag(race.country_code) || circuitFlags[race.circuit_id] || '🏁';
                                         const isLastRace = spoilerFree && ri === 0;
                                         return (
                                             <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url || race.vk_search_url)} style={{minWidth:200}}>
                                                 <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${isLastRace?'var(--f1-red)':race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                                                     {isLastRace ? <div style={{fontSize:36}}>🔒</div> : race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                                    <div style={{position:'absolute',top:8,left:8,fontSize:20}}>{flag}</div>
+                                                    <div style={{position:'absolute',top:8,left:8}}>{race.country_code ? <FlagImg code={race.country_code} size={24}/> : <span style={{fontSize:20}}>{circuitFlags[race.circuit_id]||'🏁'}</span>}</div>
                                                     <div style={{position:'absolute',top:8,right:8,background:'rgba(0,119,255,0.9)',color:'#fff',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:4}}>VK</div>
                                                 </div>
                                                 <div style={{padding:'10px 12px'}}>
@@ -597,28 +596,32 @@
 
             return (
                 <div className="page-container fade-in" style={{padding:0}}>
-                    <div style={{padding:'10px 16px 0',position:'relative'}}>
+                    <div style={{padding:'10px 16px 0'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
                             {isLive && <span className="live-dot"/>}
                             <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,color:isLive?'var(--f1-red)':session?.is_demo?'#FFA500':'var(--f1-text-muted)'}}>{isLive?'LIVE':session?.is_demo?'ДЕМО':'Последняя сессия'}</span>
-                            {timing?.session_best?.lap && <span style={{fontSize:11,color:'#A020F0',fontWeight:700,marginLeft:'auto'}}>Лучший: {fmtLap(timing.session_best.lap)}</span>}
+                            <div style={{marginLeft:'auto'}}>
+                                {onChange && <button onClick={()=>onChange('analytics')} style={{background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'5px 10px',color:'var(--f1-text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4}}>
+                                    <span style={{width:14,height:14,display:'inline-flex'}}>{NavIcons.analytics}</span> Аналитика
+                                </button>}
+                            </div>
                         </div>
                         <h2 style={{fontSize:18,fontWeight:900,lineHeight:1.2}}>{session.meeting_name || 'Гран-при'}</h2>
                         <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginBottom:4}}>{session.session_name || session.session_type || ''} · {session.circuit_short_name}</div>
-                        {onChange && <button onClick={()=>onChange('analytics')} style={{position:'absolute',top:10,right:16,background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',borderRadius:8,padding:'5px 10px',color:'var(--f1-text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:4}}>
-                            <span style={{width:14,height:14,display:'inline-flex'}}>{NavIcons.analytics}</span> Аналитика
-                        </button>}
                     </div>
 
                     <DemoBanner session={session} onPickSession={()=>setShowDemoPicker(true)}/>
                     <DemoSessionPicker show={showDemoPicker} onClose={()=>setShowDemoPicker(false)} onSelect={()=>{}}/>
 
-                    {weather?.weather && (
+                    {(weather?.weather || timing?.session_best?.lap) && (
                         <div className="weather-strip">
-                            <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'🌧️':'☀️'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'—'}°C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>🏁</span><span>Трасса </span><span className="weather-pill-val">{weather.weather.track_temperature||'—'}°C</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>💧</span><span className="weather-pill-val">{weather.weather.humidity||'—'}%</span></div>
-                            <div className="weather-pill"><span style={{fontSize:14}}>💨</span><span className="weather-pill-val">{weather.weather.wind_speed||'—'} м/с</span></div>
+                            {timing?.session_best?.lap && <div className="weather-pill" style={{background:'rgba(160,32,240,0.15)',border:'1px solid rgba(160,32,240,0.3)'}}><span style={{fontSize:14}}>⚡</span><span className="weather-pill-val" style={{color:'#A020F0'}}>{fmtLap(timing.session_best.lap)}</span></div>}
+                            {weather?.weather && <>
+                                <div className={`weather-pill ${weather.weather.is_raining?'rain-active':''}`}><span style={{fontSize:14}}>{weather.weather.is_raining?'🌧️':'☀️'}</span><span className="weather-pill-val">{weather.weather.air_temperature||'—'}°C</span></div>
+                                <div className="weather-pill"><span style={{fontSize:14}}>🏁</span><span>Трасса </span><span className="weather-pill-val">{weather.weather.track_temperature||'—'}°C</span></div>
+                                <div className="weather-pill"><span style={{fontSize:14}}>💧</span><span className="weather-pill-val">{weather.weather.humidity||'—'}%</span></div>
+                                <div className="weather-pill"><span style={{fontSize:14}}>💨</span><span className="weather-pill-val">{weather.weather.wind_speed||'—'} м/с</span></div>
+                            </>}
                         </div>
                     )}
 
@@ -646,7 +649,7 @@
                     {liveTab==='positions' && (positions?.positions?.length>0 ? (
                         <div>
                             <div className="live-row" style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5,minHeight:28,padding:'4px 12px'}}>
-                                <span>P</span><span></span><span>Пилот</span><span style={{textAlign:'center'}}>Время</span><span style={{textAlign:'center'}}>Ш</span><span style={{textAlign:'right'}}>Отст.</span><span style={{textAlign:'center'}}>🔧</span>
+                                <span>P</span><span></span><span></span><span>Пилот</span><span style={{textAlign:'center'}}>Время</span><span style={{textAlign:'center'}}>Ш</span><span style={{textAlign:'right'}}>Отст.</span><span style={{textAlign:'center'}}>🔧</span>
                             </div>
                             {positions.positions.map((p,i) => {
                                 const t = timingMap[p.driver_number]; const isExp = expandedRow===p.driver_number;
@@ -656,6 +659,7 @@
                                              style={{background:i%2===0?'transparent':`${p.team_color}08`,cursor:'pointer'}}>
                                             <PosBadge pos={p.position}/>
                                             <div style={{background:p.team_color,width:5,height:34,borderRadius:2,alignSelf:'center'}}/>
+                                            {p.photo_url ? <img src={p.photo_url} alt="" style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/> : <div style={{width:28,height:28,borderRadius:'50%',background:'rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:p.team_color,flexShrink:0}}>{(p.code||'?')[0]}</div>}
                                             <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:14,lineHeight:1.2}}>{p.code||p.name?.split(' ').pop()}</div>{t&&<SectorBar s1={t.s1_status} s2={t.s2_status} s3={t.s3_status}/>}</div>
                                             <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:t?.is_best_lap?'#A020F0':t?.is_personal_best?'#39B54A':'var(--f1-text-secondary)',fontVariantNumeric:'tabular-nums'}}>{t?fmtLap(t.lap_duration):'—'}</div>
                                             <div style={{textAlign:'center',position:'relative'}}><TyreIcon compound={p.tyre}/>{p.tyre_age>0&&<div style={{fontSize:8,color:'var(--f1-text-muted)',position:'absolute',bottom:-4,left:'50%',transform:'translateX(-50%)',fontWeight:600}}>{p.tyre_age}L</div>}</div>
@@ -903,6 +907,11 @@
             if (!code) return '';
             return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
         };
+        const FlagImg = ({code, size}) => {
+            if (!code || code.length !== 2) return null;
+            const s = size || 20;
+            return <img src={`https://flagcdn.com/${Math.round(s*2)}x${Math.round(s*1.5)}/${code.toLowerCase()}.png`} alt={code} style={{width:s,height:Math.round(s*0.75),objectFit:'cover',verticalAlign:'middle',borderRadius:2}} onError={e=>{e.target.style.display='none'}}/>;
+        };
         const toMSK = (utcTime) => {
             if (!utcTime) return '';
             const [h, m] = utcTime.replace('Z','').split(':');
@@ -947,7 +956,7 @@
                                     <div style={{width:36,height:36,borderRadius:10,background:isPast?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0,color:isPast?'var(--f1-red)':'var(--f1-text-muted)'}}>{race.round}</div>
                                     <div style={{flex:1,minWidth:0}}>
                                         <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                                            <span>{flag}</span>
+                                            {race.country_code ? <FlagImg code={race.country_code} size={20}/> : <span>{circuitFlags[race.circuit_id]||'🏁'}</span>}
                                             <span style={{fontWeight:700,fontSize:14}}>{race.name}</span>
                                             {race.sprint ? (
                                                 <span style={{background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>СПРИНТ + ГОНКА</span>
@@ -2076,7 +2085,7 @@
                         <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
                         <div style={{position:'relative',zIndex:1}}>
                             <div style={{display:'flex',alignItems:'center',gap:10}}>
-                                <span style={{fontSize:36}}>{flag}</span>
+                                {race.country_code ? <FlagImg code={race.country_code} size={32}/> : <span style={{fontSize:36}}>{flag}</span>}
                                 <div>
                                     <div style={{fontSize:20,fontWeight:900}}>{race.name}</div>
                                     <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{race.circuit_name} · Раунд {race.round}</div>
