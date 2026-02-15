@@ -307,7 +307,7 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, onChange, season, onSeasonChange, spoilerFree}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onRaceClick}) => {
             if (!nextRace && !lastRace) return (
                 <div className="page-container fade-in" style={{padding:16}}>
                     <div style={{textAlign:'center',padding:'8px 0'}}>
@@ -362,43 +362,36 @@
                         </div>
                     )}
 
-                    {/* VK Race Recordings — last 3 races */}
-                    {seasonResults?.races && (() => {
+                    {/* Upcoming races */}
+                    {schedule?.races && (() => {
                         const now = new Date();
-                        const pastRaces = seasonResults.races.filter(r => new Date(r.date) < now && (r.vk_url || r.vk_search_url)).slice(-3).reverse();
-                        if (!pastRaces.length) return null;
+                        const upcoming = schedule.races.filter(r => r.race_datetime && new Date(r.race_datetime.replace('Z','')) > now).slice(0, 5);
+                        if (!upcoming.length) return null;
                         return (
-                            <div>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10,paddingLeft:4}}>
-                                    📺 Записи гонок
+                            <div className="card" style={{padding:'16px 12px'}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
+                                    Ближайшие гонки
                                 </div>
-                                <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:10,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
-                                    {pastRaces.map((race, ri) => {
-                                        const isLastRace = spoilerFree && ri === 0;
-                                        return (
-                                            <div key={race.round} className="stream-card" onClick={()=>openLink(race.vk_url || race.vk_search_url)} style={{minWidth:200}}>
-                                                <div style={{width:'100%',height:124,background:`linear-gradient(135deg,${isLastRace?'var(--f1-red)':race.winner?.team_color||'var(--f1-red)'}33,var(--f1-card-solid))`,position:'relative',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                                                    {isLastRace ? <div style={{fontSize:36}}>🔒</div> : race.winner?.photo_url && <img src={race.winner.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',objectFit:'cover',border:`3px solid ${race.winner.team_color||'#FFD700'}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                                    <div style={{position:'absolute',top:8,left:8}}>{race.country_code ? <FlagImg code={race.country_code} size={24}/> : <span style={{fontSize:20}}>{circuitFlags[race.circuit_id]||'🏁'}</span>}</div>
-                                                    <div style={{position:'absolute',top:8,right:8,background:'rgba(0,119,255,0.9)',color:'#fff',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:4}}>VK</div>
-                                                </div>
-                                                <div style={{padding:'10px 12px'}}>
-                                                    <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.name}</div>
-                                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,display:'flex',alignItems:'center',gap:4}}>
-                                                        {isLastRace ? <span style={{color:'var(--f1-red)',fontWeight:700}}>🔒 Без спойлеров</span> : <span style={{color:'#FFD700',fontWeight:700}}>🏆 {race.winner?.code}</span>}
-                                                        <span>· R{race.round}</span>
-                                                    </div>
+                                {upcoming.map((race, i) => {
+                                    const rd = new Date(race.race_datetime.replace('Z',''));
+                                    const msk = new Date(rd.getTime() + 3*3600000);
+                                    const dateStr = msk.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+                                    const timeStr = msk.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+                                    return (
+                                        <div key={race.round} onClick={()=>onRaceClick(race.round)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:i<upcoming.length-1?'1px solid var(--f1-border)':'none',cursor:'pointer'}}>
+                                            <div style={{width:26,textAlign:'center',fontWeight:800,fontSize:13,color:'var(--f1-text-muted)'}}>{race.round}</div>
+                                            <FlagImg code={race.country_code} size={18}/>
+                                            <div style={{flex:1,minWidth:0}}>
+                                                <div style={{fontWeight:600,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.name}</div>
+                                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>
+                                                    {dateStr} · {timeStr} МСК
+                                                    {race.sprint && <span style={{color:'#FF8000',marginLeft:6,fontWeight:700}}>СПРИНТ</span>}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                    <div className="stream-card" onClick={()=>onChange('schedule')} style={{display:'flex',alignItems:'center',justifyContent:'center',minWidth:120,minHeight:160}}>
-                                        <div style={{textAlign:'center',padding:20}}>
-                                            <div style={{fontSize:28,marginBottom:8}}>📅</div>
-                                            <div style={{fontSize:12,fontWeight:600,color:'var(--f1-text-secondary)'}}>Все гонки</div>
+                                            <div style={{color:'var(--f1-text-muted)',fontSize:16}}>›</div>
                                         </div>
-                                    </div>
-                                </div>
+                                    );
+                                })}
                             </div>
                         );
                     })()}
@@ -2324,7 +2317,7 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab}/>;
                     case 'news': return <NewsPage/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round)=>{setSelectedRound(round);setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;

@@ -407,19 +407,27 @@ F1_PHOTO_CODES_2026 = {
     11: ("cadillac", "serper01"),          # Perez
 }
 
-CUSTOM_DRIVER_PHOTOS = {
-    77: "/static/drivers/77_custom.jpg",  # Bottas — custom photo
+CUSTOM_CARD_PHOTOS = {
+    77: "/static/drivers/77_custom.jpg",  # Bottas — card only
 }
 
 def get_f1_cdn_photo(driver_number, season=2026, width=200):
-    """Get driver photo URL from formula1.com CDN (face-cropped square)."""
-    if driver_number in CUSTOM_DRIVER_PHOTOS:
-        return CUSTOM_DRIVER_PHOTOS[driver_number]
+    """Get driver avatar photo URL (face-cropped square for round avatars)."""
     codes = F1_PHOTO_CODES_2026 if season == 2026 else F1_PHOTO_CODES_2025
     if driver_number not in codes:
         return ""
     team, code = codes[driver_number]
-    return f"https://media.formula1.com/image/upload/c_fill,g_face,ar_1:1,w_{width}/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
+    return f"https://media.formula1.com/image/upload/c_fill,g_north,ar_1:1,w_{width}/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
+
+def get_f1_cdn_card_photo(driver_number, season=2026):
+    """Get driver card photo (larger, may be custom)."""
+    if driver_number in CUSTOM_CARD_PHOTOS:
+        return CUSTOM_CARD_PHOTOS[driver_number]
+    codes = F1_PHOTO_CODES_2026 if season == 2026 else F1_PHOTO_CODES_2025
+    if driver_number not in codes:
+        return ""
+    team, code = codes[driver_number]
+    return f"https://media.formula1.com/image/upload/c_fill,w_400,h_300,g_north/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
 
 # ============ TEAM ASSETS (logos, car photos) ============
 TEAM_ASSETS = {
