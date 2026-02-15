@@ -3201,111 +3201,211 @@
             );
         };
 
-        const TRACKS_QUIZ = [
-            {name:'Монца',country:'🇮🇹',svg:'M35,15 L36,23 L37,30 L37,38 L38,47 L39,55 L39,61 L40,71 L41,80 L42,90 L42,95 L43,100 L43,103 L45,106 L47,106 L48,108 L48,110 L47,112 L47,114 L46,119 L45,125 L45,129 L45,136 L47,143 L49,148 L58,160 L65,164 L70,166 L78,168 L85,169 L92,169 L99,170 L105,170 L111,170 L117,171 L119,171 L121,173 L122,175 L124,176 L126,177 L129,177 L133,178 L138,180 L141,181 L146,183 L151,185 L155,185 L157,184 L161,182 L163,177 L163,173 L164,168 L164,161 L165,156 L164,152 L163,150 L160,148 L156,146 L153,144 L148,142 L144,139 L140,137 L136,135 L129,131 L124,127 L117,121 L111,116 L105,111 L100,106 L96,103 L89,97 L84,92 L79,88 L77,85 L76,82 L76,77 L74,73 L72,69 L69,65 L68,60 L67,55 L66,47 L66,40 L65,36 Z'},
-            {name:'Спа',country:'🇧🇪',svg:'M69,158 L68,160 L66,163 L64,167 L61,170 L59,174 L57,177 L56,179 L55,181 L54,184 L55,185 L56,185 L57,185 L59,184 L60,184 L62,183 L64,182 L65,181 L66,180 L67,180 L68,179 L69,179 L71,178 L73,177 L74,175 L78,173 L80,170 L83,167 L86,165 L88,162 L90,160 L93,157 L96,154 L99,151 L106,145 L108,142 L109,137 L110,134 L113,129 L116,125 L118,122 L120,119 L122,116 L124,113 L125,110 L127,107 L128,102 L129,98 L131,95 L132,92 L134,86 L135,81 L137,76 L138,72 L140,67 L141,63 L142,60 L144,56 L144,54 L145,50 L146,48 L146,46 L145,44 L144,43 L143,42 L142,41 L141,39 L142,37 L142,35 L143,33 L143,31 L143,29 L143,27 L142,25 L141,24 L140,24 L139,23 L138,22 L137,22 L136,21 L134,20 L133,18 L131,17 L128,15 Z'},
-            {name:'Сильверстоун',country:'🇬🇧',svg:'M31,15 L34,20 L40,27 L46,36 L53,46 L57,51 L61,57 L65,62 L69,67 L75,70 L78,71 L83,72 L90,72 L94,71 L101,70 L109,71 L115,73 L120,76 L125,80 L131,86 L141,94 L144,95 L148,95 L151,93 L152,91 L153,88 L153,85 L154,81 L155,79 L157,77 L160,75 L162,76 L164,78 L166,81 L167,84 L168,87 L169,89 L169,91 L169,94 L169,97 L169,100 L168,104 L167,106 L166,109 L165,111 L163,113 L161,116 L157,119 L154,121 L151,124 L148,126 L144,129 L139,133 L136,136 L127,144 L122,148 L118,152 L113,156 L109,160 L106,163 L103,165 L100,168 L96,171 L93,174 L89,177 L85,180 L79,182 L75,182 L69,181 L67,179 L65,175 L64,172 L64,168 L63,162 L58,157 L55,156 L53,157 L50,159 L48,163 L47,166 L47,169 L48,174 L50,178 L53,185 Z'},
-            {name:'Монако',country:'🇲🇨',svg:'M15,29 L16,44 L17,53 L18,58 L19,61 L20,64 L21,66 L24,69 L28,70 L33,71 L39,71 L46,72 L52,74 L59,76 L68,78 L78,79 L86,81 L95,85 L102,88 L106,89 L110,90 L113,90 L117,91 L122,91 L130,94 L133,97 L137,102 L138,105 L138,108 L136,115 L134,119 L131,123 L128,128 L127,131 L128,135 L131,140 L135,146 L140,152 L146,160 L150,165 L154,169 L158,170 L160,168 L161,165 L162,163 L163,161 L164,158 L165,154 L168,150 L171,149 L172,150 L172,152 L172,154 L171,155 L169,157 L167,159 L166,163 L168,166 L170,168 L171,168 L174,170 L178,170 L181,171 L183,169 L184,167 L185,165 L185,162 L185,160 L185,156 L184,151 L183,145 L183,138 L181,131 L178,123 L174,113 L170,105 L161,97 L150,92 L141,88 L131,82 L121,79 L113,77 L105,76 L100,76 Z'},
-            {name:'Сузука',country:'🇯🇵',svg:'M148,112 L152,107 L156,102 L159,98 L163,94 L165,91 L169,87 L171,84 L175,80 L178,76 L182,72 L184,69 L185,64 L184,60 L183,58 L181,56 L178,56 L175,58 L173,60 L171,63 L169,66 L167,69 L161,72 L158,72 L155,74 L154,76 L152,79 L151,83 L149,86 L145,87 L142,87 L135,90 L134,93 L134,97 L136,101 L136,103 L136,108 L133,110 L130,112 L126,113 L121,113 L116,113 L112,111 L106,105 L103,101 L100,98 L97,96 L93,95 L90,95 L85,95 L83,98 L83,101 L82,104 L82,106 L81,110 L80,115 L79,119 L79,123 L81,127 L82,130 L82,131 L82,133 L81,134 L80,133 L78,133 L77,130 L76,127 L74,124 L72,122 L68,118 L65,116 L57,116 L53,116 L49,117 L44,119 L39,123 L35,127 L33,131 L31,135 L29,139 L27,143 L23,144 L18,144 L15,142 Z'},
-            {name:'Интерлагос',country:'🇧🇷',svg:'M55,66 L59,51 L63,33 L67,23 L71,16 L78,16 L86,22 L96,20 L111,18 L125,28 L133,47 L138,68 L142,86 L146,101 L149,113 L153,126 L153,134 L149,140 L137,143 L126,142 L116,135 L105,120 L98,110 L92,101 L85,92 L78,88 L69,88 L59,97 L56,108 L55,114 L56,118 L58,120 L62,120 L66,118 L69,117 L73,117 L77,119 L78,125 L77,128 L75,130 L72,133 L69,137 L66,141 L63,146 L62,150 L61,153 L62,156 L68,157 L72,155 L75,150 L84,143 L101,146 L115,166 L118,173 L117,177 L113,181 L102,185 L92,185 L79,181 L65,173 L60,167 L58,163 L55,159 L53,153 L51,147 L50,140 L48,128 L47,116 L47,103 L50,86 L55,66 L59,49 L63,34 L68,21 L72,16 L76,15 L81,18 L87,22 L95,20 L107,18 L119,22 L126,29 L131,42 L135,58 Z'},
-            {name:'Баку',country:'🇦🇿',svg:'M148,96 L153,98 L159,100 L165,103 L170,105 L175,107 L178,108 L181,109 L183,110 L184,113 L185,115 L184,118 L183,121 L182,124 L180,129 L178,132 L175,139 L174,143 L172,147 L170,151 L169,153 L168,155 L167,156 L166,157 L164,157 L163,157 L161,156 L158,156 L156,155 L152,153 L149,152 L144,150 L136,147 L130,145 L124,143 L118,140 L108,136 L102,134 L93,130 L88,127 L84,126 L81,124 L76,122 L70,120 L64,117 L61,115 L57,114 L55,113 L52,111 L50,110 L49,108 L49,106 L50,104 L51,102 L52,99 L53,95 L55,91 L57,86 L59,83 L59,80 L59,77 L57,76 L54,75 L52,74 L49,73 L46,71 L42,70 L39,68 L36,67 L32,64 L29,63 L27,62 L24,60 L21,59 L19,57 L18,56 L17,54 L17,52 L17,51 L18,49 L19,47 L19,45 L17,44 L15,43 Z'},
-            {name:'Джидда',country:'🇸🇦',svg:'M115,15 L113,19 L112,22 L110,27 L109,30 L108,32 L108,35 L107,38 L106,41 L105,44 L104,46 L104,48 L102,49 L101,49 L100,49 L99,49 L98,50 L98,51 L98,52 L98,53 L98,55 L99,57 L99,59 L99,62 L99,67 L98,69 L98,72 L98,74 L97,78 L97,81 L97,83 L96,84 L94,85 L93,86 L92,87 L91,87 L90,89 L90,90 L89,91 L89,93 L89,94 L89,97 L90,99 L91,101 L92,104 L92,107 L91,109 L90,111 L89,112 L86,114 L86,117 L85,119 L86,123 L86,125 L87,126 L88,128 L89,128 L91,129 L93,130 L94,132 L95,135 L95,136 L95,139 L96,141 L96,142 L97,146 L98,150 L98,154 L98,158 L98,162 L98,166 L98,170 L97,172 L97,175 L97,177 L97,179 L96,181 L96,183 L94,184 L93,185 L91,185 L90,185 L89,183 Z'},
-            {name:'Мельбурн',country:'🇦🇺',svg:'M140,15 L139,16 L138,17 L136,19 L134,20 L133,22 L132,23 L130,24 L127,27 L122,31 L117,34 L114,37 L110,41 L108,43 L107,45 L106,47 L106,49 L106,51 L107,54 L107,56 L107,58 L107,61 L106,64 L105,67 L103,69 L101,71 L96,75 L92,79 L89,82 L85,86 L81,91 L78,94 L75,98 L71,103 L69,106 L66,111 L63,115 L61,118 L60,120 L60,122 L60,124 L61,125 L63,126 L64,126 L66,127 L68,127 L71,127 L73,128 L75,129 L77,131 L78,134 L78,136 L78,138 L78,141 L77,144 L77,148 L76,152 L77,155 L78,157 L78,159 L80,161 L81,162 L83,164 L85,166 L88,167 L91,169 L94,171 L98,173 L100,174 L102,175 L103,176 L105,176 L107,177 L109,178 L112,180 L115,181 L117,182 L120,184 L122,185 L124,185 L128,184 L129,182 L132,181 L134,180 Z'},
-            {name:'Барселона',country:'🇪🇸',svg:'M167,135 L161,127 L156,119 L151,109 L145,102 L140,93 L133,83 L128,76 L121,64 L114,53 L106,40 L102,33 L98,28 L95,25 L90,23 L85,24 L82,25 L77,27 L71,25 L63,20 L57,16 L50,15 L43,16 L36,21 L32,28 L31,35 L31,42 L33,50 L36,57 L41,65 L47,73 L53,83 L57,89 L62,92 L67,92 L71,91 L74,87 L76,82 L77,77 L74,70 L70,64 L65,56 L61,51 L56,41 L57,38 L60,36 L63,35 L66,36 L70,38 L79,42 L85,45 L90,47 L99,55 L105,62 L109,69 L109,74 L107,80 L102,84 L97,89 L95,95 L90,105 L88,110 L85,118 L86,126 L89,132 L97,138 L104,140 L110,143 L119,148 L127,152 L134,155 L145,161 L153,165 L161,169 L166,171 L168,174 L169,178 L168,180 L165,183 L162,185 L156,185 L151,184 L146,180 L142,178 Z'},
-            {name:'Шанхай',country:'🇨🇳',svg:'M157,34 L149,32 L139,30 L127,27 L116,24 L103,21 L93,18 L78,15 L72,15 L65,17 L59,21 L56,27 L56,34 L60,41 L65,43 L70,40 L71,38 L71,36 L71,33 L71,28 L73,25 L78,25 L80,27 L82,30 L83,36 L83,41 L80,47 L75,54 L69,60 L65,65 L59,71 L53,78 L48,87 L43,98 L39,109 L36,116 L36,120 L37,123 L40,124 L44,123 L48,121 L52,117 L56,111 L59,105 L64,95 L67,87 L75,78 L85,72 L92,72 L101,74 L112,88 L116,95 L120,100 L125,102 L132,103 L140,99 L143,94 L145,88 L148,84 L152,82 L156,82 L159,84 L162,89 L164,94 L163,101 L159,109 L153,118 L148,127 L144,133 L140,140 L135,149 L132,155 L127,162 L124,165 L120,165 L117,162 L112,160 L108,160 L105,162 L102,167 L101,171 L102,175 L105,181 L111,185 Z'},
-            {name:'Сингапур',country:'🇸🇬',svg:'M185,104 L184,111 L183,121 L182,128 L181,137 L180,143 L178,146 L175,148 L171,149 L168,152 L165,154 L163,154 L161,152 L160,149 L159,145 L160,142 L161,137 L164,131 L166,125 L167,119 L168,113 L165,108 L160,107 L156,107 L151,107 L147,107 L142,108 L137,108 L130,109 L124,109 L117,110 L105,113 L99,117 L93,120 L87,124 L81,128 L78,130 L74,130 L72,130 L70,128 L68,125 L65,121 L63,116 L62,113 L60,111 L59,111 L57,112 L55,114 L53,116 L51,119 L48,122 L46,124 L42,125 L39,124 L37,122 L35,119 L33,115 L31,111 L27,104 L24,99 L21,94 L17,88 L15,83 L15,79 L16,77 L18,75 L21,73 L24,72 L26,71 L27,68 L27,66 L28,63 L30,60 L35,56 L38,52 L41,49 L43,46 L45,46 L46,47 L46,49 L47,51 L47,53 L47,56 L48,60 Z'},
-            {name:'Хунгароринг',country:'🇭🇺',svg:'M86,20 L81,24 L72,32 L65,37 L57,44 L49,51 L42,56 L30,65 L22,72 L18,76 L17,80 L18,83 L20,85 L23,85 L28,85 L35,83 L40,81 L48,77 L53,73 L60,67 L68,60 L75,55 L79,54 L85,56 L87,59 L87,63 L85,67 L82,74 L80,80 L80,87 L82,93 L87,101 L91,108 L95,115 L99,121 L102,128 L107,135 L112,142 L115,149 L114,156 L112,162 L109,171 L109,176 L110,180 L115,184 L120,185 L126,183 L133,177 L137,173 L141,168 L146,163 L149,158 L149,154 L148,151 L147,148 L147,145 L149,139 L151,131 L154,126 L159,123 L164,123 L173,118 L175,115 L175,111 L175,107 L173,99 L172,94 L173,84 L177,77 L181,73 L183,66 L183,60 L180,54 L176,50 L170,44 L164,37 L157,30 L152,25 L147,19 L143,16 L140,15 L136,17 L132,21 L129,25 Z'},
-            {name:'Зандворт',country:'🇳🇱',svg:'M17,131 L22,142 L26,153 L30,163 L33,173 L35,180 L39,184 L45,185 L50,182 L52,175 L50,169 L47,161 L42,150 L41,142 L41,132 L41,127 L37,121 L30,118 L24,116 L18,111 L19,104 L24,101 L31,102 L37,104 L45,107 L56,109 L69,110 L81,108 L91,106 L102,107 L112,111 L120,116 L135,122 L152,122 L168,121 L175,117 L181,111 L183,99 L181,91 L177,85 L171,76 L166,65 L157,52 L150,49 L142,49 L135,51 L127,54 L122,57 L118,63 L119,69 L124,73 L131,76 L134,77 L141,78 L147,79 L153,81 L157,89 L156,94 L151,99 L145,100 L138,101 L128,102 L117,101 L105,100 L93,97 L82,93 L71,89 L59,84 L51,81 L46,80 L43,82 L39,85 L33,84 L30,82 L29,78 L30,73 L31,64 L33,57 L35,45 L37,35 L38,28 L37,22 L31,16 L23,15 Z'},
-            {name:'Лас-Вегас',country:'🇺🇸',svg:'M135,25 L140,31 L147,38 L150,42 L150,45 L149,46 L148,47 L146,47 L142,47 L138,45 L136,42 L133,40 L128,41 L124,44 L122,51 L121,58 L121,69 L120,78 L120,89 L120,99 L119,111 L119,116 L119,120 L122,123 L127,123 L133,123 L141,125 L146,128 L149,132 L150,135 L151,138 L150,141 L147,142 L146,145 L147,148 L148,150 L148,153 L146,155 L141,155 L135,154 L128,154 L120,154 L113,155 L107,159 L101,165 L99,171 L95,177 L90,182 L83,184 L78,185 L75,184 L74,181 L73,178 L70,172 L67,167 L63,160 L59,151 L56,141 L53,134 L51,124 L50,116 L50,107 L50,99 L50,89 L50,82 L50,74 L50,65 L50,52 L50,43 L50,37 L49,26 L50,23 L50,21 L52,19 L54,19 L57,17 L60,15 L65,15 L73,15 L82,15 L93,16 L101,16 L110,16 L118,16 Z'},
+        const F1_CARDS = [
+            {name:'Макс Ферстаппен',code:'VER',number:1,team:'Red Bull Racing',teamColor:'#3671C6',country:'🇳🇱',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/verstappen.jpg.img.640.medium.jpg/1738086499498.jpg',stats:{speed:98,racecraft:97,experience:85,wins:63,points:437}},
+            {name:'Льюис Хэмилтон',code:'HAM',number:44,team:'Ferrari',teamColor:'#E8002D',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hamilton.jpg.img.640.medium.jpg/1738086522tried.jpg',stats:{speed:93,racecraft:96,experience:100,wins:105,points:198}},
+            {name:'Шарль Леклер',code:'LEC',number:16,team:'Ferrari',teamColor:'#E8002D',country:'🇲🇨',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/leclerc.jpg.img.640.medium.jpg/1738086534424.jpg',stats:{speed:95,racecraft:90,experience:70,wins:8,points:280}},
+            {name:'Ландо Норрис',code:'NOR',number:4,team:'McLaren',teamColor:'#FF8000',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/norris.jpg.img.640.medium.jpg/1738086505498.jpg',stats:{speed:94,racecraft:89,experience:65,wins:4,points:350}},
+            {name:'Оскар Пиастри',code:'PIA',number:81,team:'McLaren',teamColor:'#FF8000',country:'🇦🇺',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/piastri.jpg.img.640.medium.jpg/1738086516198.jpg',stats:{speed:91,racecraft:86,experience:40,wins:3,points:268}},
+            {name:'Карлос Сайнс',code:'SAI',number:55,team:'Williams',teamColor:'#64C4FF',country:'🇪🇸',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/sainz.jpg.img.640.medium.jpg/1738086546752.jpg',stats:{speed:89,racecraft:88,experience:75,wins:4,points:120}},
+            {name:'Джордж Расселл',code:'RUS',number:63,team:'Mercedes',teamColor:'#27F4D2',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/russell.jpg.img.640.medium.jpg/1738086527564.jpg',stats:{speed:92,racecraft:87,experience:60,wins:3,points:195}},
+            {name:'Кими Антонелли',code:'ANT',number:12,team:'Mercedes',teamColor:'#27F4D2',country:'🇮🇹',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/antonelli.jpg.img.640.medium.jpg/1738086593898.jpg',stats:{speed:88,racecraft:78,experience:15,wins:0,points:95}},
+            {name:'Фернандо Алонсо',code:'ALO',number:14,team:'Aston Martin',teamColor:'#229971',country:'🇪🇸',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/alonso.jpg.img.640.medium.jpg/1738086558245.jpg',stats:{speed:85,racecraft:95,experience:100,wins:32,points:65}},
+            {name:'Лэнс Стролл',code:'STR',number:18,team:'Aston Martin',teamColor:'#229971',country:'🇨🇦',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/stroll.jpg.img.640.medium.jpg/1738086563648.jpg',stats:{speed:78,racecraft:72,experience:65,wins:0,points:30}},
+            {name:'Юки Цунода',code:'TSU',number:22,team:'Red Bull Racing',teamColor:'#3671C6',country:'🇯🇵',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/tsunoda.jpg.img.640.medium.jpg/1738086573898.jpg',stats:{speed:87,racecraft:82,experience:55,wins:0,points:105}},
+            {name:'Пьер Гасли',code:'GAS',number:10,team:'Alpine',teamColor:'#0093CC',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/gasly.jpg.img.640.medium.jpg/1738086580148.jpg',stats:{speed:86,racecraft:83,experience:70,wins:1,points:52}},
+            {name:'Эстебан Окон',code:'OCO',number:31,team:'Haas',teamColor:'#B6BABD',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/ocon.jpg.img.640.medium.jpg/1738086587248.jpg',stats:{speed:83,racecraft:80,experience:68,wins:1,points:38}},
+            {name:'Александр Албон',code:'ALB',number:23,team:'Williams',teamColor:'#64C4FF',country:'🇹🇭',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/albon.jpg.img.640.medium.jpg/1738086540298.jpg',stats:{speed:84,racecraft:82,experience:58,wins:0,points:42}},
+            {name:'Нико Хюлькенберг',code:'HUL',number:27,team:'Sauber',teamColor:'#52E252',country:'🇩🇪',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hulkenberg.jpg.img.640.medium.jpg/1738086599898.jpg',stats:{speed:82,racecraft:84,experience:82,wins:0,points:28}},
+            {name:'Лиам Лоусон',code:'LAW',number:30,team:'Racing Bulls',teamColor:'#6692FF',country:'🇳🇿',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/lawson.jpg.img.640.medium.jpg/1738086569348.jpg',stats:{speed:85,racecraft:79,experience:30,wins:0,points:45}},
+            {name:'Исаак Хаджар',code:'HAD',number:6,team:'Racing Bulls',teamColor:'#6692FF',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hadjar.jpg.img.640.medium.jpg/1738086605898.jpg',stats:{speed:86,racecraft:78,experience:15,wins:0,points:62}},
+            {name:'Оливер Бирман',code:'BEA',number:7,team:'Haas',teamColor:'#B6BABD',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/bearman.jpg.img.640.medium.jpg/1738086611898.jpg',stats:{speed:84,racecraft:77,experience:15,wins:0,points:36}},
+            {name:'Франко Колапинто',code:'COL',number:43,team:'Alpine',teamColor:'#0093CC',country:'🇦🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/colapinto.jpg.img.640.medium.jpg/1738086617898.jpg',stats:{speed:83,racecraft:76,experience:20,wins:0,points:18}},
+            {name:'Габриэль Бортолето',code:'BOR',number:5,team:'Sauber',teamColor:'#52E252',country:'🇧🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/bortoleto.jpg.img.640.medium.jpg/1738086623898.jpg',stats:{speed:82,racecraft:75,experience:10,wins:0,points:15}},
         ];
 
-        const GuessTrackGame = ({onBack}) => {
-            const [state, setState] = useState('ready');
-            const [qIdx, setQIdx] = useState(0);
-            const [score, setScore] = useState(0);
-            const [questions, setQuestions] = useState([]);
-            const [selected, setSelected] = useState(null);
-            const [result, setResult] = useState(null);
-            const totalQ = 5;
+        const STAT_LABELS = {
+            speed:{label:'Скорость',icon:'⚡'},
+            racecraft:{label:'Мастерство',icon:'🏎️'},
+            experience:{label:'Опыт',icon:'📅'},
+            wins:{label:'Победы',icon:'🏆'},
+            points:{label:'Очки 2025',icon:'🔢'},
+        };
 
-            const generateQuestions = () => {
-                const shuffled = [...TRACKS_QUIZ].sort(()=>Math.random()-0.5);
-                return shuffled.slice(0,totalQ).map(correct => {
-                    const others = TRACKS_QUIZ.filter(t=>t.name!==correct.name).sort(()=>Math.random()-0.5).slice(0,3);
-                    return {track:correct, options:[correct,...others].sort(()=>Math.random()-0.5)};
-                });
+        const DriverCard = ({driver,isPlayer,isRevealed,selectedStat,wonStat,onSelectStat}) => (
+            <div style={{
+                width:'100%',borderRadius:14,overflow:'hidden',
+                background:`linear-gradient(145deg, ${driver.teamColor}22, #1a1a2e, ${driver.teamColor}11)`,
+                border:`2px solid ${driver.teamColor}`,
+                boxShadow:`0 6px 24px ${driver.teamColor}33, 0 0 0 1px rgba(255,255,255,0.05)`,
+            }}>
+                <div style={{position:'relative',height:100,overflow:'hidden'}}>
+                    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'70%',background:'linear-gradient(transparent, #1a1a2e)',zIndex:2}}/>
+                    <img src={driver.photo} alt={driver.name} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top'}} onError={e=>{e.target.style.display='none';}}/>
+                    <div style={{position:'absolute',top:4,right:6,fontSize:32,fontWeight:900,color:`${driver.teamColor}44`,fontStyle:'italic',zIndex:1,fontFamily:'monospace',lineHeight:1}}>{driver.number}</div>
+                    <div style={{position:'absolute',top:5,left:5,zIndex:3,padding:'2px 6px',borderRadius:6,fontSize:8,fontWeight:700,background:`${driver.teamColor}cc`,color:'#fff'}}>{driver.team}</div>
+                    <div style={{position:'absolute',bottom:4,left:6,zIndex:3}}>
+                        <div style={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>{driver.country} {driver.code}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:'#fff',lineHeight:1.2}}>{driver.name}</div>
+                    </div>
+                </div>
+                <div style={{padding:'6px 6px 4px'}}>
+                    {Object.entries(driver.stats).map(([key,value]) => {
+                        const isSel = selectedStat===key;
+                        const info = STAT_LABELS[key];
+                        return (
+                            <div key={key} onClick={()=>isPlayer&&onSelectStat&&onSelectStat(key)}
+                                 style={{
+                                     display:'flex',alignItems:'center',justifyContent:'space-between',
+                                     padding:'5px 8px',marginBottom:2,borderRadius:8,
+                                     cursor:isPlayer&&onSelectStat?'pointer':'default',
+                                     background:isSel?(wonStat===true?'rgba(0,200,0,0.15)':wonStat===false?'rgba(255,0,0,0.15)':`${driver.teamColor}22`):'rgba(255,255,255,0.03)',
+                                     border:isSel?`1px solid ${wonStat===true?'#4CAF50':wonStat===false?'#f44336':driver.teamColor}`:'1px solid transparent',
+                                     transition:'all 0.2s',
+                                 }}>
+                                <div style={{fontSize:11,fontWeight:600,color:'rgba(255,255,255,0.7)'}}>{info.icon} {info.label}</div>
+                                <div style={{fontSize:13,fontWeight:800,color:isRevealed||isPlayer?'#fff':'transparent'}}>{isRevealed||isPlayer?value:'?'}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div style={{height:3,background:driver.teamColor}}/>
+            </div>
+        );
+
+        const CardBack = ({count}) => (
+            <div style={{
+                width:'100%',height:320,borderRadius:14,overflow:'hidden',
+                background:'linear-gradient(145deg, #e10600, #8b0000, #e10600)',
+                border:'2px solid #e10600',boxShadow:'0 6px 24px rgba(225,6,0,0.3)',
+                display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+                position:'relative',
+            }}>
+                <div style={{position:'absolute',inset:0,opacity:0.1,backgroundImage:'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)'}}/>
+                <div style={{fontSize:40,marginBottom:6}}>🏎️</div>
+                <div style={{fontSize:20,fontWeight:900,color:'#fff',fontStyle:'italic'}}>F1</div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginTop:6}}>{count} карт</div>
+            </div>
+        );
+
+        const TopTrumpsGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [playerDeck, setPlayerDeck] = useState([]);
+            const [aiDeck, setAiDeck] = useState([]);
+            const [playerCard, setPlayerCard] = useState(null);
+            const [aiCard, setAiCard] = useState(null);
+            const [selectedStat, setSelectedStat] = useState(null);
+            const [roundWinner, setRoundWinner] = useState(null);
+            const [isRevealed, setIsRevealed] = useState(false);
+            const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+            const [score, setScore] = useState({player:0,ai:0});
+            const [roundNum, setRoundNum] = useState(0);
+            const [message, setMessage] = useState('');
+            const totalRounds = 10;
+
+            const startGame = () => {
+                const shuffled = [...F1_CARDS].sort(()=>Math.random()-0.5);
+                const p = shuffled.slice(0,10), a = shuffled.slice(10,20);
+                setPlayerDeck(p); setAiDeck(a);
+                setPlayerCard(p[0]); setAiCard(a[0]);
+                setScore({player:0,ai:0}); setRoundNum(1);
+                setIsPlayerTurn(true); setSelectedStat(null);
+                setIsRevealed(false); setRoundWinner(null);
+                setState('playerTurn'); setMessage('Выбери характеристику!');
             };
 
-            const startGame = () => { setQuestions(generateQuestions()); setQIdx(0); setScore(0); setSelected(null); setResult(null); setState('playing'); };
-
-            const answer = (name) => {
-                if (selected) return;
-                const isCorrect = name===questions[qIdx].track.name;
-                const newScore = score + (isCorrect?1:0);
-                if(isCorrect) setScore(s=>s+1);
-                setSelected(name);
+            const selectStat = (stat) => {
+                if (state!=='playerTurn'||!isPlayerTurn) return;
+                setSelectedStat(stat); setState('revealing'); setIsRevealed(true);
+                const pVal = playerCard.stats[stat], aVal = aiCard.stats[stat];
                 setTimeout(()=>{
-                    if (qIdx+1<totalQ) { setQIdx(i=>i+1); setSelected(null); }
-                    else {
-                        setState('finished');
-                        api.post('/api/games/result',{game_type:'guess_track',score:newScore}).then(r=>setResult(r));
-                    }
-                }, 1200);
+                    let winner;
+                    if (pVal>aVal) { winner='player'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} > ${aVal} — Ты выиграл!`); setScore(s=>({...s,player:s.player+1})); }
+                    else if (aVal>pVal) { winner='ai'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} < ${aVal} — AI выиграл!`); setScore(s=>({...s,ai:s.ai+1})); }
+                    else { winner='draw'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} = ${aVal} — Ничья!`); }
+                    setRoundWinner(winner); setState('roundResult');
+                }, 1000);
+            };
+
+            const nextRound = () => {
+                const nextIdx = roundNum;
+                if (nextIdx>=totalRounds||nextIdx>=playerDeck.length||nextIdx>=aiDeck.length) { setState('finished'); return; }
+                setPlayerCard(playerDeck[nextIdx]); setAiCard(aiDeck[nextIdx]);
+                setRoundNum(roundNum+1); setSelectedStat(null); setIsRevealed(false); setRoundWinner(null);
+                const aiTurn = roundWinner==='ai';
+                setIsPlayerTurn(!aiTurn);
+                if (aiTurn) {
+                    setState('aiThinking'); setMessage('🤖 AI думает...');
+                    setTimeout(()=>{
+                        const ac = aiDeck[nextIdx];
+                        const keys = Object.keys(ac.stats);
+                        let best=keys[0]; keys.forEach(k=>{if(ac.stats[k]>ac.stats[best])best=k;});
+                        setSelectedStat(best); setIsRevealed(true); setState('revealing');
+                        const pV=playerDeck[nextIdx].stats[best], aV=ac.stats[best];
+                        setTimeout(()=>{
+                            let w;
+                            if(pV>aV){w='player';setMessage(`AI: ${STAT_LABELS[best].icon} ${aV} < ${pV}. Ты выиграл!`);setScore(s=>({...s,player:s.player+1}));}
+                            else if(aV>pV){w='ai';setMessage(`AI: ${STAT_LABELS[best].icon} ${aV} > ${pV}. AI выиграл!`);setScore(s=>({...s,ai:s.ai+1}));}
+                            else{w='draw';setMessage('Ничья!');}
+                            setRoundWinner(w); setState('roundResult');
+                        },1000);
+                    },1500);
+                } else { setState('playerTurn'); setMessage('Твой ход! Выбери характеристику.'); }
             };
 
             return (
-                <div className="page-container fade-in" style={{padding:'20px 16px',textAlign:'center'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
-                        <div style={{fontWeight:800,fontSize:18}}>🗺️ Угадай трассу</div>
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'rgba(255,255,255,0.5)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:17}}>🃏 Top Trumps</div>
                         <div style={{width:50}}/>
                     </div>
                     {state==='ready' && (
-                        <div>
-                            <div style={{fontSize:60,marginBottom:20}}>🗺️</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>Узнай трассу по контуру!<br/>{totalQ} вопросов</div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>Реальные контуры трасс F1!</div>
-                            <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#FF8000',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
+                        <div style={{textAlign:'center',paddingTop:40}}>
+                            <div style={{fontSize:64,marginBottom:16}}>🃏</div>
+                            <div style={{fontSize:22,fontWeight:800,marginBottom:8}}>F1 Top Trumps</div>
+                            <div style={{fontSize:14,color:'rgba(255,255,255,0.5)',marginBottom:8,lineHeight:1.6}}>20 пилотов F1 · 5 характеристик<br/>Выбирай стат — у кого больше, тот выигрывает!</div>
+                            <div style={{fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:28}}>10 раундов · Ты vs AI</div>
+                            <div onClick={startGame} style={{padding:'16px 48px',borderRadius:16,background:'linear-gradient(135deg, #e10600, #8b0000)',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',boxShadow:'0 4px 20px rgba(225,6,0,0.4)'}}>РАЗДАТЬ КАРТЫ</div>
                         </div>
                     )}
-                    {state==='playing' && questions[qIdx] && (
+                    {state!=='ready'&&state!=='finished' && (
                         <div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
-                            <svg viewBox="0 0 200 200" style={{width:220,height:220,margin:'0 auto 24px',display:'block'}}>
-                                <defs>
-                                    <filter id="trackGlow">
-                                        <feGaussianBlur stdDeviation="3" result="blur"/>
-                                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                                    </filter>
-                                </defs>
-                                <path d={questions[qIdx].track.svg} fill="none" stroke="rgba(225,6,0,0.15)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d={questions[qIdx].track.svg} fill="none" stroke="#e10600" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#trackGlow)"/>
-                            </svg>
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,maxWidth:320,margin:'0 auto'}}>
-                                {questions[qIdx].options.map(opt => {
-                                    const isCorrectAnswer = opt.name===questions[qIdx].track.name;
-                                    const isSel = selected===opt.name;
-                                    let bg = 'rgba(255,255,255,0.06)';
-                                    if (selected) { if(isCorrectAnswer) bg='rgba(0,200,0,0.2)'; else if(isSel) bg='rgba(255,0,0,0.2)'; }
-                                    return (
-                                        <div key={opt.name} onClick={()=>answer(opt.name)}
-                                             style={{padding:'14px 10px',borderRadius:12,background:bg,cursor:selected?'default':'pointer',
-                                                 fontWeight:700,fontSize:14,border:isSel?'2px solid white':'2px solid transparent',transition:'all 0.2s'}}>
-                                            {opt.name}
-                                        </div>
-                                    );
-                                })}
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,padding:'6px 12px',borderRadius:10,background:'rgba(255,255,255,0.04)'}}>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>Ты</div><div style={{fontSize:20,fontWeight:800,color:'#4CAF50'}}>{score.player}</div></div>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)'}}>Раунд {roundNum}/{totalRounds}</div><div style={{fontSize:10,color:'rgba(255,255,255,0.3)',marginTop:1}}>{isPlayerTurn?'🟢 Твой ход':'🔴 Ход AI'}</div></div>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>AI</div><div style={{fontSize:20,fontWeight:800,color:'#f44336'}}>{score.ai}</div></div>
                             </div>
+                            <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:'rgba(255,255,255,0.6)',marginBottom:10,minHeight:18}}>{message}</div>
+                            <div style={{display:'flex',gap:6,alignItems:'flex-start'}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:10,fontWeight:700,textAlign:'center',color:'rgba(255,255,255,0.4)',marginBottom:4}}>ТВОЯ КАРТА</div>
+                                    {playerCard && <DriverCard driver={playerCard} isPlayer={true} isRevealed={true} selectedStat={selectedStat} wonStat={roundWinner==='player'?true:roundWinner==='ai'?false:null} onSelectStat={state==='playerTurn'&&isPlayerTurn?selectStat:null}/>}
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,color:'#e10600',alignSelf:'center',minWidth:24,flexShrink:0}}>VS</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:10,fontWeight:700,textAlign:'center',color:'rgba(255,255,255,0.4)',marginBottom:4}}>КАРТА AI</div>
+                                    {aiCard && (isRevealed ? <DriverCard driver={aiCard} isPlayer={false} isRevealed={true} selectedStat={selectedStat} wonStat={roundWinner==='ai'?true:roundWinner==='player'?false:null}/> : <CardBack count={aiDeck.length-roundNum+1}/>)}
+                                </div>
+                            </div>
+                            {state==='roundResult' && (
+                                <div style={{textAlign:'center',marginTop:12}}>
+                                    <div onClick={nextRound} style={{padding:'10px 28px',borderRadius:12,background:roundWinner==='player'?'#4CAF50':roundWinner==='ai'?'#f44336':'#666',fontWeight:700,fontSize:14,cursor:'pointer',display:'inline-block'}}>
+                                        {roundNum>=totalRounds?'Результат':'Следующий раунд →'}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                     {state==='finished' && (
-                        <div>
-                            <div style={{fontSize:48,marginBottom:12}}>{score>=4?'🏆':score>=2?'👏':'🤔'}</div>
-                            <div style={{fontSize:32,fontWeight:800,color:'#FF8000'}}>{score}/{totalQ}</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>{score>=4?'Настоящий знаток!':score>=2?'Неплохо!':'Попробуй ещё!'}</div>
+                        <div style={{textAlign:'center',paddingTop:30}}>
+                            <div style={{fontSize:64,marginBottom:12}}>{score.player>score.ai?'🏆':score.player<score.ai?'😤':'🤝'}</div>
+                            <div style={{fontSize:28,fontWeight:800,color:score.player>score.ai?'#4CAF50':score.player<score.ai?'#f44336':'#FF9800'}}>{score.player>score.ai?'ПОБЕДА!':score.player<score.ai?'ПОРАЖЕНИЕ':'НИЧЬЯ'}</div>
+                            <div style={{fontSize:36,fontWeight:800,marginTop:8}}>{score.player} : {score.ai}</div>
+                            <div style={{fontSize:14,color:'rgba(255,255,255,0.4)',marginTop:8}}>{score.player>score.ai?'Ты настоящий стратег!':score.player<score.ai?'AI оказался хитрее. Попробуй ещё!':'Достойная битва!'}</div>
                             <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
-                                <div onClick={startGame} style={{padding:'12px 24px',borderRadius:12,background:'#FF8000',fontWeight:700,cursor:'pointer',color:'#fff'}}>Ещё раз</div>
-                                <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                                <div onClick={startGame} style={{padding:'14px 28px',borderRadius:12,background:'linear-gradient(135deg, #e10600, #8b0000)',fontWeight:700,cursor:'pointer'}}>Играть снова</div>
+                                <div onClick={onBack} style={{padding:'14px 28px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
                             </div>
                         </div>
                     )}
@@ -3433,15 +3533,15 @@
             const goBack = () => { setActiveGame(null); api.get('/api/games/status').then(setStatus); };
 
             if (activeGame==='pit_stop') return <PitStopGame onBack={goBack}/>;
-            if (activeGame==='guess_track') return <GuessTrackGame onBack={goBack}/>;
+            if (activeGame==='top_trumps') return <TopTrumpsGame onBack={goBack}/>;
             if (activeGame==='reaction') return <ReactionGame onBack={goBack}/>;
             if (activeGame==='quiz') return <QuizGame onBack={goBack}/>;
 
             const games = [
                 {id:'pit_stop',icon:'🔧',name:'Пит-стоп',desc:'Смени шины быстрее всех!',color:'#e10600'},
-                {id:'guess_track',icon:'🗺️',name:'Угадай трассу',desc:'Узнай трассу по контуру',color:'#FF8000'},
+                {id:'top_trumps',icon:'🃏',name:'Top Trumps',desc:'Карточная битва пилотов F1',color:'#FFD700'},
                 {id:'reaction',icon:'🚦',name:'Реакция',desc:'Стартуй по зелёному!',color:'#27F4D2'},
-                {id:'quiz',icon:'🧠',name:'F1 Квиз',desc:'5 вопросов о Формуле 1',color:'#6692FF'},
+                {id:'quiz',icon:'🧠',name:'F1 Квиз',desc:'Проверь свои знания',color:'#6692FF'},
             ];
 
             return (
