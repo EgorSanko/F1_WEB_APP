@@ -560,6 +560,16 @@
                             <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Все гран-при</div>
                         </div>
                     </div>
+
+                    {/* Mini-games button */}
+                    <div className="card" onClick={()=>onChange('games')} style={{display:'flex',alignItems:'center',gap:14,padding:16,cursor:'pointer',marginTop:10,borderLeft:'4px solid var(--f1-red)'}}>
+                        <div style={{fontSize:28}}>🎮</div>
+                        <div style={{flex:1}}>
+                            <div style={{fontWeight:700,fontSize:16}}>Мини-игры</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>Пит-стоп, реакция, квиз и другие</div>
+                        </div>
+                        <div style={{color:'var(--f1-red)',fontWeight:700}}>→</div>
+                    </div>
                 </div>
             );
         };
@@ -2927,6 +2937,423 @@
             );
         };
 
+        // ==== MINI-GAMES ====
+
+        const Timer = ({startTime}) => {
+            const [now, setNow] = useState(Date.now());
+            useEffect(() => { const i = setInterval(()=>setNow(Date.now()), 16); return ()=>clearInterval(i); }, []);
+            return ((now - startTime) / 1000).toFixed(3);
+        };
+
+        const PitStopGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [startTime, setStartTime] = useState(0);
+            const [endTime, setEndTime] = useState(0);
+            const [wheels, setWheels] = useState([
+                {id:'fl',label:'FL',step:0},{id:'fr',label:'FR',step:0},
+                {id:'rl',label:'RL',step:0},{id:'rr',label:'RR',step:0},
+            ]);
+            const [result, setResult] = useState(null);
+            const stepLabels = ['🔩 Открути','🔄 Смени','🔧 Закрути','✅'];
+            const stepColors = ['#ff4444','#ffaa00','#44cc44','#27F4D2'];
+
+            const start = () => { setState('playing'); setStartTime(Date.now()); setWheels(w=>w.map(wh=>({...wh,step:0}))); setResult(null); };
+
+            const tapWheel = (id) => {
+                if (state !== 'playing') return;
+                setWheels(prev => {
+                    const next = prev.map(w => w.id===id && w.step<3 ? {...w,step:w.step+1} : w);
+                    if (next.every(w=>w.step>=3)) {
+                        const time = Date.now() - startTime;
+                        setEndTime(time);
+                        setState('finished');
+                        api.post('/api/games/result',{game_type:'pit_stop',score:time}).then(r=>setResult(r));
+                    }
+                    return next;
+                });
+            };
+
+            const timeStr = (ms) => (ms/1000).toFixed(3)+'s';
+
+            return (
+                <div className="page-container fade-in" style={{padding:'20px 16px',textAlign:'center'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:18}}>🔧 Пит-стоп</div>
+                        <div style={{width:50}}/>
+                    </div>
+                    {state==='ready' && (
+                        <div>
+                            <div style={{fontSize:60,marginBottom:20}}>🏎️</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>
+                                Тапай по каждому колесу 3 раза:<br/>Открути → Смени → Закрути
+                            </div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>
+                                {'< 2.0с = 50 очков · < 2.5с = 30 · < 3.0с = 20 · < 4.0с = 10'}
+                            </div>
+                            <div onClick={start} className="btn-primary" style={{display:'inline-block',fontSize:18,padding:'16px 40px'}}>СТАРТ</div>
+                        </div>
+                    )}
+                    {state==='playing' && (
+                        <div>
+                            <div style={{fontSize:32,fontWeight:800,fontFamily:'monospace',marginBottom:20,color:'var(--f1-red)'}}>
+                                <Timer startTime={startTime}/>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,maxWidth:300,margin:'0 auto'}}>
+                                {wheels.map(w => (
+                                    <div key={w.id} onClick={()=>tapWheel(w.id)}
+                                         style={{padding:'24px 16px',borderRadius:16,
+                                             background:w.step>=3?'rgba(39,244,210,0.15)':'rgba(255,255,255,0.06)',
+                                             border:`3px solid ${stepColors[w.step]}`,
+                                             cursor:w.step<3?'pointer':'default',transition:'all 0.15s',
+                                             userSelect:'none',WebkitUserSelect:'none'}}>
+                                        <div style={{fontSize:13,fontWeight:800,color:'var(--f1-text-muted)',marginBottom:8}}>{w.label}</div>
+                                        <div style={{fontSize:28}}>{w.step>=3?'✅':'🔴'}</div>
+                                        <div style={{fontSize:12,fontWeight:700,color:stepColors[w.step],marginTop:8}}>{stepLabels[w.step]}</div>
+                                        <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:6}}>
+                                            {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<w.step?stepColors[2]:'rgba(255,255,255,0.15)'}}/>)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {state==='finished' && (
+                        <div>
+                            <div style={{fontSize:60,marginBottom:16}}>{endTime<2000?'🏆':endTime<3000?'🥈':'👍'}</div>
+                            <div style={{fontSize:40,fontWeight:800,fontFamily:'monospace',color:'#27F4D2'}}>{timeStr(endTime)}</div>
+                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            {result?.new_achievements?.length>0 && <div style={{fontSize:14,color:'#27F4D2',marginTop:8}}>🏅 Новое достижение!</div>}
+                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
+                                <div onClick={start} className="btn-primary" style={{padding:'12px 24px'}}>Ещё раз</div>
+                                <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ReactionGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [lights, setLights] = useState(0);
+            const [greenTime, setGreenTime] = useState(0);
+            const [reaction, setReaction] = useState(0);
+            const [result, setResult] = useState(null);
+            const timeoutRef = useRef(null);
+            const lightsRef = useRef([]);
+
+            const startSequence = () => {
+                setState('lights'); setLights(0); setResult(null);
+                lightsRef.current.forEach(t=>clearTimeout(t));
+                lightsRef.current = [];
+                for (let i=1;i<=5;i++) {
+                    lightsRef.current.push(setTimeout(()=>setLights(i), i*1000));
+                }
+                const delay = 5000 + 500 + Math.random()*2500;
+                timeoutRef.current = setTimeout(()=>{ setState('green'); setGreenTime(Date.now()); }, delay);
+            };
+
+            const tap = () => {
+                if (state==='ready') return;
+                if (state==='lights') {
+                    clearTimeout(timeoutRef.current);
+                    lightsRef.current.forEach(t=>clearTimeout(t));
+                    setState('false_start');
+                    return;
+                }
+                if (state==='green') {
+                    const rt = Date.now() - greenTime;
+                    setReaction(rt); setState('finished');
+                    api.post('/api/games/result',{game_type:'reaction',score:rt}).then(r=>setResult(r));
+                }
+            };
+
+            useEffect(() => () => { clearTimeout(timeoutRef.current); lightsRef.current.forEach(t=>clearTimeout(t)); }, []);
+
+            return (
+                <div className="page-container fade-in" style={{padding:'20px 16px',textAlign:'center'}} onClick={tap}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                        <div onClick={e=>{e.stopPropagation();onBack();}} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:18}}>🚦 Реакция</div>
+                        <div style={{width:50}}/>
+                    </div>
+                    <div style={{display:'flex',gap:16,justifyContent:'center',marginTop:40,marginBottom:40}}>
+                        {[1,2,3,4,5].map(i=>(
+                            <div key={i} style={{width:40,height:40,borderRadius:'50%',border:'3px solid #555',
+                                background:state==='green'||state==='finished'?'#00ff00':i<=lights?'#e10600':'#222',
+                                boxShadow:(state==='green'||state==='finished')?'0 0 20px rgba(0,255,0,0.6)':i<=lights?'0 0 20px rgba(225,6,0,0.5)':'none',
+                                transition:'all 0.2s'}}/>
+                        ))}
+                    </div>
+                    {state==='ready' && (
+                        <div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>Жди зелёный свет, потом тапни!</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>{'< 0.2с = 50 очков · < 0.3с = 30 · < 0.5с = 10'}</div>
+                            <div onClick={e=>{e.stopPropagation();startSequence();}} className="btn-primary" style={{display:'inline-block',fontSize:18,padding:'16px 40px'}}>СТАРТ</div>
+                        </div>
+                    )}
+                    {(state==='lights'||state==='green') && (
+                        <div style={{fontSize:18,fontWeight:600,color:'var(--f1-text-secondary)',marginTop:20}}>
+                            {state==='lights'?'Жди...':'🟢 ТАПНИ!'}
+                        </div>
+                    )}
+                    {state==='false_start' && (
+                        <div>
+                            <div style={{fontSize:48,marginBottom:12}}>❌</div>
+                            <div style={{fontSize:22,fontWeight:800,color:'#ff4444'}}>ФАЛЬСТАРТ!</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:8}}>0 очков</div>
+                            <div onClick={e=>{e.stopPropagation();setState('ready');setLights(0);}} className="btn-primary" style={{display:'inline-block',padding:'12px 24px',marginTop:20}}>Попробовать снова</div>
+                        </div>
+                    )}
+                    {state==='finished' && (
+                        <div>
+                            <div style={{fontSize:48,marginBottom:12}}>{reaction<200?'⚡':reaction<300?'🏎️':'👍'}</div>
+                            <div style={{fontSize:40,fontWeight:800,fontFamily:'monospace',color:'#27F4D2'}}>{reaction}ms</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>
+                                {reaction<200?'Нечеловеческая реакция!':reaction<300?'Отличная реакция!':reaction<500?'Неплохо!':'Можно лучше!'}
+                            </div>
+                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            {result?.new_achievements?.length>0 && <div style={{fontSize:14,color:'#27F4D2',marginTop:8}}>🏅 Новое достижение!</div>}
+                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
+                                <div onClick={e=>{e.stopPropagation();setState('ready');setLights(0);}} className="btn-primary" style={{padding:'12px 24px'}}>Ещё раз</div>
+                                <div onClick={e=>{e.stopPropagation();onBack();}} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const TRACKS_QUIZ = [
+            {name:'Монца',country:'IT',svg:'M30,80 L35,60 L50,40 L70,35 L85,50 L80,70 L60,85 Z'},
+            {name:'Спа',country:'BE',svg:'M20,70 L30,30 L45,20 L55,35 L50,55 L65,60 L80,40 L85,65 L70,80 Z'},
+            {name:'Сильверстоун',country:'GB',svg:'M25,50 L35,25 L55,20 L70,30 L75,50 L65,70 L45,75 L30,65 Z'},
+            {name:'Монако',country:'MC',svg:'M30,30 L50,25 L70,35 L75,55 L60,70 L40,75 L25,60 Z'},
+            {name:'Сузука',country:'JP',svg:'M20,50 L30,25 L50,20 L60,35 L55,50 L65,55 L75,40 L80,60 L65,75 L40,80 Z'},
+            {name:'Интерлагос',country:'BR',svg:'M25,40 L45,20 L70,25 L80,45 L75,65 L55,80 L30,75 L20,55 Z'},
+            {name:'Баку',country:'AZ',svg:'M30,80 L25,50 L35,25 L55,20 L65,35 L60,60 L70,75 L50,85 Z'},
+            {name:'Джидда',country:'SA',svg:'M20,70 L25,35 L40,20 L60,25 L70,15 L80,30 L75,55 L65,70 L45,80 Z'},
+            {name:'Мельбурн',country:'AU',svg:'M30,30 L55,20 L75,30 L80,55 L70,75 L45,80 L25,65 L20,45 Z'},
+            {name:'Барселона',country:'ES',svg:'M25,45 L40,20 L65,25 L75,45 L70,65 L50,75 L30,70 Z'},
+        ];
+
+        const GuessTrackGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [qIdx, setQIdx] = useState(0);
+            const [score, setScore] = useState(0);
+            const [questions, setQuestions] = useState([]);
+            const [selected, setSelected] = useState(null);
+            const [result, setResult] = useState(null);
+            const totalQ = 5;
+
+            const generateQuestions = () => {
+                const shuffled = [...TRACKS_QUIZ].sort(()=>Math.random()-0.5);
+                return shuffled.slice(0,totalQ).map(correct => {
+                    const others = TRACKS_QUIZ.filter(t=>t.name!==correct.name).sort(()=>Math.random()-0.5).slice(0,3);
+                    return {track:correct, options:[correct,...others].sort(()=>Math.random()-0.5)};
+                });
+            };
+
+            const startGame = () => { setQuestions(generateQuestions()); setQIdx(0); setScore(0); setSelected(null); setResult(null); setState('playing'); };
+
+            const answer = (name) => {
+                if (selected) return;
+                const isCorrect = name===questions[qIdx].track.name;
+                const newScore = score + (isCorrect?1:0);
+                if(isCorrect) setScore(s=>s+1);
+                setSelected(name);
+                setTimeout(()=>{
+                    if (qIdx+1<totalQ) { setQIdx(i=>i+1); setSelected(null); }
+                    else {
+                        setState('finished');
+                        api.post('/api/games/result',{game_type:'guess_track',score:newScore}).then(r=>setResult(r));
+                    }
+                }, 1200);
+            };
+
+            return (
+                <div className="page-container fade-in" style={{padding:'20px 16px',textAlign:'center'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:18}}>🗺️ Угадай трассу</div>
+                        <div style={{width:50}}/>
+                    </div>
+                    {state==='ready' && (
+                        <div>
+                            <div style={{fontSize:60,marginBottom:20}}>🗺️</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>Узнай трассу по контуру!<br/>{totalQ} вопросов</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>Каждый правильный ответ = 5 очков</div>
+                            <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#FF8000',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
+                        </div>
+                    )}
+                    {state==='playing' && questions[qIdx] && (
+                        <div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
+                            <svg viewBox="0 0 100 100" style={{width:200,height:200,margin:'0 auto 24px',display:'block'}}>
+                                <path d={questions[qIdx].track.svg} fill="none" stroke="#e10600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,maxWidth:320,margin:'0 auto'}}>
+                                {questions[qIdx].options.map(opt => {
+                                    const isCorrectAnswer = opt.name===questions[qIdx].track.name;
+                                    const isSel = selected===opt.name;
+                                    let bg = 'rgba(255,255,255,0.06)';
+                                    if (selected) { if(isCorrectAnswer) bg='rgba(0,200,0,0.2)'; else if(isSel) bg='rgba(255,0,0,0.2)'; }
+                                    return (
+                                        <div key={opt.name} onClick={()=>answer(opt.name)}
+                                             style={{padding:'14px 10px',borderRadius:12,background:bg,cursor:selected?'default':'pointer',
+                                                 fontWeight:700,fontSize:14,border:isSel?'2px solid white':'2px solid transparent',transition:'all 0.2s'}}>
+                                            {opt.name}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    {state==='finished' && (
+                        <div>
+                            <div style={{fontSize:48,marginBottom:12}}>{score>=4?'🏆':score>=2?'👏':'🤔'}</div>
+                            <div style={{fontSize:32,fontWeight:800,color:'#FF8000'}}>{score}/{totalQ}</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>{score>=4?'Настоящий знаток!':score>=2?'Неплохо!':'Попробуй ещё!'}</div>
+                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
+                                <div onClick={startGame} style={{padding:'12px 24px',borderRadius:12,background:'#FF8000',fontWeight:700,cursor:'pointer',color:'#fff'}}>Ещё раз</div>
+                                <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const QuizGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [question, setQuestion] = useState(null);
+            const [selected, setSelected] = useState(null);
+            const [correctIdx, setCorrectIdx] = useState(null);
+            const [score, setScore] = useState(0);
+            const [qNum, setQNum] = useState(0);
+            const [result, setResult] = useState(null);
+            const totalQ = 5;
+
+            const loadQuestion = () => { api.get('/api/quiz/question').then(q=>{setQuestion(q);setSelected(null);setCorrectIdx(null);}); };
+            const startGame = () => { setScore(0);setQNum(1);setResult(null);setState('playing');loadQuestion(); };
+
+            const answer = (idx) => {
+                if (selected!==null) return;
+                setSelected(idx);
+                api.post('/api/quiz/answer',{question_id:question.question_id||question.id,answer:idx}).then(r=>{
+                    setCorrectIdx(r.correct_answer);
+                    const isCorrect = r.correct;
+                    if(isCorrect) setScore(s=>s+1);
+                    setTimeout(()=>{
+                        if (qNum<totalQ) { setQNum(n=>n+1); loadQuestion(); }
+                        else {
+                            setState('finished');
+                            const finalScore = score + (isCorrect?1:0);
+                            api.post('/api/games/result',{game_type:'quiz',score:finalScore}).then(res=>setResult(res));
+                        }
+                    }, 1500);
+                });
+            };
+
+            return (
+                <div className="page-container fade-in" style={{padding:'20px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:18}}>🧠 F1 Квиз</div>
+                        <div style={{width:50}}/>
+                    </div>
+                    {state==='ready' && (
+                        <div style={{textAlign:'center'}}>
+                            <div style={{fontSize:60,marginBottom:20}}>🧠</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:24}}>{totalQ} вопросов об истории F1</div>
+                            <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#6692FF',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
+                        </div>
+                    )}
+                    {state==='playing' && question && (
+                        <div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12,textAlign:'center'}}>Вопрос {qNum}/{totalQ} · Счёт: {score}</div>
+                            <div style={{fontSize:16,fontWeight:700,marginBottom:20,textAlign:'center',lineHeight:1.4}}>{question.question}</div>
+                            {question.options.map((opt,idx)=>{
+                                let bg = 'rgba(255,255,255,0.06)';
+                                if (selected!==null) { if(idx===correctIdx) bg='rgba(0,200,0,0.2)'; else if(idx===selected) bg='rgba(255,0,0,0.2)'; }
+                                return (
+                                    <div key={idx} onClick={()=>answer(idx)} style={{padding:'14px 16px',marginBottom:8,borderRadius:12,background:bg,cursor:selected!==null?'default':'pointer',fontWeight:600,fontSize:14,transition:'all 0.2s'}}>
+                                        {opt}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {state==='finished' && (
+                        <div style={{textAlign:'center'}}>
+                            <div style={{fontSize:48,marginBottom:12}}>{score>=4?'🏆':score>=2?'👏':'📚'}</div>
+                            <div style={{fontSize:32,fontWeight:800,color:'#6692FF'}}>{score}/{totalQ}</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>{score>=4?'Настоящий знаток!':score>=2?'Неплохо!':'Почитай про F1!'}</div>
+                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
+                                <div onClick={startGame} style={{padding:'12px 24px',borderRadius:12,background:'#6692FF',fontWeight:700,cursor:'pointer',color:'#fff'}}>Ещё раз</div>
+                                <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const GamesPage = ({onChange}) => {
+            const [status, setStatus] = useState(null);
+            const [activeGame, setActiveGame] = useState(null);
+
+            useEffect(()=>{ api.get('/api/games/status').then(setStatus); }, []);
+
+            const goBack = () => { setActiveGame(null); api.get('/api/games/status').then(setStatus); };
+
+            if (activeGame==='pit_stop') return <PitStopGame onBack={goBack}/>;
+            if (activeGame==='guess_track') return <GuessTrackGame onBack={goBack}/>;
+            if (activeGame==='reaction') return <ReactionGame onBack={goBack}/>;
+            if (activeGame==='quiz') return <QuizGame onBack={goBack}/>;
+
+            const games = [
+                {id:'pit_stop',icon:'🔧',name:'Пит-стоп',desc:'Смени шины быстрее всех!',color:'#e10600'},
+                {id:'guess_track',icon:'🗺️',name:'Угадай трассу',desc:'Узнай трассу по контуру',color:'#FF8000'},
+                {id:'reaction',icon:'🚦',name:'Реакция',desc:'Стартуй по зелёному!',color:'#27F4D2'},
+                {id:'quiz',icon:'🧠',name:'F1 Квиз',desc:'5 вопросов о Формуле 1',color:'#6692FF'},
+            ];
+
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+                        <h2 style={{fontSize:22,fontWeight:900}}>🎮 Мини-игры</h2>
+                        {onChange && <div onClick={()=>onChange('home')} style={{cursor:'pointer',fontSize:13,color:'var(--f1-text-muted)'}}>← Главная</div>}
+                    </div>
+                    {games.map(g => {
+                        const st = status?.games?.[g.id];
+                        const canPlay = st?.can_play!==false;
+                        const cooldown = st?.seconds_left;
+                        return (
+                            <div key={g.id} className="card" onClick={()=>canPlay&&setActiveGame(g.id)}
+                                 style={{display:'flex',alignItems:'center',gap:14,padding:16,marginBottom:8,
+                                     borderLeft:`4px solid ${g.color}`,opacity:canPlay?1:0.5,cursor:canPlay?'pointer':'default'}}>
+                                <div style={{fontSize:32}}>{g.icon}</div>
+                                <div style={{flex:1}}>
+                                    <div style={{fontWeight:700,fontSize:16}}>{g.name}</div>
+                                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>{g.desc}</div>
+                                </div>
+                                {!canPlay && cooldown>0 && (
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',textAlign:'right'}}>
+                                        ⏳ {Math.floor(cooldown/3600)}ч {Math.floor((cooldown%3600)/60)}м
+                                    </div>
+                                )}
+                                {canPlay && <div style={{fontSize:13,fontWeight:700,color:g.color}}>ИГРАТЬ →</div>}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
         // ==== MAIN APP ====
         const App = () => {
             const [tab, setTab] = useState('home');
@@ -3023,6 +3450,7 @@
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
                     case 'analytics': return <AnalyticsPage/>;
+                    case 'games': return <GamesPage onChange={setTab}/>;
                     default: return null;
                 }
             };
