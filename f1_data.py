@@ -372,7 +372,7 @@ def enrich_driver(driver_number: int, extra: dict = None, season: int = None) ->
     # CDN photo with local fallback
     cdn_photo = get_f1_cdn_photo(driver_number, season=s, width=200)
     photo_url = cdn_photo or info.get("photo_url", "")
-    card_photo = get_f1_cdn_card_photo(driver_number, season=s)
+    card_url, card_pos = get_f1_cdn_card_photo(driver_number, season=s)
 
     result = {
         "driver_number": driver_number,
@@ -384,7 +384,8 @@ def enrich_driver(driver_number: int, extra: dict = None, season: int = None) ->
         "team_color": colors.get(team, TEAM_COLORS.get(team, "#888888")),
         "country": info.get("country", ""),
         "photo_url": photo_url,
-        "card_photo_url": card_photo,
+        "card_photo_url": card_url,
+        "card_photo_position": card_pos,
         "photo_url_large": info.get("photo_url_large", ""),
     }
     if extra:

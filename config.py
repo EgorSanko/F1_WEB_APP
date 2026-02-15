@@ -408,7 +408,7 @@ F1_PHOTO_CODES_2026 = {
 }
 
 CUSTOM_CARD_PHOTOS = {
-    77: "/static/drivers/77_custom.jpg",  # Bottas — card only
+    77: {"url": "/static/drivers/77_custom.jpg", "position": "center 85%"},
 }
 
 def get_f1_cdn_photo(driver_number, season=2026, width=200):
@@ -420,14 +420,17 @@ def get_f1_cdn_photo(driver_number, season=2026, width=200):
     return f"https://media.formula1.com/image/upload/c_fill,g_north,ar_1:1,w_{width}/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
 
 def get_f1_cdn_card_photo(driver_number, season=2026):
-    """Get driver card photo (larger, may be custom)."""
+    """Get driver card photo (larger, may be custom). Returns (url, position)."""
     if driver_number in CUSTOM_CARD_PHOTOS:
-        return CUSTOM_CARD_PHOTOS[driver_number]
+        custom = CUSTOM_CARD_PHOTOS[driver_number]
+        if isinstance(custom, dict):
+            return custom["url"], custom.get("position", "top center")
+        return custom, "top center"
     codes = F1_PHOTO_CODES_2026 if season == 2026 else F1_PHOTO_CODES_2025
     if driver_number not in codes:
-        return ""
+        return "", "top center"
     team, code = codes[driver_number]
-    return f"https://media.formula1.com/image/upload/c_fill,w_400,h_300,g_north/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp"
+    return f"https://media.formula1.com/image/upload/c_fill,w_400,h_300,g_north/q_auto/v1740000000/common/f1/{season}/{team}/{code}/{season}{team}{code}right.webp", "top center"
 
 # ============ TEAM ASSETS (logos, car photos) ============
 TEAM_ASSETS = {
