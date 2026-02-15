@@ -225,7 +225,7 @@
             return flags[code] || '🏳️';
         };
 
-        const openLink = (url) => { if (tg?.openLink) tg.openLink(url, {try_instant_view: false}); else window.open(url, '_blank'); };
+        const openLink = (url) => { if (tg?.openLink) tg.openLink(url, {try_instant_view: false, try_browser: true}); else window.open(url, '_blank'); };
 
         // ==== SVG NAV ICONS ====
         const NavIcons = {
@@ -331,15 +331,15 @@
                     </div>
 
                     {nextRace && nextRace.name && (
-                        <div className="gradient-card" style={{minHeight:200}}>
-                            {nextRace.circuit_image && <img src={nextRace.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'55%',height:'100%',objectFit:'contain',opacity:0.08,pointerEvents:'none'}}/>}
+                        <div className="gradient-card" style={{minHeight:200,background:'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'}}>
+                            <div style={{position:'absolute',right:-20,top:-20,fontSize:120,fontWeight:900,color:'rgba(255,255,255,0.04)',lineHeight:1,pointerEvents:'none',fontFamily:'monospace'}}>{nextRace.round}</div>
                             <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'linear-gradient(135deg,rgba(225,6,0,0.15) 0%,transparent 60%)',pointerEvents:'none',borderRadius:16}}/>
                             <div style={{position:'relative',zIndex:1}}>
                                 <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                                    🏁 Следующий гран-при
+                                    Следующий гран-при
                                 </div>
                                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-                                    <span style={{fontSize:32}}>{flagEmoji(nextRace.country)}</span>
+                                    <FlagImg code={nextRace.country_code} size={28}/>
                                     <div>
                                         <div style={{fontSize:20,fontWeight:900}}>{nextRace.name}</div>
                                         <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{nextRace.circuit} · Раунд {nextRace.round}</div>
