@@ -169,28 +169,10 @@
         @keyframes flipIn { 0%{transform:rotateX(90deg);opacity:0} 100%{transform:rotateX(0);opacity:1} }
         .flip-anim { animation:flipIn 0.3s ease-out; }
 
-        /* F1 Start Lights Loader */
-        @keyframes f1light { 0%{opacity:0.15} 50%{opacity:1} 100%{opacity:0.15} }
-        .f1-loader { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 20px; }
-        .f1-lights { display:flex; gap:8px; }
-        .f1-light { width:18px; height:18px; border-radius:50%; background:var(--f1-red); opacity:0.15; }
-        .f1-light:nth-child(1) { animation:f1light 1.2s 0s infinite; }
-        .f1-light:nth-child(2) { animation:f1light 1.2s 0.2s infinite; }
-        .f1-light:nth-child(3) { animation:f1light 1.2s 0.4s infinite; }
-        .f1-light:nth-child(4) { animation:f1light 1.2s 0.6s infinite; }
-        .f1-light:nth-child(5) { animation:f1light 1.2s 0.8s infinite; }
-
-        /* F1 Mini Loader (pulsing dots) */
-        @keyframes f1dot { 0%,100%{transform:scale(0.6);opacity:0.3} 50%{transform:scale(1);opacity:1} }
-        .f1-mini-loader { display:inline-flex; gap:4px; align-items:center; }
-        .f1-mini-dot { width:6px; height:6px; border-radius:50%; background:var(--f1-red); }
-        .f1-mini-dot:nth-child(1) { animation:f1dot 0.8s 0s infinite; }
-        .f1-mini-dot:nth-child(2) { animation:f1dot 0.8s 0.15s infinite; }
-        .f1-mini-dot:nth-child(3) { animation:f1dot 0.8s 0.3s infinite; }
-
-        /* Tyre Loader (spinning) */
-        @keyframes tyreSpin { to { transform:rotate(360deg); } }
-        .tyre-loader { width:32px; height:32px; border:3px solid var(--f1-gray); border-top-color:var(--f1-red); border-radius:50%; animation:tyreSpin 0.7s linear infinite; }
+        /* F1 Loader animations */
+        @keyframes f1pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1.2)} }
+        @keyframes tyreSpin { to{transform:rotate(360deg)} }
+        @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
 
         /* Pull-to-refresh */
         .ptr-indicator { display:flex; align-items:center; justify-content:center; overflow:hidden; transition:height 0.2s ease; }
@@ -260,28 +242,31 @@
             const [refreshing, setRefreshing] = useState(false);
             const startY = useRef(0);
             const containerRef = useRef(null);
-            const threshold = 60;
+            const threshold = 80;
             const onTouchStart = useCallback(e => {
+                if (refreshing) return;
                 const el = containerRef.current;
                 if (el && el.scrollTop <= 0) startY.current = e.touches[0].clientY;
                 else startY.current = 0;
-            }, []);
+            }, [refreshing]);
             const onTouchMove = useCallback(e => {
-                if (!startY.current) return;
+                if (!startY.current || refreshing) return;
                 const dy = e.touches[0].clientY - startY.current;
-                if (dy > 0) { setPulling(true); setPullY(Math.min(dy * 0.4, 80)); }
-            }, []);
+                if (dy > 0) { setPulling(true); setPullY(Math.min(dy * 0.4, 120)); if (dy > 10) e.preventDefault(); }
+            }, [refreshing]);
             const onTouchEnd = useCallback(async () => {
                 if (pullY >= threshold && onRefresh && !refreshing) {
-                    setRefreshing(true); setPullY(40);
-                    await onRefresh();
-                    setRefreshing(false);
+                    setRefreshing(true); setPullY(50);
+                    try { await onRefresh(); } finally { setRefreshing(false); }
                 }
                 setPulling(false); setPullY(0); startY.current = 0;
             }, [pullY, onRefresh, refreshing]);
-            const indicatorEl = (pulling || refreshing) ? (
-                <div className="ptr-indicator" style={{height:pullY}}>
-                    {refreshing ? <F1MiniLoader/> : <div style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:600,opacity:pullY/threshold}}>{pullY >= threshold ? 'Отпустите' : 'Потяните вниз'}</div>}
+            const indicatorEl = (pullY > 0 || refreshing) ? (
+                <div style={{textAlign:'center',overflow:'hidden',transition:pulling?'none':'height 0.3s',height:refreshing?50:pullY,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                    {refreshing ? <F1MiniLoader/> : (<>
+                        <div style={{transform:`rotate(${pullY*3}deg)`,fontSize:24,opacity:pullY/threshold}}>🏎️</div>
+                        <div style={{fontSize:11,color:'rgba(255,255,255,0.4)'}}>{pullY >= threshold ? 'Отпусти для обновления!' : 'Потяни вниз'}</div>
+                    </>)}
                 </div>
             ) : null;
             return {containerRef, onTouchStart, onTouchMove, onTouchEnd, indicatorEl};
@@ -304,17 +289,36 @@
         const CardSkeleton = () => <div className="card" style={{display:'flex',flexDirection:'column',gap:12}}><Skeleton w="60%" h="20px"/><Skeleton w="100%" h="14px"/><Skeleton w="80%" h="14px"/></div>;
 
         // ==== F1 LOADERS ====
-        const F1Loader = ({text}) => (
-            <div className="f1-loader">
-                <div className="f1-lights"><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/></div>
-                {text && <div style={{fontSize:13,color:'var(--f1-text-muted)',fontWeight:600}}>{text}</div>}
+        const F1Loader = ({text = 'Загрузка...'}) => {
+            const [activeLight, setActiveLight] = useState(0);
+            useEffect(() => {
+                const interval = setInterval(() => setActiveLight(prev => (prev + 1) % 6), 400);
+                return () => clearInterval(interval);
+            }, []);
+            return (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',gap:20}}>
+                    <div style={{display:'flex',gap:12}}>
+                        {[0,1,2,3,4].map(i => (
+                            <div key={i} style={{width:28,height:28,borderRadius:'50%',background:activeLight===5?'#333':i<=activeLight?'#e10600':'#333',boxShadow:(activeLight!==5&&i<=activeLight)?'0 0 15px rgba(225,6,0,0.6)':'none',transition:'all 0.3s ease',border:'2px solid #555'}}/>
+                        ))}
+                    </div>
+                    <div style={{fontSize:13,color:'rgba(255,255,255,0.4)',fontWeight:600,letterSpacing:1,animation:'pulse 1.5s ease-in-out infinite'}}>
+                        {activeLight === 5 ? 'GO!' : text}
+                    </div>
+                </div>
+            );
+        };
+        const F1MiniLoader = () => (
+            <div style={{display:'flex',gap:6,justifyContent:'center',padding:'20px 0'}}>
+                {[0,1,2].map(i => (
+                    <div key={i} style={{width:8,height:8,borderRadius:'50%',background:'#e10600',animation:`f1pulse 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+                ))}
             </div>
         );
-        const F1MiniLoader = () => <span className="f1-mini-loader"><span className="f1-mini-dot"/><span className="f1-mini-dot"/><span className="f1-mini-dot"/></span>;
-        const TyreLoader = ({text}) => (
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,padding:'40px 20px'}}>
-                <div className="tyre-loader"/>
-                {text && <div style={{fontSize:13,color:'var(--f1-text-muted)',fontWeight:600}}>{text}</div>}
+        const TyreLoader = ({text = 'Анализ данных...'}) => (
+            <div style={{textAlign:'center',padding:'40px 20px'}}>
+                <div style={{width:50,height:50,margin:'0 auto 16px',border:'4px solid rgba(255,255,255,0.1)',borderTop:'4px solid #e10600',borderRadius:'50%',animation:'tyreSpin 0.8s linear infinite'}}/>
+                <div style={{fontSize:13,color:'rgba(255,255,255,0.4)',fontWeight:600}}>{text}</div>
             </div>
         );
 
@@ -393,7 +397,7 @@
                             {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
                         </div>
                     </div>
-                    <F1Loader text="Загрузка данных..."/>
+                    <F1Loader text="Разогрев моторов..."/>
                 </div>
             );
             return (
@@ -672,7 +676,7 @@
             };
             useEffect(() => () => { if (audioRef.current) audioRef.current.pause(); }, []);
 
-            if (!session) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Подключение к сессии..."/></div>;
+            if (!session) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Подключение к трассе..."/></div>;
 
             const timingMap = {};
             if (timing?.timing) timing.timing.forEach(t => { timingMap[t.driver_number] = t; });
@@ -1097,7 +1101,7 @@
             useEffect(() => { api.get('/api/news').then(d => { setNews(d); setLoading(false); }); }, []);
             const ptr = usePullToRefresh(async()=>{const d=await api.get('/api/news');if(d)setNews(d);});
 
-            if (loading) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка новостей..."/></div>;
+            if (loading) return <div className="page-container fade-in" style={{padding:16}}><F1MiniLoader/></div>;
 
             return (
                 <div className="page-container fade-in" ref={ptr.containerRef} onTouchStart={ptr.onTouchStart} onTouchMove={ptr.onTouchMove} onTouchEnd={ptr.onTouchEnd} style={{padding:'12px 16px'}}>
@@ -1746,7 +1750,7 @@
             const [leaderboard, setLeaderboard] = useState(null);
             const [achievements, setAchievements] = useState(null);
             useEffect(() => { api.get('/api/leaderboard').then(setLeaderboard); api.get('/api/user/achievements').then(setAchievements); }, []);
-            if (!user) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка профиля..."/></div>;
+            if (!user) return <div className="page-container fade-in" style={{padding:16}}><F1MiniLoader/></div>;
             return (
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
                     <div className="card" style={{textAlign:'center',marginBottom:16,position:'relative',overflow:'hidden'}}>
@@ -2213,7 +2217,7 @@
                     {/* Scrollable content */}
                     <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:80}}>
 
-                    {loading && <div style={{padding:16}}><TyreLoader text="Загрузка аналитики..."/></div>}
+                    {loading && <div style={{padding:16}}><TyreLoader text="Анализ телеметрии..."/></div>}
 
                     {/* TYRE STRATEGY */}
                     {aTab==='strategy' && !loading && (strategy?.drivers?.length > 0 ? (
@@ -2800,41 +2804,44 @@
                     {qualiData?.results?.length > 0 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
                             <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>🏁 Квалификация</div>
-                            <div className="tab-switch" style={{marginBottom:12}}>
-                                {['q3','q2','q1'].map(seg=>(
-                                    <button key={seg} className={`tab-switch-btn ${qualiSegment===seg?'active':''}`} onClick={()=>setQualiSegment(seg)} style={{fontSize:12,padding:'6px 12px'}}>{seg.toUpperCase()}</button>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>КВАЛИФИКАЦИЯ · {qualiData.race_name || ''}</div>
+                            {/* Q1/Q2/Q3 segment cards */}
+                            <div style={{display:'flex',gap:8,marginBottom:16}}>
+                                {['q1','q2','q3'].map(q=>(
+                                    <div key={q} onClick={()=>setQualiSegment(q)} style={{flex:1,textAlign:'center',padding:'10px 0',background:qualiSegment===q?'#e10600':'rgba(255,255,255,0.08)',borderRadius:10,fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s'}}>
+                                        {q.toUpperCase()}
+                                        <div style={{fontSize:10,opacity:0.5,marginTop:2}}>{q==='q1'?'20 пилотов':q==='q2'?'15 пилотов':'10 пилотов'}</div>
+                                    </div>
                                 ))}
                             </div>
                             {(() => {
                                 const seg = qualiSegment;
-                                const filtered = qualiData.results.filter(r => r[seg]);
+                                const filtered = qualiData.results.filter(r => r[seg]).sort((a,b) => {
+                                    const tA = a[seg] || '99:99.999', tB = b[seg] || '99:99.999';
+                                    return tA.localeCompare(tB);
+                                });
                                 if (!filtered.length) return <div style={{textAlign:'center',padding:20,color:'var(--f1-text-muted)',fontSize:12}}>Нет данных {seg.toUpperCase()}</div>;
                                 const bestTime = filtered[0]?.[seg] || '';
                                 const parseTime = (t) => { if(!t) return null; const p = t.split(':'); return p.length===2 ? parseFloat(p[0])*60+parseFloat(p[1]) : parseFloat(t); };
                                 const bestSec = parseTime(bestTime);
-                                // Elimination zones
-                                const q1Elim = seg === 'q1' ? 15 : null;
-                                const q2Elim = seg === 'q2' ? 10 : null;
                                 return filtered.map((r, i) => {
                                     const time = r[seg];
                                     const sec = parseTime(time);
-                                    const delta = bestSec && sec ? (sec - bestSec).toFixed(3) : null;
-                                    const isElim = (seg==='q1' && r.position > 15) || (seg==='q2' && r.position > 10);
+                                    const delta = bestSec && sec && i > 0 ? (sec - bestSec).toFixed(3) : null;
+                                    const isElim = (seg==='q1' && i >= 15) || (seg==='q2' && i >= 10);
                                     return (
-                                        <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:i<filtered.length-1?'1px solid var(--f1-border)':'none',opacity:isElim?0.5:1}}>
-                                            <div style={{width:24,fontWeight:900,fontSize:13,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',textAlign:'center'}}>{r.position}</div>
-                                            <div style={{background:r.team_color,width:3,height:24,borderRadius:2}}/>
-                                            {r.photo_url && <DriverPhoto url={r.photo_url} size={24}/>}
+                                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',marginBottom:4,background:isElim?'rgba(255,0,0,0.08)':'rgba(255,255,255,0.04)',borderRadius:10,borderLeft:`3px solid ${r.team_color||'#888'}`}}>
+                                            <div style={{width:24,fontWeight:800,fontSize:16,textAlign:'center',color:i<3?['#e10600','#aaa','#cd7f32'][i]:'rgba(255,255,255,0.5)'}}>{i+1}</div>
+                                            {r.photo_url && <img src={r.photo_url} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover'}} onError={e=>{e.target.style.display='none'}}/>}
                                             <div style={{flex:1,minWidth:0}}>
-                                                <span style={{fontWeight:700,fontSize:13}}>{r.code}</span>
-                                                <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{r.team?.split(' ')[0]}</span>
+                                                <div style={{fontWeight:700,fontSize:14}}>{r.name||r.code}</div>
+                                                <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.team}</div>
                                             </div>
-                                            <div style={{textAlign:'right',fontVariantNumeric:'tabular-nums'}}>
-                                                <div style={{fontSize:13,fontWeight:700,color:i===0?'#A020F0':'var(--f1-text)'}}>{time}</div>
-                                                {delta && i > 0 && <div style={{fontSize:10,color:isElim?'var(--f1-red)':'var(--f1-text-muted)'}}>+{delta}</div>}
+                                            <div style={{textAlign:'right'}}>
+                                                <div style={{fontWeight:700,fontSize:15,fontFamily:'monospace',color:i===0?'#a855f7':'white'}}>{time||'—'}</div>
+                                                {delta && <div style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'monospace'}}>+{delta}</div>}
                                             </div>
-                                            {isElim && <div style={{fontSize:8,color:'var(--f1-red)',fontWeight:700}}>OUT</div>}
+                                            {isElim && <div style={{fontSize:9,color:'#ff4444',fontWeight:700,width:24,textAlign:'center'}}>OUT</div>}
                                         </div>
                                     );
                                 });

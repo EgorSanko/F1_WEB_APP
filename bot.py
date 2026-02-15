@@ -7,8 +7,9 @@ import os
 import json
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
     Application, CommandHandler, ContextTypes, JobQueue
@@ -140,6 +141,19 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_notify_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command: test push notification."""
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        return
+
+    await update.message.reply_text(
+        "🏁 <b>Тестовое уведомление</b>\n\n"
+        "Если ты это видишь — push-уведомления работают! ✅",
+        parse_mode="HTML",
+    )
+
+
 # ============ NOTIFICATION HELPERS ============
 
 async def send_notification(app: Application, user_id: int, text: str,
@@ -172,93 +186,112 @@ async def broadcast(app: Application, text: str, keyboard=None):
 
 # ============ SCHEDULED JOBS ============
 
-# Track which reminders we already sent (session_key:window -> True)
-_sent_reminders = {}
+NOTIFICATIONS_DIR = "/app/data/notifications"
+
+
+def _was_sent(key: str) -> bool:
+    """Check if notification was already sent (file-based marker)."""
+    return os.path.exists(os.path.join(NOTIFICATIONS_DIR, f"{key}.sent"))
+
+
+def _mark_sent(key: str, sent_count: int):
+    """Mark notification as sent."""
+    os.makedirs(NOTIFICATIONS_DIR, exist_ok=True)
+    with open(os.path.join(NOTIFICATIONS_DIR, f"{key}.sent"), "w") as f:
+        f.write(f"sent={sent_count} at={datetime.utcnow().isoformat()}")
 
 
 async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
     """
-    Runs every 5 minutes. Check if any F1 session starts soon and
-    send reminders at 24h, 1h, and 10min before.
+    Runs every 5 minutes. Check if race starts soon and
+    send notifications at 24h, 1h, and 10min before.
+    Uses file-based markers to survive container restarts.
     """
     try:
-        import requests
-        r = requests.get(f"{WEBAPP_URL}/api/race/next", timeout=10)
-        if r.status_code != 200:
-            return
-
-        race = r.json()
-        if "sessions" not in race:
-            return
-
-        now = datetime.utcnow()
-        session_names = {
-            "fp1": "FP1", "fp2": "FP2", "fp3": "FP3",
-            "qualifying": "Квалификация", "race": "ГОНКА",
-            "sprint": "Спринт", "sprint_qualifying": "Спринт-квалификация",
-        }
-
-        # Define reminder windows: (label, min_seconds, max_seconds, emoji)
-        windows = [
-            ("24h", 23*3600, 25*3600, "📅"),
-            ("1h", 55*60, 65*60, "⏰"),
-            ("10min", 8*60, 12*60, "🚦"),
-        ]
-
-        for session_key, session_info in race.get("sessions", {}).items():
-            if not session_info.get("date") or not session_info.get("time"):
-                continue
-
-            try:
-                session_dt = datetime.fromisoformat(
-                    f"{session_info['date']}T{session_info['time']}".replace("Z", "")
-                )
-            except (ValueError, TypeError):
-                continue
-
-            diff = (session_dt - now).total_seconds()
-            name = session_names.get(session_key, session_key)
-
-            for window_label, min_s, max_s, emoji in windows:
-                reminder_key = f"{session_key}:{session_info['date']}:{window_label}"
-
-                if min_s <= diff <= max_s and reminder_key not in _sent_reminders:
-                    # Only send 24h reminder for race/qualifying/sprint
-                    if window_label == "24h" and session_key not in ("race", "qualifying", "sprint"):
-                        continue
-
-                    time_text = {"24h": "через 24 часа", "1h": "через 1 час", "10min": "через 10 минут"}[window_label]
-
-                    text = (
-                        f"{emoji} *{name}* {time_text}!\n\n"
-                        f"🏎️ {race.get('name', 'Гран-при')}\n"
-                        f"📍 {race.get('circuit', '')}"
-                    )
-
-                    if window_label == "10min":
-                        text += "\n\n_Приготовься! Lights out and away we go!_ 🏁"
-
-                    keyboard = [[InlineKeyboardButton("🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL})]]
-                    await broadcast(context.application, text, keyboard)
-                    _sent_reminders[reminder_key] = True
-                    logger.info(f"Sent {window_label} reminder for {name}")
-
-        # Clean up old reminders (older than 48 hours)
-        keys_to_remove = []
-        for key in _sent_reminders:
-            parts = key.split(":")
-            if len(parts) >= 2:
-                try:
-                    d = datetime.fromisoformat(parts[1])
-                    if (now - d).total_seconds() > 48 * 3600:
-                        keys_to_remove.append(key)
-                except ValueError:
-                    pass
-        for key in keys_to_remove:
-            del _sent_reminders[key]
-
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{WEBAPP_URL}/api/race/next", timeout=10)
+            if resp.status_code != 200:
+                return
+            next_race = resp.json()
     except Exception as e:
-        logger.error(f"Session reminder error: {e}")
+        logger.error(f"Failed to fetch next race: {e}")
+        return
+
+    race_date = next_race.get("date", "")
+    race_time = next_race.get("time", "14:00:00Z")
+    race_name = next_race.get("raceName", next_race.get("name", "Гран-при"))
+    race_round = next_race.get("round", 0)
+
+    if not race_date:
+        return
+
+    try:
+        dt_str = f"{race_date}T{race_time}"
+        if not dt_str.endswith("Z") and "+" not in dt_str:
+            dt_str += "Z"
+        race_dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return
+
+    now = datetime.now(timezone.utc)
+    hours_until = (race_dt - now).total_seconds() / 3600
+
+    notifications = [
+        (23.8, 24.2, f"24h_{race_round}",
+         f"🏁 <b>{race_name}</b> — через 24 часа!\n\n"
+         f"⏰ Старт: {race_dt.strftime('%d.%m в %H:%M')} UTC\n\n"
+         f"🔮 Успей сделать прогноз!"),
+
+        (0.8, 1.2, f"1h_{race_round}",
+         f"🚨 <b>{race_name}</b> — через 1 час!\n\n"
+         f"🏎 Готовь попкорн!\n\n"
+         f"📱 Смотри Live тайминги в F1 Hub"),
+
+        (0.1, 0.25, f"10m_{race_round}",
+         "🔴🔴🔴🔴🔴\n"
+         f"<b>LIGHTS OUT через 10 минут!</b>\n\n"
+         f"🏁 {race_name}"),
+    ]
+
+    for low, high, key, message in notifications:
+        if low < hours_until < high and not _was_sent(key):
+            # Send to all users
+            users = db.execute("SELECT user_id FROM users")
+            sent = 0
+            keyboard = [[InlineKeyboardButton(
+                "🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL}
+            )]]
+            for user in users:
+                try:
+                    await context.application.bot.send_message(
+                        chat_id=user["user_id"],
+                        text=message,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        disable_web_page_preview=True,
+                    )
+                    sent += 1
+                    if sent % 30 == 0:
+                        await asyncio.sleep(1)
+                except Exception:
+                    pass
+            _mark_sent(key, sent)
+            logger.info(f"[NOTIFY] {key}: sent to {sent}/{len(users)} users")
+            break
+
+    # Clean up old marker files (older than 7 days)
+    try:
+        if os.path.exists(NOTIFICATIONS_DIR):
+            for fname in os.listdir(NOTIFICATIONS_DIR):
+                fpath = os.path.join(NOTIFICATIONS_DIR, fname)
+                if os.path.isfile(fpath):
+                    age = (datetime.utcnow() - datetime.utcfromtimestamp(
+                        os.path.getmtime(fpath)
+                    )).total_seconds()
+                    if age > 7 * 86400:
+                        os.remove(fpath)
+    except Exception:
+        pass
 
 
 async def check_prediction_results(context: ContextTypes.DEFAULT_TYPE):
@@ -350,6 +383,7 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("admin", cmd_admin))
+    app.add_handler(CommandHandler("notify_test", cmd_notify_test))
 
     # Schedule jobs
     job_queue = app.job_queue
