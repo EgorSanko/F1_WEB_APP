@@ -2538,6 +2538,23 @@ async def get_strategy_prediction(session_key: str, driver_number: int = None) -
 
 # ============ WEATHER RADAR ============
 
+# OpenF1 circuit_short_name → our CIRCUITS key
+_CIRCUIT_SHORT_NAME_MAP = {
+    "sakhir": "bahrain", "jeddah": "jeddah", "albert park": "albert_park",
+    "suzuka": "suzuka", "shanghai": "shanghai", "miami": "miami",
+    "imola": "imola", "monaco": "monaco", "barcelona": "catalunya",
+    "montreal": "villeneuve", "spielberg": "red_bull_ring", "silverstone": "silverstone",
+    "budapest": "hungaroring", "spa-francorchamps": "spa", "spa": "spa",
+    "zandvoort": "zandvoort", "monza": "monza", "baku": "baku",
+    "marina bay": "marina_bay", "singapore": "marina_bay",
+    "austin": "americas", "cota": "americas",
+    "mexico city": "rodriguez", "interlagos": "interlagos", "são paulo": "interlagos",
+    "las vegas": "vegas", "losail": "losail", "lusail": "losail",
+    "yas marina": "yas_marina", "yas island": "yas_marina",
+    "madrid": "madring",
+}
+
+
 def _lat_lon_to_tile(lat: float, lon: float, zoom: int) -> Tuple[int, int]:
     """Convert lat/lon to tile coordinates."""
     import math
@@ -2565,19 +2582,17 @@ async def get_weather_radar(session_key: str) -> Dict[str, Any]:
 
     # Find coordinates from CIRCUITS config
     lat, lon = 0.0, 0.0
-    # Try matching circuit_short_name to our CIRCUITS dict
-    circuit_key_lower = circuit_name.lower().replace(" ", "_")
-    for key, coords in CIRCUITS.items():
-        if key == circuit_key_lower or circuit_name.lower() in key or key in circuit_name.lower():
-            lat = coords.get("lat", 0)
-            lon = coords.get("lon", 0)
-            break
-
-    if not lat:
-        # Fallback: try circuit_key from session
-        ck = session_info.get("circuit_key", "")
+    cn_lower = circuit_name.lower().strip()
+    # Use mapping first
+    mapped_key = _CIRCUIT_SHORT_NAME_MAP.get(cn_lower, "")
+    if mapped_key and mapped_key in CIRCUITS:
+        lat = CIRCUITS[mapped_key].get("lat", 0)
+        lon = CIRCUITS[mapped_key].get("lon", 0)
+    else:
+        # Fallback: fuzzy match
+        circuit_key_lower = cn_lower.replace(" ", "_")
         for key, coords in CIRCUITS.items():
-            if str(ck) in key:
+            if key == circuit_key_lower or cn_lower in key or key in cn_lower:
                 lat = coords.get("lat", 0)
                 lon = coords.get("lon", 0)
                 break
