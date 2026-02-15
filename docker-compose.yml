@@ -10,6 +10,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./index.html:/app/index.html:ro
+      - ./static/drivers:/app/static/drivers:ro
     env_file: .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
