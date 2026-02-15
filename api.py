@@ -1004,6 +1004,42 @@ async def analytics_weather_radar(session_key: str = "latest"):
     return await f1_data.get_weather_radar(session_key)
 
 
+@app.get("/api/analytics/lap-time-series")
+async def analytics_lap_time_series(session_key: str = "latest", drivers: str = ""):
+    """Full lap time table data for all drivers."""
+    driver_numbers = None
+    if drivers:
+        try:
+            driver_numbers = [int(x.strip()) for x in drivers.split(",") if x.strip()]
+        except ValueError:
+            pass
+    return await f1_data.get_lap_time_series(session_key, driver_numbers)
+
+
+@app.get("/api/analytics/race-trace")
+async def analytics_race_trace(session_key: str = "latest"):
+    """Race trace — cumulative gap to leader per lap."""
+    return await f1_data.get_race_trace(session_key)
+
+
+@app.get("/api/analytics/speed-traps")
+async def analytics_speed_traps(session_key: str = "latest"):
+    """Speed trap leaderboard."""
+    return await f1_data.get_speed_traps(session_key)
+
+
+@app.get("/api/head-to-head")
+async def head_to_head(season: int = CURRENT_SEASON):
+    """Teammate head-to-head comparison."""
+    return await f1_data.get_head_to_head(season)
+
+
+@app.get("/api/live/car-data")
+async def live_car_data(driver: int = 1):
+    """Live car telemetry for speedometer — speed, throttle, brake, gear, DRS."""
+    return await f1_data.get_live_car_data(driver)
+
+
 @app.get("/api/live/track-map")
 async def live_track_map():
     """Live track map: track outline + car positions."""

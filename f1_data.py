@@ -2723,3 +2723,277 @@ async def get_weather_radar(session_key: str) -> Dict[str, Any]:
     }
     cache_set(cache_key, result)
     return result
+
+
+# ============ ANALYTICS: RACE TRACE ============
+
+async def get_race_trace(session_key: str) -> Dict[str, Any]:
+    """Race trace - cumulative gap to leader per lap."""
+    cache_key = f"race_trace:{session_key}"
+    cached = cache_get(cache_key, ttl_override=300)
+    if cached:
+        return cached
+
+    is_demo = str(session_key) != "latest"
+    season = _live_season(is_demo=is_demo, session_key=session_key)
+
+    laps_raw = await fetch_openf1("laps", {"session_key": session_key})
+    if not laps_raw:
+        return {"error": "no_data", "drivers": {}, "total_laps": 0}
+
+    drivers_laps: Dict[int, Dict[int, float]] = {}
+    for lap in laps_raw:
+        dn = lap.get("driver_number")
+        lap_num = lap.get("lap_number")
+        duration = lap.get("lap_duration")
+        if not all([dn, lap_num, duration]):
+            continue
+        if dn not in drivers_laps:
+            drivers_laps[dn] = {}
+        drivers_laps[dn][lap_num] = duration
+
+    if not drivers_laps:
+        return {"error": "no_data", "drivers": {}, "total_laps": 0}
+
+    all_laps = sorted(set(l for dl in drivers_laps.values() for l in dl.keys()))
+    all_laps = [l for l in all_laps if l > 1]
+
+    traces: Dict[int, list] = {}
+    for dn, laps_dict in drivers_laps.items():
+        cumulative = 0.0
+        trace = []
+        for lap_num in all_laps:
+            if lap_num in laps_dict:
+                cumulative += laps_dict[lap_num]
+                trace.append({"lap": lap_num, "time": round(cumulative, 3)})
+            else:
+                trace.append({"lap": lap_num, "time": None})
+        traces[dn] = trace
+
+    normalized = {}
+    for dn, trace in traces.items():
+        norm_trace = []
+        for i, point in enumerate(trace):
+            if point["time"] is None:
+                norm_trace.append({"lap": point["lap"], "gap": None})
+                continue
+            min_time = min(
+                (t[i]["time"] for t in traces.values() if i < len(t) and t[i]["time"] is not None),
+                default=point["time"]
+            )
+            gap = round(point["time"] - min_time, 3)
+            norm_trace.append({"lap": point["lap"], "gap": gap})
+
+        info = enrich_driver(dn, season=season)
+        normalized[str(dn)] = {
+            "driver_number": dn,
+            "name_acronym": info.get("code", str(dn)),
+            "team": info.get("team", ""),
+            "color": info.get("team_color", "#888"),
+            "trace": norm_trace,
+        }
+
+    result = {"session_key": session_key, "total_laps": len(all_laps), "drivers": normalized}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ ANALYTICS: SPEED TRAPS ============
+
+async def get_speed_traps(session_key: str) -> Dict[str, Any]:
+    """Speed trap leaderboard from laps data."""
+    cache_key = f"speed_traps:{session_key}"
+    cached = cache_get(cache_key, ttl_override=300)
+    if cached:
+        return cached
+
+    is_demo = str(session_key) != "latest"
+    season = _live_season(is_demo=is_demo, session_key=session_key)
+
+    laps_raw = await fetch_openf1("laps", {"session_key": session_key})
+    if not laps_raw:
+        return {"error": "no_data", "speeds": []}
+
+    best_speeds: Dict[int, float] = {}
+    for lap in laps_raw:
+        dn = lap.get("driver_number")
+        speed = lap.get("st_speed")
+        if dn and speed:
+            if dn not in best_speeds or speed > best_speeds[dn]:
+                best_speeds[dn] = speed
+
+    speeds = []
+    for dn, speed in sorted(best_speeds.items(), key=lambda x: x[1], reverse=True):
+        info = enrich_driver(dn, season=season)
+        speeds.append({
+            "driver_number": dn,
+            "name_acronym": info.get("code", str(dn)),
+            "team": info.get("team", ""),
+            "color": info.get("team_color", "#888"),
+            "speed": speed,
+            "photo_url": info.get("photo_url", ""),
+        })
+
+    result = {"session_key": session_key, "speeds": speeds}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ HEAD-TO-HEAD ============
+
+async def get_head_to_head(season: int = 2025) -> Dict[str, Any]:
+    """Teammate head-to-head comparison from standings."""
+    cache_key = f"h2h:{season}"
+    cached = cache_get(cache_key, ttl_override=900)
+    if cached:
+        return cached
+
+    standings = await get_driver_standings(season=season)
+    drivers_list = standings.get("drivers", [])
+
+    team_drivers: Dict[str, list] = {}
+    for d in drivers_list:
+        team = d.get("team", "")
+        if not team:
+            continue
+        if team not in team_drivers:
+            team_drivers[team] = []
+        team_drivers[team].append(d)
+
+    colors = get_team_colors(season)
+    h2h = []
+    for team, drivers in team_drivers.items():
+        if len(drivers) < 2:
+            continue
+        d1, d2 = drivers[0], drivers[1]
+
+        def _driver_data(d, _season=season):
+            dn = d.get("number") or d.get("driver_number")
+            info = enrich_driver(dn, season=_season) if dn else {}
+            return {
+                "name": info.get("code", d.get("code", "")),
+                "full_name": d.get("name", info.get("name", "")),
+                "number": dn,
+                "points": float(d.get("points", 0)),
+                "wins": int(d.get("wins", 0)),
+                "photo_url": info.get("photo_url", ""),
+            }
+
+        h2h.append({
+            "team": team,
+            "color": colors.get(team, "#888"),
+            "driver1": _driver_data(d1),
+            "driver2": _driver_data(d2),
+        })
+
+    result = {"season": season, "head_to_head": h2h}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ LAP TIME SERIES (TABLE) ============
+
+async def get_lap_time_series(session_key: str, driver_numbers: list = None) -> Dict[str, Any]:
+    """Full lap time table for all drivers — used for tabular display."""
+    cache_key = f"lap_time_series:{session_key}"
+    cached = cache_get(cache_key, ttl_override=300)
+    if cached:
+        return cached
+
+    is_demo = str(session_key) != "latest"
+    season = _live_season(is_demo=is_demo, session_key=session_key)
+
+    laps_raw = await fetch_openf1("laps", {"session_key": session_key})
+    if not laps_raw:
+        return {"error": "no_data", "drivers": [], "total_laps": 0}
+
+    stints_raw = await fetch_openf1("stints", {"session_key": session_key})
+    stint_map: Dict[int, list] = {}
+    for s in (stints_raw or []):
+        dn = s.get("driver_number")
+        if dn:
+            stint_map.setdefault(dn, []).append(s)
+
+    def _get_compound(dn, lap_num):
+        for st in stint_map.get(dn, []):
+            ls = st.get("lap_start", 0)
+            le = st.get("lap_end", 9999)
+            if ls <= lap_num <= le:
+                return st.get("compound", "UNKNOWN")
+        return "UNKNOWN"
+
+    drivers_data: Dict[int, list] = {}
+    max_lap = 0
+    for lap in laps_raw:
+        dn = lap.get("driver_number")
+        ln = lap.get("lap_number")
+        dur = lap.get("lap_duration")
+        if not dn or not ln:
+            continue
+        if driver_numbers and dn not in driver_numbers:
+            continue
+        max_lap = max(max_lap, ln)
+        drivers_data.setdefault(dn, []).append({
+            "lap": ln,
+            "time": round(dur, 3) if dur else None,
+            "compound": _get_compound(dn, ln),
+            "is_pit_out": lap.get("is_pit_out_lap", False),
+            "st_speed": lap.get("st_speed"),
+        })
+
+    drivers = []
+    for dn, laps in sorted(drivers_data.items(), key=lambda x: x[0]):
+        info = enrich_driver(dn, season=season)
+        laps.sort(key=lambda l: l["lap"])
+        valid_times = [l["time"] for l in laps if l["time"] and not l["is_pit_out"]]
+        best = min(valid_times) if valid_times else None
+        drivers.append({
+            "driver_number": dn,
+            "code": info.get("code", str(dn)),
+            "team": info.get("team", ""),
+            "team_color": info.get("team_color", "#888"),
+            "best_lap": round(best, 3) if best else None,
+            "laps": laps,
+        })
+
+    drivers.sort(key=lambda d: d["best_lap"] or 9999)
+    result = {"session_key": session_key, "total_laps": max_lap, "drivers": drivers}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============ LIVE CAR DATA (SPEEDOMETER) ============
+
+async def get_live_car_data(driver_number: int) -> Dict[str, Any]:
+    """Get latest car telemetry for a single driver — speed, throttle, brake, gear, DRS, RPM."""
+    cache_key = f"car_data:{driver_number}"
+    cached = cache_get(cache_key, ttl_override=2)
+    if cached:
+        return cached
+
+    season = _live_season()
+    raw = await fetch_openf1("car_data", {
+        "session_key": "latest",
+        "driver_number": driver_number,
+    })
+    if not raw:
+        return {"error": "no_data"}
+
+    latest = raw[-1] if raw else {}
+    info = enrich_driver(driver_number, season=season)
+
+    result = {
+        "driver_number": driver_number,
+        "code": info.get("code", str(driver_number)),
+        "team": info.get("team", ""),
+        "team_color": info.get("team_color", "#888"),
+        "speed": latest.get("speed", 0),
+        "throttle": latest.get("throttle", 0),
+        "brake": latest.get("brake", 0),
+        "gear": latest.get("n_gear", 0),
+        "drs": latest.get("drs", 0),
+        "rpm": latest.get("rpm", 0),
+        "date": latest.get("date", ""),
+    }
+    cache_set(cache_key, result)
+    return result

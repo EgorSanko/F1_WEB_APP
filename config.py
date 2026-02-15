@@ -51,6 +51,11 @@ CACHE_TTL = {
     "strategy_prediction": 600,   # 10 min — strategy simulation
     "weather_radar": 120,         # 2 min — radar updates every 5 min
     "article": 3600,              # 1 hour — articles don't change
+    "race_trace": 300,            # 5 min — race trace data
+    "speed_traps": 300,           # 5 min — speed trap leaderboard
+    "lap_time_series": 300,       # 5 min — all lap times
+    "h2h": 900,                   # 15 min — head-to-head
+    "car_data": 2,                  # 2 sec — live car telemetry
 }
 
 # ============ GAME SETTINGS ============
