@@ -1186,7 +1186,7 @@
                             ) : (
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                                     {allDrivers.map(d=>{
-                                        const bigPhoto = d.photo_url_large || largePhoto(d.photo_url);
+                                        const bigPhoto = d.card_photo_url || d.photo_url_large || largePhoto(d.photo_url);
                                         return (
                                             <div key={d.driver_number} onClick={()=>openDriver(d.driver_number)}
                                                  style={{cursor:'pointer',borderRadius:16,overflow:'hidden',position:'relative',background:'var(--f1-card)',border:'1px solid var(--f1-border)',boxShadow:'0 4px 24px rgba(0,0,0,0.2)',transition:'transform 0.15s'}}>
