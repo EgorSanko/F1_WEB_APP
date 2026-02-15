@@ -2,7 +2,7 @@
 
 # 🏎️ F1 Hub — Telegram Mini App
 
-### Всё о Формуле 1 в одном приложении
+### Всё о Формуле 1 в одном приложении (и даже больше)
 
 [![Telegram Bot](https://img.shields.io/badge/Telegram-@F1__egor__bot-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/F1_egor_bot)
 [![Live](https://img.shields.io/badge/🌐_Live-f1.lead--seek.ru-E10600?style=for-the-badge)](https://f1.lead-seek.ru)
@@ -10,401 +10,217 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![RAM](https://img.shields.io/badge/RAM-~47MB-green?style=for-the-badge)](/)
+[![Vibes](https://img.shields.io/badge/Vibes-Immaculate-ff69b4?style=for-the-badge)](/)
 
 <br/>
 
-<img src="https://media.formula1.com/image/upload/f_auto,c_limit,w_1440,q_auto/f_auto/q_auto/content/dam/fom-website/2018-redesign-assets/Racehub%20header%20images/Australia" width="100%" style="border-radius: 16px" alt="F1 Banner"/>
+<img src="screenshots/banner.jpg" width="100%" style="border-radius: 16px" alt="F1 Hub Banner"/>
 
 <br/>
 
-**Live тайминги** · **Прогнозы** · **Чемпионат** · **Новости** · **Аналитика** · **Мини-игры**
+*Когда твоё приложение настолько хорошее, что даже Ferrari одобряет* 🤌
+
+**Live тайминги** · **AI Стратегия** · **Телеметрия** · **Радар осадков** · **Прогнозы** · **Чемпионат** · **Новости**
+
+<sub>22 пилота · 11 команд · 24 гонки · 2 сезона · 1 голый Боттас · 47MB RAM · 0 багов (наверное)</sub>
 
 ---
 
 </div>
 
-## ✨ О проекте
+## 🤔 Что это вообще такое?
 
-**F1 Hub** — полноценное Telegram Mini App для фанатов Формулы 1. Открывается внутри Telegram через бота, работает как SPA с бэкендом, базой данных и интеграцией с внешними API.
+**F1 Hub** — это когда ты фанат Формулы 1 и тебе мало просто смотреть гонки. Тебе нужно знать что Норрис на 0.003с быстрее Ферстаппена в третьем секторе, какой compound стоит у Хэмилтона, и будет ли дождь через 15 минут.
 
-> 🏁 Live позиции и тайминги во время сессий  
-> 🔮 Система прогнозов с очками и лидербордом  
-> 📊 Аналитика стратегий (шины, позиции, темпы)  
-> 📰 Новости с championat.com в реальном времени  
-> 📺 Видео с YouTube + записи трансляций VK  
-> 🏆 Чемпионат пилотов и конструкторов  
+Всё это — прямо в Telegram. Открыл бота, нажал кнопку, и ты как стратег на пит-уолле. Только без зарплаты в $500k.
+
+> 🏁 **Live позиции** — как будто сидишь в командном штабе
+> 🧠 **AI Стратегия** — моделирует пит-стопы (точность примерно как у Ferrari)
+> 📻 **Командное радио** — слушай как пилоты ругаются на инженеров
+> 🌧 **Радар осадков** — единственное что работает лучше чем у FIA
+> 🔮 **Прогнозы** — угадай победителя и докажи что ты умнее букмекеров
+> 📰 **Новости** — свежее с championat.com пока ты на работе
 
 ---
 
-## 🖼️ Скриншоты
+## 📸 А как оно выглядит?
 
 <div align="center">
 <table>
 <tr>
-<td align="center"><b>🏠 Главная</b><br/><sub>Следующий ГП, таймер, подиум, чемпионат</sub></td>
-<td align="center"><b>🏁 Live тайминги</b><br/><sub>Позиции, секторы, шины, гэпы</sub></td>
-<td align="center"><b>📊 Аналитика</b><br/><sub>Стратегия шин, позиции, темпы</sub></td>
+<td align="center"><b>🏠 Главная</b><br/><sub>Таймер, чемпионат, ближайшие гонки</sub><br/><img src="screenshots/home.png" width="250"/></td>
+<td align="center"><b>🏁 Live</b><br/><sub>Позиции, секторы, шины, погода</sub><br/><img src="screenshots/live.png" width="250"/></td>
+<td align="center"><b>🃏 Карточки</b><br/><sub>Все 22 пилота с фото и цветами</sub><br/><img src="screenshots/cards.png" width="250"/></td>
 </tr>
 <tr>
-<td align="center"><b>🏆 Чемпионат</b><br/><sub>Пилоты, конструкторы, карточки, команды</sub></td>
-<td align="center"><b>📰 Новости</b><br/><sub>Championat.com + Telegram</sub></td>
-<td align="center"><b>👤 Профиль</b><br/><sub>Статистика, достижения, лидерборд</sub></td>
+<td align="center"><b>🧠 AI Стратегия</b><br/><sub>5 вариантов пит-стопов, деградация</sub><br/><img src="screenshots/strategy.png" width="250"/></td>
+<td align="center"><b>🌧 Радар</b><br/><sub>RainViewer + погода с трассы</sub><br/><img src="screenshots/weather.png" width="250"/></td>
+<td align="center"><b>📅 Календарь 2026</b><br/><sub>Флаги, фоны трасс, время МСК</sub><br/><img src="screenshots/schedule.png" width="250"/></td>
+</tr>
+<tr>
+<td align="center"><b>🏆 Standings</b><br/><sub>Пилоты и конструкторы</sub><br/><img src="screenshots/standings.png" width="250"/></td>
+<td align="center"><b>📋 Детали ГП</b><br/><sub>Сессии, стратегия, результаты</sub><br/><img src="screenshots/race_detail.png" width="250"/></td>
+<td align="center"><b>📅 Сезон 2025</b><br/><sub>Все результаты с фото</sub><br/><img src="screenshots/schedule_2025.png" width="250"/></td>
 </tr>
 </table>
 </div>
 
 ---
 
-## 🛠️ Стек технологий
+## 🚀 Фичи (их много)
 
-<div align="center">
-
-| Слой | Технология | Описание |
-|:---:|:---|:---|
-| 🎨 | **React 18 + Tailwind CSS** | SPA в одном HTML · Babel standalone · Мгновенная загрузка |
-| ⚡ | **FastAPI (Python 3.11)** | Async API · Автодокументация Swagger · Один файл |
-| 🗃️ | **SQLite (WAL mode)** | Встроена в Python · Один файл .db · Легко бэкапить |
-| 🐳 | **Docker Compose** | API + Bot + Nginx · Let's Encrypt SSL |
-| 📡 | **OpenF1 API** | Live данные: позиции, круги, шины, радио, погода |
-| 📈 | **Ergast / Jolpica** | Историческая статистика, standings, расписание |
-| 📰 | **Championat.com** | Парсинг новостей F1 в реальном времени |
-| 📺 | **YouTube RSS** | Видео Formula 1 Official без API ключа |
-
-</div>
-
----
-
-## 🏗️ Архитектура
-
-```
-┌──────────────────────────────────────────────────┐
-│           Telegram Mini App (WebApp)              │
-│        React 18 · Tailwind · Babel · SPA          │
-│            index.html (~5000 строк)               │
-├──────────────────────────────────────────────────┤
-│              FastAPI Backend (api.py)              │
-│          Python 3.11 · Uvicorn · async             │
-├────────┬──────────┬──────────┬───────────────────┤
-│ OpenF1 │ Jolpica  │Telegram  │ YouTube RSS       │
-│ (live) │(history) │ Bot API  │ Championat.com    │
-├────────┴──────────┴──────────┴───────────────────┤
-│                 SQLite Database                    │
-│      users · predictions · games · achievements   │
-└──────────────────────────────────────────────────┘
-```
-
----
-
-## 📦 Структура проекта
-
-```
-f1-hub/
-├── 🐍 api.py              # FastAPI бэкенд (30+ эндпоинтов)
-├── 🤖 bot.py              # Telegram бот
-├── 📊 f1_data.py          # Класс работы с данными F1
-├── ⚙️ config.py            # Конфигурация, пилоты, команды, цвета
-├── 🗃️ database.py          # SQLite ORM
-├── 🎨 index.html           # React SPA (весь фронтенд)
-├── 🐳 Dockerfile
-├── 🐳 docker-compose.yml
-├── 🌐 nginx.conf
-├── 📋 requirements.txt
-├── 🔒 .env.example
-└── 📖 README.md
-```
-
----
-
-## 🚀 Возможности
-
-### 🏠 Главная страница
-- Карточка следующего Гран-при с обратным отсчётом
-- Подиум последней гонки (2-1-3 с фотографиями пилотов)
-- Топ-3 чемпионата с большими фото и цветами команд
-- Карусель видео с YouTube
+### 🏠 Главная
+- Карточка следующего ГП с **фоном трассы** и обратным отсчётом
+- Ближайшие 5 гонок с флагами стран
+- Топ-3 чемпионата с фото
+- Переключатель **2025 ↔ 2026** (да, два сезона, мы не ленивые)
 
 ### 🏁 Live тайминги
-- Позиции пилотов в реальном времени (обновление каждые 10 сек)
-- Секторы: зелёный = personal best, фиолетовый = session best
-- Текущие шины каждого пилота (SOFT / MEDIUM / HARD / INTER / WET)
-- Пит-стопы с временем и количеством
-- Командное радио (аудио)
-- Сообщения дирекции гонки (флаги, штрафы, SC/VSC)
-- Погода на трассе
+- Позиции пилотов в реальном времени
+- Фото с CDN formula1.com (кроп по лицу, а не по ногам)
+- Секторы с цветами (зелёный/фиолетовый как в телеке)
+- Шины, пит-стопы, радио, погода, дирекция гонки
+- Сообщения дирекции **на русском** — 14 точных переводов + 24 паттерна
+- **Демо-режим** — работает даже когда нет гонки (а это 90% времени)
 
-### 📊 Аналитика
-- **Стратегия шин** — визуализация стинтов всех пилотов (Chart.js)
-- **Позиции по кругам** — линейный график изменения позиций
-- **Темпы** — сравнение времён кругов
+### 📊 Аналитика (7 вкладок, да)
+| Вкладка | Что делает | Насколько полезно |
+|:---|:---|:---|
+| 🛞 Шины | Стинты всех пилотов | ⭐⭐⭐⭐⭐ |
+| 📈 Позиции | График изменения позиций | ⭐⭐⭐⭐ |
+| ⏱ Темпы | Сравнение времён кругов | ⭐⭐⭐⭐ |
+| 📉 Деградация | Scatter plot с трендами | ⭐⭐⭐⭐ |
+| 🔬 Телеметрия | Speed/throttle/brake двух пилотов | ⭐⭐⭐⭐⭐ |
+| 🧠 AI Стратегия | Моделирование пит-стопов | ⭐⭐⭐ (точность Ferrari) |
+| 🌧 Радар | Осадки + вероятность дождя | ⭐⭐⭐⭐ |
 
-### 🏆 Чемпионат (4 вкладки)
-- **Пилоты** — топ-3 увеличенные карточки с золотым/серебряным/бронзовым, progress bars
-- **Кубок конструкторов** — лого, два пилота с фото, очки
-- **Карточки пилотов** — сетка 2×N с большими фото, gradient overlay цвета команды
-- **Команды** — фото болида, лого, пилоты, позиция в чемпионате
-
-### 📰 Новости
-- Парсинг championat.com (до 25 статей)
-- Фото, заголовок, превью, дата
-- Fallback на Telegram канал
-
-### 🔮 Прогнозы
-- 6 типов: победитель, подиум, топ-10, быстрый круг, DNF, Safety Car
-- Система очков за точность
-- Автоматический расчёт после гонки
-
-### 📺 Видео и трансляции
-- YouTube RSS (Formula 1 Official)
-- Ссылки на VK Video, YouTube, Telegram каналы
-- Записи прошлых трансляций (VK Video @stanizlavskylive)
-
-### 👤 Профиль
-- Статистика: прогнозы, точность, серия, очки
-- 12 достижений
-- Глобальный лидерборд
+### 🏆 Чемпионат
+- **Пилоты** — standings с большими фото
+- **Конструкторы** — per-driver contribution (кто тащит, а кто на пассажирском)
+- **Карточки** — сетка 2×11 с фото formula1.com CDN
+- **Команды** — фото болидов, лого, пилоты
 
 ---
 
-## 📅 Расписание
+## 🏎 Пилоты 2026
 
-- Большая карточка следующего ГП с обратным отсчётом
-- Разделение: «Прошедшие» / «Предстоящие»
-- Победитель с фото у прошлых гонок
-- Кнопка 📺 «Запись» — ссылка на VK Video трансляцию
+| Команда | Пилот 1 | Пилот 2 | Vibe |
+|:---|:---|:---|:---|
+| 🟠 McLaren | #1 Norris 🏆 | #81 Piastri | Чемпионы и красавцы |
+| 🔵 Red Bull | #3 Verstappen | #6 Hadjar | Макс и новичок |
+| 🟢 Mercedes | #63 Russell | #87 Antonelli | PowerPoint King + вундеркинд |
+| 🔴 Ferrari | #44 Hamilton | #16 Leclerc | Dream team (наконец-то) |
+| 🟢 Aston Martin | #14 Alonso | #18 Stroll | Дед и миллиардер |
+| ⚪ Williams | #23 Albon | #55 Sainz | Smooth operators |
+| 🔵 Alpine | #10 Gasly | #43 Colapinto | Pierre + аргентинский хаос |
+| ⚫ Haas | #31 Ocon | #7 Bearman | Тихий серьёзный тим |
+| 🔵 Racing Bulls | #22 Tsunoda | #41 Lindblad | Юки кричит, Арвид едет |
+| 🟢 Audi | #27 Hulkenberg | #5 Bortoleto | Подиум? Не, не слышали |
+| 🟤 Cadillac | #11 Perez | #77 Bottas 😎 | [см. карточку Боттаса] |
 
 ---
 
-## ⚡ Быстрый старт
+## 🛠 Под капотом
 
-### Требования
+```
+┌─────────────────────────────────────────────────────┐
+│           Telegram Mini App (WebApp)                │
+│      React 18 · Babel · SPA · index.html            │
+│              "один файл, чтобы править всеми"       │
+├─────────────────────────────────────────────────────┤
+│            Nginx (SSL · Static · Proxy)             │
+│     /static/drivers/77_custom.jpg 😎                │
+├─────────────────────────────────────────────────────┤
+│              FastAPI Backend (api.py)                │
+│      Python 3.11 · Uvicorn · async · ~47MB RAM      │
+│         "работает на VPS за $5/мес"                 │
+├────────┬──────────┬──────────┬───────────┬──────────┤
+│ OpenF1 │ Jolpica  │RainViewer│ VK API    │Formula1  │
+│ (live) │(history) │(weather) │(записи)   │(фото)   │
+├────────┴──────────┴──────────┴───────────┴──────────┤
+│                  SQLite Database                    │
+│       users · predictions · games · achievements    │
+│            "PostgreSQL дома:"                       │
+└─────────────────────────────────────────────────────┘
+```
 
-- Docker & Docker Compose
-- Домен с SSL (Telegram WebApp **требует** HTTPS)
-- Telegram Bot Token (от [@BotFather](https://t.me/BotFather))
+| Что | Чем | Зачем |
+|:---|:---|:---|
+| 🎨 Фронтенд | React 18 + Babel | Один HTML файл, zero build step |
+| ⚡ Бэкенд | FastAPI | Потому что Flask — это прошлый век |
+| 🗃 БД | SQLite WAL | Потому что PostgreSQL жрёт RAM |
+| 🐳 Деплой | Docker Compose | Потому что "у меня локально работает" |
+| 📡 Live | OpenF1 API | Бесплатно и без ключей |
+| 📈 История | Jolpica API | Ergast умер, Jolpica живёт |
+| 🌧 Погода | RainViewer | Бесплатный радар |
+| 🖼 Фото | Formula1.com CDN | Cloudinary творит чудеса |
+| 🏳 Флаги | flagcdn.com | Потому что эмодзи-флаги не везде |
 
-### 1. Клонируй репозиторий
+---
+
+## ⚡ Запуск за 2 минуты
 
 ```bash
+# 1. Клонируй
 git clone https://github.com/EgorSanko/F1_WEB_APP.git
 cd F1_WEB_APP
-```
 
-### 2. Настрой окружение
-
-```bash
+# 2. Настрой
 cp .env.example .env
-nano .env
-```
+nano .env  # BOT_TOKEN, WEBAPP_URL, VK_TOKEN
 
-```env
-TELEGRAM_TOKEN=your_bot_token_here
-WEBAPP_URL=https://yourdomain.com
-ADMIN_IDS=your_telegram_id
-```
-
-### 3. SSL сертификат
-
-```bash
-apt install certbot python3-certbot-nginx
-certbot --nginx -d yourdomain.com
-```
-
-### 4. Запусти
-
-```bash
+# 3. Запусти
 docker compose up -d --build
-```
 
-### 5. Проверь
-
-```bash
-curl https://yourdomain.com/api/health
-# {"status": "ok", "timestamp": "..."}
+# 4. Готово. Серьёзно, это всё.
 ```
 
 ---
 
-## 🔌 API Endpoints
+## 🔧 Как мы впихнули всё в 47MB RAM
 
-<details>
-<summary><b>👤 Пользователи</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/user/me` | Текущий пользователь |
-| POST | `/api/user/favorite` | Установить любимого пилота |
-| GET | `/api/user/predictions` | Мои прогнозы |
-| GET | `/api/user/achievements` | Мои достижения |
-| GET | `/api/avatar/{user_id}` | Аватарка |
-
-</details>
-
-<details>
-<summary><b>🏁 Live данные</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/live/session` | Текущая сессия |
-| GET | `/api/live/positions` | Позиции в реальном времени |
-| GET | `/api/live/timing` | Секторы, лучшие круги, гэпы |
-| GET | `/api/live/tyres` | Текущие шины |
-| GET | `/api/live/weather` | Погода на трассе |
-| GET | `/api/live/race-control` | Сообщения дирекции |
-| GET | `/api/live/radio` | Командное радио |
-| GET | `/api/live/pit-stops` | Пит-стопы |
-
-</details>
-
-<details>
-<summary><b>📅 Расписание и результаты</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/schedule` | Календарь сезона |
-| GET | `/api/race/next` | Следующий ГП + таймер |
-| GET | `/api/race/last` | Последний результат |
-| GET | `/api/race/{round}/results` | Результаты гонки |
-
-</details>
-
-<details>
-<summary><b>🏆 Чемпионат</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/standings/drivers` | Чемпионат пилотов |
-| GET | `/api/standings/constructors` | Чемпионат конструкторов |
-| GET | `/api/drivers` | Все пилоты с фото |
-| GET | `/api/driver/{number}` | Карточка пилота |
-| GET | `/api/teams` | Все команды |
-
-</details>
-
-<details>
-<summary><b>🔮 Прогнозы и игры</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/predictions/available` | Доступные прогнозы |
-| POST | `/api/predictions/make` | Сделать прогноз |
-| GET | `/api/predictions/results` | Результаты |
-| POST | `/api/games/result` | Результат мини-игры |
-| GET | `/api/leaderboard` | Рейтинг пользователей |
-
-</details>
-
-<details>
-<summary><b>📰 Контент</b></summary>
-
-| Метод | Эндпоинт | Описание |
-|:---:|:---|:---|
-| GET | `/api/news` | Новости (championat.com) |
-| GET | `/api/streams` | Видео (YouTube RSS) |
-| GET | `/api/past-races-vk` | Записи трансляций VK |
-| GET | `/api/analytics/strategy` | Стратегия шин |
-| GET | `/api/analytics/positions` | Позиции по кругам |
-| GET | `/api/analytics/pace` | Темпы |
-
-</details>
+| Проблема | Решение | Было → Стало |
+|:---|:---|:---|
+| `/location` убивал сервер | Заменили на `/position` | 77MB → 46MB |
+| Whisper жрал RAM | Groq API (бесплатно) | -500MB |
+| Фото пилотов | CDN formula1.com | 0 байт на диске |
+| 3000 запросов/сек | Семафор на 3 | Сервер жив |
+| Нет live сессии | Демо-режим | Всегда работает |
 
 ---
 
-## 🎨 Дизайн
+## 🎨 Пасхалки
 
-Приложение использует фирменную палитру F1:
-
-| Цвет | Hex | Использование |
-|:---:|:---:|:---|
-| 🔴 | `#E10600` | F1 Red — акценты, кнопки, активные элементы |
-| ⬛ | `#15151E` | Dark — основной фон |
-| ⬜ | `#FFFFFF` | White — текст |
-| 🔵 | `#3671C6` | Red Bull Racing |
-| 🟢 | `#27F4D2` | Mercedes |
-| 🔴 | `#E8002D` | Ferrari |
-| 🟠 | `#FF8000` | McLaren |
-| 🟢 | `#229971` | Aston Martin |
-
-### Цвета шин
-
-| Тип | Цвет | Hex |
-|:---:|:---:|:---:|
-| 🔴 SOFT | Красный | `#FF3333` |
-| 🟡 MEDIUM | Жёлтый | `#FFD700` |
-| ⚪ HARD | Белый | `#CCCCCC` |
-| 🟢 INTER | Зелёный | `#39B54A` |
-| 🔵 WET | Синий | `#0067FF` |
-
----
-
-## 🗄️ База данных
-
-```sql
-users              — Telegram пользователи, очки, любимый пилот
-predictions        — Прогнозы на гонки (6 типов)
-games              — Результаты мини-игр
-achievements       — Разблокированные достижения
-leaderboard_cache  — Кэш рейтинга
-```
-
----
-
-## 🔧 Конфигурация
-
-Все настройки в `config.py`:
-
-- **20 пилотов** сезона 2025 с номерами, командами, странами
-- **10 команд** с HEX-цветами
-- **24 трассы** с координатами, изображениями, часовыми поясами
-- **Ассеты команд** — логотипы и фото болидов с formula1.com
-- **48 записей трансляций** VK Video (2024 + 2025 сезоны)
-- **12 достижений** — от «Первый прогноз» до «Непобедимый»
-- **Система очков** прогнозов с коэффициентами
-
----
-
-## 📡 Источники данных
-
-| API | Тип | Auth | Лимиты |
-|:---|:---|:---:|:---|
-| [OpenF1](https://openf1.org) | Live данные | ❌ Не нужна | Без жёсткого лимита |
-| [Jolpica/Ergast](https://github.com/jolpica/jolpica-f1) | Историческая статистика | ❌ Не нужна | 4 req/sec, 200/час |
-| [Championat.com](https://www.championat.com/auto/_f1.html) | Новости F1 | ❌ Не нужна | HTML парсинг |
-| [YouTube RSS](https://www.youtube.com/feeds/videos.xml) | Видео | ❌ Не нужна | Без лимита |
-| [Formula1.com](https://formula1.com) | Фото, ассеты | ❌ Не нужна | CDN |
-
----
-
-## 📝 Кэширование
-
-| Данные | TTL | Описание |
-|:---|:---:|:---|
-| Live позиции | 10 сек | Во время активной сессии |
-| Погода | 5 мин | Обновляется часто |
-| Standings | 15 мин | Обновляется после гонок |
-| Расписание | 1 час | Редко меняется |
-| Новости | 15 мин | Championat.com |
-| Видео | 30 мин | YouTube RSS |
-| Результаты гонок | 1 час | Не меняются |
-| Пилоты/команды | 24 часа | Стабильные данные |
+- 🥚 Фото Боттаса в карточках — **особенное** (если знаешь, знаешь)
+- 🥚 Дирекция гонки переведена на русский с любовью
+- 🥚 AI стратегия работает с точностью стратегов Ferrari (~50%)
+- 🥚 Антиспойлер для тех кто смотрит гонки в понедельник
+- 🥚 `"PostgreSQL дома:"` в архитектуре — не баг, а фича
 
 ---
 
 ## 🤝 Благодарности
 
-- [OpenF1](https://openf1.org) — за бесплатный live API Формулы 1
-- [Jolpica](https://github.com/jolpica/jolpica-f1) — за поддержку зеркала Ergast API
-- [Championat.com](https://www.championat.com) — за качественные новости F1
-- [@stanizlavskylive](https://vkvideo.ru/@stanizlavskylive) — за трансляции гонок
-- [Formula 1](https://formula1.com) — за медиа-ассеты
+- [OpenF1](https://openf1.org) — без вас ничего бы не было
+- [Jolpica](https://github.com/jolpica/jolpica-f1) — RIP Ergast, вы достойная замена
+- [RainViewer](https://rainviewer.com) — бесплатный радар, вы лучшие
+- [Championat.com](https://www.championat.com) — за новости которые мы парсим
+- [Formula 1](https://formula1.com) — за CDN с фотками
+- [Claude](https://claude.ai) — за написание 90% кода (не шутка)
+- Боттас — за вдохновение 😎
 
 ---
 
 <div align="center">
 
-### Сделано с ❤️ и 🏎️
+### Сделано с ❤️, ☕ и бессонными ночами
 
-[![Telegram](https://img.shields.io/badge/Открыть_бота-Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/F1_egor_bot)
+[![Telegram](https://img.shields.io/badge/Попробовать-Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/F1_egor_bot)
 
-<sub>© 2025 F1 Hub · Не аффилирован с Formula 1 или FIA</sub>
+<sub>© 2025-2026 F1 Hub · Не аффилирован с Formula 1, FIA, Ferrari или Боттасом</sub>
+
+*"If you no longer go for a gap that exists, you are no longer a racing driver"* — Ayrton Senna
+*"Bwoah"* — Kimi Räikkönen
 
 </div>
