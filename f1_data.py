@@ -310,6 +310,7 @@ async def fetch_ergast(
     retries: int = 2,
     retry_delay: float = 1.0,
     limit: int = None,
+    offset: int = None,
 ) -> Optional[Dict]:
     """
     Fetch from Ergast/Jolpica API with rate limiting and retry.
@@ -318,8 +319,13 @@ async def fetch_ergast(
     await _ergast_limiter.acquire()
     client = get_client()
     url = f"{ERGAST_API}/{endpoint}.json"
+    params = []
     if limit:
-        url += f"?limit={limit}"
+        params.append(f"limit={limit}")
+    if offset:
+        params.append(f"offset={offset}")
+    if params:
+        url += "?" + "&".join(params)
 
     for attempt in range(retries + 1):
         try:
@@ -2862,7 +2868,7 @@ async def get_head_to_head(season: int = 2025) -> Dict[str, Any]:
         return cached
 
     standings = await get_driver_standings(season=season)
-    drivers_list = standings.get("drivers", [])
+    drivers_list = standings.get("standings", [])
 
     team_drivers: Dict[str, list] = {}
     for d in drivers_list:
@@ -3022,41 +3028,74 @@ async def get_points_progression(season: int = None) -> Dict[str, Any]:
     if cached:
         return cached
 
-    # Fetch all race results with high limit (Ergast default is 30)
     prefix = ergast_season(s)
-    data = await fetch_ergast(f"{prefix}/results", limit=600)
-    if not data:
-        return {"error": "Failed to fetch results", "drivers": []}
 
-    races = data.get("RaceTable", {}).get("Races", [])
-    if not races:
+    async def _fetch_all_pages(endpoint: str, result_key: str = "Results") -> Dict[int, list]:
+        """Fetch all paginated results, merge by round number."""
+        races_by_round: Dict[int, list] = {}
+        offset = 0
+        while True:
+            data = await fetch_ergast(f"{prefix}/{endpoint}", limit=100, offset=offset)
+            if not data:
+                break
+            races_page = data.get("RaceTable", {}).get("Races", [])
+            if not races_page:
+                break
+            for race in races_page:
+                rnd = int(race["round"])
+                results = race.get(result_key, [])
+                if rnd not in races_by_round:
+                    races_by_round[rnd] = []
+                races_by_round[rnd].extend(results)
+            total = int(data.get("total", 0))
+            offset += 100
+            if offset >= total:
+                break
+        return races_by_round
+
+    # Fetch race results + sprint results in parallel
+    race_results, sprint_results = await asyncio.gather(
+        _fetch_all_pages("results", "Results"),
+        _fetch_all_pages("sprint", "SprintResults"),
+    )
+
+    if not race_results and not sprint_results:
         return {"drivers": [], "rounds": [], "not_started": True}
 
+    # Merge all rounds, sorted
+    all_rounds = sorted(set(list(race_results.keys()) + list(sprint_results.keys())))
+
     # Build cumulative points per driver
-    driver_cumulative = {}  # driver_id -> {info, points_by_round: []}
-    round_labels = []
+    driver_cumulative = {}  # driver_id -> {info, cumulative, points_by_round}
 
-    for race in races:
-        round_num = int(race["round"])
-        round_labels.append(round_num)
+    for round_num in all_rounds:
+        # Collect all results for this round (sprint + race)
+        round_results = sprint_results.get(round_num, []) + race_results.get(round_num, [])
 
-        for result in race.get("Results", []):
+        # Aggregate points per driver for this round
+        round_driver_pts = {}
+        for result in round_results:
             driver_id = result["Driver"]["driverId"]
             pts = float(result.get("points", 0))
             driver_num = int(result.get("number", 0))
+            if driver_id not in round_driver_pts:
+                round_driver_pts[driver_id] = {"pts": 0, "num": driver_num, "result": result}
+            round_driver_pts[driver_id]["pts"] += pts
 
+        for driver_id, info in round_driver_pts.items():
             if driver_id not in driver_cumulative:
-                info = enrich_driver(driver_num, season=s)
+                enriched = enrich_driver(info["num"], season=s)
+                r = info["result"]
                 driver_cumulative[driver_id] = {
-                    "driver_number": driver_num,
-                    "code": info.get("code", driver_id[:3].upper()),
-                    "name": info.get("name", result["Driver"].get("familyName", "")),
-                    "team": info.get("team", result.get("Constructor", {}).get("name", "")),
-                    "team_color": info.get("team_color", "#888"),
+                    "driver_number": info["num"],
+                    "code": enriched.get("code", driver_id[:3].upper()),
+                    "name": enriched.get("name", r["Driver"].get("familyName", "")),
+                    "team": enriched.get("team", r.get("Constructor", {}).get("name", "")),
+                    "team_color": enriched.get("team_color", "#888"),
                     "points": [],
                     "cumulative": 0,
                 }
-            driver_cumulative[driver_id]["cumulative"] += pts
+            driver_cumulative[driver_id]["cumulative"] += info["pts"]
             driver_cumulative[driver_id]["points"].append({
                 "round": round_num,
                 "cumulative": driver_cumulative[driver_id]["cumulative"],
@@ -3078,6 +3117,6 @@ async def get_points_progression(season: int = None) -> Dict[str, Any]:
             "progression": d["points"],
         })
 
-    response = {"drivers": drivers_out, "rounds": round_labels, "season": s}
+    response = {"drivers": drivers_out, "rounds": all_rounds, "season": s}
     cache_set(cache_key, response)
     return response
