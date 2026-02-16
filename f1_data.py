@@ -206,12 +206,14 @@ async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
         cache_set("_fallback_resolved", {"key": "latest", "is_demo": False})
         return "latest", False, None
 
-    # Not live — use this session's key
+    # Not live — check if this is a proper race/quali session (not pre-season testing)
+    session_name = session.get("session_name", "")
+    is_testing = "Day" in session_name or "Test" in session_name.lower()
     sk = session.get("session_key")
-    if sk:
+    if sk and not is_testing:
         info = {
             "session_key": sk,
-            "session_name": session.get("session_name", ""),
+            "session_name": session_name,
             "session_type": session.get("session_type", ""),
             "meeting_name": session.get("meeting_name", ""),
             "circuit_short_name": session.get("circuit_short_name", ""),
@@ -2042,68 +2044,122 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
     if cached:
         return cached
 
-    # 2) File cache (survives restarts)
+    # 2) File cache (survives restarts) — validate the loop is closed
     cache_file = os.path.join(TRACK_CACHE_DIR, f"{session_key}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r") as f:
                 points = json.load(f)
             if points and len(points) >= 20:
-                cache_set(cache_key, points)
-                return points
-        except (json.JSONDecodeError, IOError):
+                # Validate: first and last points must be close (closed loop)
+                dx = points[0]["x"] - points[-1]["x"]
+                dy = points[0]["y"] - points[-1]["y"]
+                gap = (dx * dx + dy * dy) ** 0.5
+                xs = [p["x"] for p in points]
+                ys = [p["y"] for p in points]
+                rng = max(max(xs) - min(xs), max(ys) - min(ys)) or 1
+                if gap / rng < 0.15:  # gap < 15% of range = good loop
+                    cache_set(cache_key, points)
+                    return points
+                else:
+                    logger.info(f"Track outline {session_key} has bad loop (gap={gap:.0f}, {gap/rng*100:.0f}%), regenerating")
+                    os.remove(cache_file)
+        except (json.JSONDecodeError, IOError, KeyError):
             pass
 
     # 3) Fetch from OpenF1 (heavy — only once)
-    laps = await fetch_openf1("laps", {
-        "session_key": session_key,
-        "driver_number": 1,
-    })
-    if not laps:
+    # Try multiple drivers to find the best closed-loop outline
+    best_points = None
+    best_gap_pct = 999.0
+
+    for driver_num in [1, 44, 4, 63, 16]:
         laps = await fetch_openf1("laps", {
             "session_key": session_key,
-            "driver_number": 44,
+            "driver_number": driver_num,
         })
-    if not laps:
-        return None
+        if not laps:
+            continue
 
-    # Find a complete mid-race lap (not first lap, has date_start)
-    target_lap = None
-    for lap in laps:
-        if lap.get("date_start") and lap.get("lap_number", 0) > 2 and lap.get("lap_duration"):
-            target_lap = lap
-            break
-    if not target_lap and laps:
-        for lap in laps:
-            if lap.get("date_start"):
-                target_lap = lap
+        # Collect candidate laps (mid-race, has date_start + duration)
+        candidates = [
+            lap for lap in laps
+            if lap.get("date_start") and lap.get("lap_duration")
+            and lap.get("lap_number", 0) > 2
+        ]
+        if not candidates:
+            candidates = [lap for lap in laps if lap.get("date_start")]
+        if not candidates:
+            continue
+
+        # Try up to 3 different laps from this driver
+        for target_lap in candidates[:3]:
+            dn = target_lap.get("driver_number", driver_num)
+            date_start = target_lap["date_start"]
+            location = await fetch_openf1("location", {
+                "session_key": session_key,
+                "driver_number": dn,
+                "date>": date_start,
+            })
+            if not location or len(location) < 50:
+                continue
+
+            lap_dur = target_lap.get("lap_duration") or 90
+            max_pts = int(lap_dur * 3.7) * 2 + 100
+            pts_raw = location[:max_pts]
+
+            # Find closest-to-start point (loop-closing)
+            first_x = pts_raw[0].get("x", 0)
+            first_y = pts_raw[0].get("y", 0)
+            min_idx = int(len(pts_raw) * 0.4)
+            best_idx = len(pts_raw) - 1
+            best_dist_sq = float("inf")
+            for i in range(min_idx, len(pts_raw)):
+                dx = pts_raw[i].get("x", 0) - first_x
+                dy = pts_raw[i].get("y", 0) - first_y
+                d = dx * dx + dy * dy
+                if d < best_dist_sq:
+                    best_dist_sq = d
+                    best_idx = i
+                    if d < 200 * 200:
+                        break
+            pts_raw = pts_raw[:best_idx + 1]
+
+            # Downsample
+            stride = max(1, len(pts_raw) // 250)
+            pts_down = [
+                {"x": p.get("x", 0), "y": p.get("y", 0)}
+                for i, p in enumerate(pts_raw) if i % stride == 0
+                if p.get("x") is not None and p.get("y") is not None
+            ]
+            if len(pts_down) < 20:
+                continue
+
+            # Compute gap quality
+            f, l = pts_down[0], pts_down[-1]
+            gap = ((f["x"] - l["x"]) ** 2 + (f["y"] - l["y"]) ** 2) ** 0.5
+            xs = [p["x"] for p in pts_down]
+            ys = [p["y"] for p in pts_down]
+            rng = max(max(xs) - min(xs), max(ys) - min(ys)) or 1
+            gap_pct = gap / rng
+
+            logger.info(f"Track outline candidate: driver={dn} lap={target_lap.get('lap_number')} "
+                        f"pts={len(pts_down)} gap={gap:.0f} gap%={gap_pct*100:.1f}%")
+
+            if gap_pct < best_gap_pct:
+                best_gap_pct = gap_pct
+                best_points = pts_down
+
+            # Good enough — stop searching
+            if gap_pct < 0.05:
                 break
-    if not target_lap:
+
+        if best_gap_pct < 0.05:
+            break
+
+    if not best_points:
         return None
-
-    # Fetch location data for that one lap (one driver only)
-    dn = target_lap.get("driver_number", 1)
-    date_start = target_lap["date_start"]
-    location = await fetch_openf1("location", {
-        "session_key": session_key,
-        "driver_number": dn,
-        "date>": date_start,
-    })
-    if not location:
-        return None
-
-    # Limit to one lap (~300 points at 3.7Hz) to avoid multi-lap overlap
-    lap_dur = target_lap.get("lap_duration") or 90
-    max_pts = int(lap_dur * 3.7) + 20  # one lap + small buffer
-    points_raw = location[:max_pts]
-
-    # Downsample to ~250 points
-    stride = max(1, len(points_raw) // 250)
-    points = [
-        {"x": p.get("x", 0), "y": p.get("y", 0)}
-        for i, p in enumerate(points_raw) if i % stride == 0
-        if p.get("x") is not None and p.get("y") is not None
-    ]
+    points = best_points
+    logger.info(f"Track outline selected: {len(points)} pts, gap%={best_gap_pct*100:.1f}%")
 
     if len(points) < 20:
         return None
@@ -2140,6 +2196,18 @@ async def get_live_track_map() -> Dict[str, Any]:
 
     # Get track outline (persisted to disk — fetched from API only once ever)
     track_points = await _get_track_outline(str(session_key))
+
+    # Fallback: if no outline for this session, try circuit match from 2025 races
+    if not track_points and _is_demo:
+        circuit = session.get("circuit_short_name", "")
+        if circuit:
+            for rnd_data in SEASON_2025_RESULTS.values():
+                fallback_sk = rnd_data.get("session_key")
+                if fallback_sk:
+                    track_points = await _get_track_outline(str(fallback_sk))
+                    if track_points:
+                        logger.info(f"Track outline fallback: using session {fallback_sk} for {circuit}")
+                        break
 
     # Fetch ONLY /position (lightweight) — NO /location (thousands of points, crashes VPS)
     position_raw = await fetch_openf1("position", {"session_key": session_key})

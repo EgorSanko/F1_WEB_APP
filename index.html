@@ -799,14 +799,19 @@
                         const strokeScale = Math.max(rangeX,rangeY)/400;
                         const outlineStr = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
                         const leader = cars.length > 0 ? cars[0] : null;
+                        // Check if outline forms a closed loop (first/last points close enough)
+                        const f=pts[0], l=pts[pts.length-1];
+                        const gapDist=Math.sqrt((f.x-l.x)**2+(f.y-l.y)**2);
+                        const isClosed = gapDist / Math.max(rangeX,rangeY) < 0.15;
+                        const TrackLine = isClosed ? 'polygon' : 'polyline';
                         return (
                             <div style={{padding:'8px 12px'}}>
                                 <div style={{width:'100%',height:380,position:'relative'}}>
                                 <svg viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" style={{width:'100%',height:'100%',display:'block'}}>
                                     {/* Track glow */}
-                                    <polygon points={outlineStr} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinejoin="round"/>
+                                    <TrackLine points={outlineStr} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinejoin="round" strokeLinecap="round"/>
                                     {/* Track outline */}
-                                    <polygon points={outlineStr} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinejoin="round"/>
+                                    <TrackLine points={outlineStr} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinejoin="round" strokeLinecap="round"/>
                                     {/* Car dots */}
                                     {cars.map(car => {
                                         const isLeader = car.driver_number === leader?.driver_number;
