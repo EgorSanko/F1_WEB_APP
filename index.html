@@ -797,16 +797,16 @@
                         const padX=rangeX*0.1||50, padY=rangeY*0.1||50;
                         const vbX=minX-padX, vbY=minY-padY, vbW=rangeX+padX*2, vbH=rangeY+padY*2;
                         const strokeScale = Math.max(rangeX,rangeY)/400;
-                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                        const outlineStr = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
                         const leader = cars.length > 0 ? cars[0] : null;
                         return (
                             <div style={{padding:'8px 12px'}}>
                                 <div style={{width:'100%',height:380,position:'relative'}}>
                                 <svg viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" style={{width:'100%',height:'100%',display:'block'}}>
                                     {/* Track glow */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinecap="round" strokeLinejoin="round"/>
+                                    <polygon points={outlineStr} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinejoin="round"/>
                                     {/* Track outline */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinecap="round" strokeLinejoin="round"/>
+                                    <polygon points={outlineStr} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinejoin="round"/>
                                     {/* Car dots */}
                                     {cars.map(car => {
                                         const isLeader = car.driver_number === leader?.driver_number;
