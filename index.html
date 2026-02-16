@@ -790,40 +790,41 @@
                     {liveTab==='track' && (trackMapData?.track?.points?.length > 0 ? (() => {
                         const pts = trackMapData.track.points;
                         const cars = trackMapData.cars || [];
-                        const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+                        const allPts = [...pts, ...cars.filter(c=>c.x!=null&&c.y!=null)];
+                        const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
                         const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
                         const rangeX=maxX-minX||1, rangeY=maxY-minY||1;
-                        const pad=30, size=400;
-                        const scale=Math.min((size-2*pad)/rangeX,(size-2*pad)/rangeY);
-                        const cx=(size-(rangeX*scale))/2, cy=(size-(rangeY*scale))/2;
-                        const tx = (x) => cx + (x-minX)*scale;
-                        const ty = (y) => cy + (y-minY)*scale;
-                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${tx(p.x).toFixed(1)},${ty(p.y).toFixed(1)}`).join(' ');
+                        const padX=rangeX*0.1||50, padY=rangeY*0.1||50;
+                        const vbX=minX-padX, vbY=minY-padY, vbW=rangeX+padX*2, vbH=rangeY+padY*2;
+                        const strokeScale = Math.max(rangeX,rangeY)/400;
+                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
                         const leader = cars.length > 0 ? cars[0] : null;
                         return (
                             <div style={{padding:'8px 12px'}}>
-                                <svg viewBox={`0 0 ${size} ${size}`} style={{width:'100%',maxWidth:400,margin:'0 auto',display:'block'}}>
+                                <div style={{width:'100%',height:380,position:'relative'}}>
+                                <svg viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" style={{width:'100%',height:'100%',display:'block'}}>
                                     {/* Track glow */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinecap="round" strokeLinejoin="round"/>
                                     {/* Track outline */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinecap="round" strokeLinejoin="round"/>
                                     {/* Car dots */}
                                     {cars.map(car => {
-                                        const carX = tx(car.x), carY = ty(car.y);
                                         const isLeader = car.driver_number === leader?.driver_number;
                                         const isSel = selectedCar === car.driver_number;
+                                        const r = Math.max(6*strokeScale,2);
                                         return (
                                             <g key={car.driver_number} style={{cursor:'pointer'}} onClick={()=>setSelectedCar(isSel?null:car.driver_number)}>
-                                                <circle cx={carX} cy={carY} r="6" fill={car.team_color||'#888'} style={{transition:'cx 0.8s ease, cy 0.8s ease'}}/>
-                                                {isLeader && <circle cx={carX} cy={carY} r="10" fill="none" stroke={car.team_color||'#888'} strokeWidth="1.5" opacity="0.6">
-                                                    <animate attributeName="r" values="10;14;10" dur="1.5s" repeatCount="indefinite"/>
+                                                <circle cx={car.x} cy={car.y} r={r} fill={car.team_color||'#888'}/>
+                                                {isLeader && <circle cx={car.x} cy={car.y} r={r*1.7} fill="none" stroke={car.team_color||'#888'} strokeWidth={strokeScale*1.5} opacity="0.6">
+                                                    <animate attributeName="r" values={`${r*1.7};${r*2.3};${r*1.7}`} dur="1.5s" repeatCount="indefinite"/>
                                                     <animate attributeName="opacity" values="0.6;0.1;0.6" dur="1.5s" repeatCount="indefinite"/>
                                                 </circle>}
-                                                <text x={carX} y={carY-10} textAnchor="middle" fill="white" fontSize="8" fontWeight="700" fontFamily="Titillium Web,sans-serif" style={{transition:'x 0.8s ease, y 0.8s ease'}}>{car.code}</text>
+                                                <text x={car.x} y={car.y-r*1.8} textAnchor="middle" fill="white" fontSize={Math.max(8*strokeScale,3)} fontWeight="700" fontFamily="Titillium Web,sans-serif">{car.code}</text>
                                             </g>
                                         );
                                     })}
                                 </svg>
+                                </div>
                                 {/* Selected car popup */}
                                 {selectedCar && (() => {
                                     const car = cars.find(c=>c.driver_number===selectedCar);
