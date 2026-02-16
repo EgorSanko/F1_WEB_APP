@@ -2989,18 +2989,23 @@ async def get_lap_time_series(session_key: str, driver_numbers: list = None) -> 
 
 async def get_live_car_data(driver_number: int) -> Dict[str, Any]:
     """Get latest car telemetry for a single driver — speed, throttle, brake, gear, DRS, RPM."""
-    cache_key = f"car_data:{driver_number}"
+    _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+
+    cache_key = f"car_data:{_session_key}:{driver_number}"
     cached = cache_get(cache_key, ttl_override=2)
     if cached:
         return cached
 
-    season = _live_season()
+    session = await get_live_session(_session_key)
+    session_key = session.get("session_key") or _session_key
+
+    season = _live_season(_is_demo, _demo_info)
     raw = await fetch_openf1("car_data", {
-        "session_key": "latest",
+        "session_key": session_key,
         "driver_number": driver_number,
     })
     if not raw:
-        return {"error": "no_data"}
+        return {"error": "no_data", "driver_number": driver_number}
 
     latest = raw[-1] if raw else {}
     info = enrich_driver(driver_number, season=season)
