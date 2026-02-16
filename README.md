@@ -91,7 +91,7 @@
 | ⚪ Williams | #23 Albon | #55 Sainz | Smooth operators |
 | 🔵 Alpine | #10 Gasly | #43 Colapinto | Pierre + аргентинский хаос |
 | ⚫ Haas | #31 Ocon | #7 Bearman | Тихий серьёзный тим |
-| 🔵 Racing Bulls | #22 Tsunoda | #41 Lindblad | Юки кричит, Арвид едет |
+| 🔵 Racing Bulls | #30 Lawson | #41 Lindblad | Виски и тип 2007г  |
 | 🟢 Audi | #27 Hulkenberg | #5 Bortoleto | Подиум? Не, не слышали |
 | 🟤 Cadillac | #11 Perez | #77 Bottas 😎 | [см. карточку Боттаса] |
 
