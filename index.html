@@ -798,7 +798,7 @@
                         const cx=(size-(rangeX*scale))/2, cy=(size-(rangeY*scale))/2;
                         const tx = (x) => cx + (x-minX)*scale;
                         const ty = (y) => cy + (y-minY)*scale;
-                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${tx(p.x).toFixed(1)},${ty(p.y).toFixed(1)}`).join(' ')+'Z';
+                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${tx(p.x).toFixed(1)},${ty(p.y).toFixed(1)}`).join(' ');
                         const leader = cars.length > 0 ? cars[0] : null;
                         return (
                             <div style={{padding:'8px 12px'}}>

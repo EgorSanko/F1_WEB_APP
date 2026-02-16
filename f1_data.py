@@ -2092,8 +2092,12 @@ async def _get_track_outline(session_key: str) -> Optional[List[Dict]]:
     if not location:
         return None
 
+    # Limit to one lap (~300 points at 3.7Hz) to avoid multi-lap overlap
+    lap_dur = target_lap.get("lap_duration") or 90
+    max_pts = int(lap_dur * 3.7) + 20  # one lap + small buffer
+    points_raw = location[:max_pts]
+
     # Downsample to ~250 points
-    points_raw = location[:500]
     stride = max(1, len(points_raw) // 250)
     points = [
         {"x": p.get("x", 0), "y": p.get("y", 0)}
