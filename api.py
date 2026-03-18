@@ -214,6 +214,15 @@ async def user_me(request: Request):
     }
 
 
+
+
+class BroadcastRequest(BaseModel):
+    race_round: int
+    session_type: str  # race, qualifying, sprint, sprint_qualifying
+    video_url: str
+    title: Optional[str] = None
+    is_live: bool = False
+
 class FavoriteRequest(BaseModel):
     driver: Optional[int] = None
     team: Optional[str] = None
@@ -1066,6 +1075,117 @@ async def demo_clear():
     """Clear demo override, return to auto mode."""
     f1_data.set_demo_session(None)
     return {"status": "ok", "message": "Demo cleared, back to auto mode"}
+
+
+
+
+@app.get("/api/user/is-admin")
+async def user_is_admin(request: Request):
+    try:
+        tg_user = get_current_user(request)
+        return {"is_admin": tg_user["id"] in ADMIN_IDS}
+    except Exception:
+        return {"is_admin": False}
+
+
+# ============ BROADCASTS ============
+
+@app.get("/api/broadcasts")
+async def list_broadcasts(race_round: Optional[int] = None, season: Optional[int] = None, is_live: Optional[bool] = None):
+    db.auto_end_stale_broadcasts()
+    return {"broadcasts": db.get_broadcasts(race_round=race_round, season=season, is_live=1 if is_live else None if is_live is None else 0)}
+
+
+@app.get("/api/broadcasts/live")
+async def live_broadcasts():
+    db.auto_end_stale_broadcasts()
+    return {"broadcasts": db.get_live_broadcasts()}
+
+
+@app.post("/api/admin/broadcast")
+async def admin_upsert_broadcast(req: BroadcastRequest, request: Request):
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Resolve VK embed URL
+    embed_url = None
+    video_url = req.video_url.strip()
+    if 'vk.com/video' in video_url or 'vkvideo.ru' in video_url:
+        embed_url = await resolve_vk_embed(video_url)
+
+    bid = db.upsert_broadcast(
+        race_round=req.race_round,
+        season=CURRENT_SEASON,
+        session_type=req.session_type,
+        video_url=video_url,
+        embed_url=embed_url,
+        title=req.title,
+        is_live=req.is_live,
+        created_by=tg_user["id"],
+    )
+    return {"id": bid, "embed_url": embed_url}
+
+
+@app.post("/api/admin/broadcast/{broadcast_id}/end")
+async def admin_end_broadcast(broadcast_id: int, request: Request):
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    db.end_broadcast(broadcast_id)
+    return {"status": "ok"}
+
+
+@app.delete("/api/admin/broadcast/{broadcast_id}")
+async def admin_delete_broadcast(broadcast_id: int, request: Request):
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    db.delete_broadcast(broadcast_id)
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/broadcasts")
+async def admin_list_broadcasts(request: Request):
+    tg_user = get_current_user(request)
+    if tg_user["id"] not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return {"broadcasts": db.get_broadcasts(season=CURRENT_SEASON)}
+
+
+async def resolve_vk_embed(video_url: str) -> str:
+    """Try to resolve a VK video URL to an embed URL using VK API."""
+    # Extract oid and id from URL like vk.com/video-12345_67890
+    match = re.search(r'video(-?\d+)_(\d+)', video_url)
+    if not match:
+        return None
+    oid, vid = match.group(1), match.group(2)
+
+    if not VK_SERVICE_KEY:
+        # Fallback: construct embed URL without hash (may not work for all videos)
+        return f"https://vkvideo.ru/video_ext.php?oid={oid}&id={vid}"
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get("https://api.vk.com/method/video.get", params={
+                "videos": f"{oid}_{vid}",
+                "count": 1,
+                "extended": 0,
+                "v": "5.199",
+                "access_token": VK_SERVICE_KEY,
+            })
+            data = resp.json()
+            items = data.get("response", {}).get("items", [])
+            if items and items[0].get("player"):
+                player_url = items[0]["player"]
+                # Convert player URL to embed URL if needed
+                if 'video_ext.php' in player_url or 'vkvideo.ru' in player_url:
+                    return player_url
+                return player_url
+    except Exception as e:
+        logger.warning(f"VK API error: {e}")
+
+    return f"https://vkvideo.ru/video_ext.php?oid={oid}&id={vid}"
 
 
 # ============ ADMIN ============

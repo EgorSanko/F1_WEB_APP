@@ -141,6 +141,24 @@ CREATE INDEX IF NOT EXISTS idx_predictions_status ON predictions(status);
 CREATE INDEX IF NOT EXISTS idx_games_user ON games(user_id);
 CREATE INDEX IF NOT EXISTS idx_games_type_time ON games(user_id, game_type, played_at);
 CREATE INDEX IF NOT EXISTS idx_achievements_user ON achievements(user_id);
+
+CREATE TABLE IF NOT EXISTS broadcasts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    race_round INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    session_type TEXT NOT NULL,
+    title TEXT,
+    video_url TEXT NOT NULL,
+    embed_url TEXT,
+    is_live BOOLEAN DEFAULT 0,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_broadcasts_race ON broadcasts(race_round, season);
+CREATE INDEX IF NOT EXISTS idx_broadcasts_live ON broadcasts(is_live);
 """.format(initial_points=INITIAL_USER_POINTS)
 
 
@@ -428,6 +446,58 @@ def get_user_rank(user_id: int) -> Optional[int]:
     """Get user's rank in leaderboard."""
     row = execute_one("SELECT rank FROM leaderboard_cache WHERE user_id = ?", (user_id,))
     return row["rank"] if row else None
+
+
+# ============ BROADCAST OPERATIONS ============
+
+def upsert_broadcast(race_round, season, session_type, video_url,
+                     embed_url=None, title=None, is_live=False, created_by=None):
+    existing = execute_one(
+        "SELECT id FROM broadcasts WHERE race_round=? AND season=? AND session_type=?",
+        (race_round, season, session_type)
+    )
+    if existing:
+        execute_write(
+            "UPDATE broadcasts SET video_url=?,embed_url=?,title=?,is_live=?,created_by=COALESCE(?,created_by) WHERE id=?",
+            (video_url, embed_url, title, int(is_live), created_by, existing["id"])
+        )
+        return existing["id"]
+    return execute_write(
+        "INSERT INTO broadcasts(race_round,season,session_type,video_url,embed_url,title,is_live,created_by) VALUES(?,?,?,?,?,?,?,?)",
+        (race_round, season, session_type, video_url, embed_url, title, int(is_live), created_by)
+    )
+
+
+def get_broadcasts(race_round=None, season=None, is_live=None):
+    query = "SELECT * FROM broadcasts WHERE 1=1"
+    params = []
+    if race_round is not None:
+        query += " AND race_round=?"; params.append(race_round)
+    if season is not None:
+        query += " AND season=?"; params.append(season)
+    if is_live is not None:
+        query += " AND is_live=?"; params.append(int(is_live))
+    query += " ORDER BY race_round DESC, session_type ASC"
+    return execute(query, tuple(params))
+
+
+def end_broadcast(broadcast_id):
+    execute_write("UPDATE broadcasts SET is_live=0,ended_at=CURRENT_TIMESTAMP WHERE id=?", (broadcast_id,))
+
+
+def delete_broadcast(broadcast_id):
+    execute_write("DELETE FROM broadcasts WHERE id=?", (broadcast_id,))
+
+
+def get_live_broadcasts():
+    return execute("SELECT * FROM broadcasts WHERE is_live=1 ORDER BY started_at DESC")
+
+
+def auto_end_stale_broadcasts(hours=4):
+    execute_write(
+        "UPDATE broadcasts SET is_live=0,ended_at=CURRENT_TIMESTAMP WHERE is_live=1 AND started_at<datetime('now','-'||?||' hours')",
+        (str(hours),)
+    )
 
 
 # ============ INIT ============

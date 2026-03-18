@@ -387,7 +387,7 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onRaceClick, onRefresh}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onRaceClick, onRefresh, liveBroadcasts}) => {
             const ptr = usePullToRefresh(onRefresh);
             if (!nextRace && !lastRace) return (
                 <div className="page-container fade-in" style={{padding:16}}>
@@ -479,7 +479,7 @@
                     })()}
 
                     {/* Last race — podium layout */}
-                    {lastRace && lastRace.results && (
+                    {lastRace && lastRace.results && !spoilerFree && (
                         <div className="card" style={{padding:'16px 12px'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
                             {/* Podium — positions 2, 1, 3 */}
@@ -528,7 +528,7 @@
                             <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Результаты появятся после первой гонки</div>
                         </div>
                     )}
-                    {standings?.standings && (
+                    {standings?.standings && !spoilerFree && (
                         <div className="card" style={{padding:'16px 12px'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
                             {standings.standings.slice(0,3).map((s,i)=>(
@@ -545,6 +545,30 @@
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {spoilerFree && (lastRace?.results || standings?.standings) && (
+                        <div className="card" style={{padding:'20px 16px',textAlign:'center'}}>
+                            <div style={{fontSize:32,marginBottom:8}}>🙈</div>
+                            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Антиспойлер включён</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Результаты и чемпионат скрыты</div>
+                        </div>
+                    )}
+
+                    {/* Live broadcast banner */}
+                    {liveBroadcasts && liveBroadcasts.length > 0 && (
+                        <div className="card" onClick={()=>{const b=liveBroadcasts[0];onRaceClick(b.race_round,'broadcast');}} style={{cursor:'pointer',padding:'14px 16px',background:'linear-gradient(135deg,rgba(225,6,0,0.15),var(--f1-card))',border:'1px solid rgba(225,6,0,0.3)'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                <div style={{position:'relative'}}>
+                                    <div style={{width:10,height:10,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>
+                                </div>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1}}>В эфире</div>
+                                    <div style={{fontSize:14,fontWeight:700}}>{liveBroadcasts[0].title || 'Трансляция F1'}</div>
+                                </div>
+                                <div style={{color:'var(--f1-text-muted)',fontSize:16}}>›</div>
+                            </div>
                         </div>
                     )}
 
@@ -1265,8 +1289,10 @@
         };
 
         // ==== STANDINGS PAGE ====
-        const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh}) => {
+        const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh, spoilerFree}) => {
             const [tab, setTab] = useState('drivers');
+            const [spoilerDismissed, setSpoilerDismissed] = useState(false);
+            const showSpoilerWarning = spoilerFree && !spoilerDismissed;
             const [selectedDriver, setSelectedDriver] = useState(null);
             const [driverDetail, setDriverDetail] = useState(null);
             const [allDrivers, setAllDrivers] = useState(null);
@@ -1382,6 +1408,7 @@
 
             return (
                 <div className="page-container fade-in flex-layout" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
+                    {showSpoilerWarning && <SpoilerWarningOverlay onDismiss={()=>setSpoilerDismissed(true)}/>}
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         {ptr.indicatorEl}
@@ -1828,6 +1855,10 @@
                                 })}
                             </div>
                         </div>
+                    )}
+
+                    {window.__F1_ADMIN_IDS && window.__F1_ADMIN_IDS.includes(user.user_id) && (
+                        <AdminBroadcastPanel userId={user.user_id}/>
                     )}
 
                     {leaderboard?.leaderboard && (
@@ -2665,6 +2696,170 @@
             );
         };
 
+        // ==== VK VIDEO PLAYER ====
+        const VKVideoPlayer = ({embedUrl, title}) => {
+            if (!embedUrl) return null;
+            return (
+                <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                    <iframe
+                        src={embedUrl}
+                        style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
+                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        title={title || 'F1 Video'}
+                    />
+                </div>
+            );
+        };
+
+        // ==== BROADCAST TAB CONTENT ====
+        const BroadcastTab = ({broadcasts, raceName}) => {
+            if (!broadcasts || broadcasts.length === 0) {
+                return (
+                    <div className="card" style={{padding:'24px 16px',textAlign:'center'}}>
+                        <div style={{fontSize:32,marginBottom:8}}>📺</div>
+                        <div style={{fontSize:15,fontWeight:700}}>Записей пока нет</div>
+                        <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Записи появятся после трансляции</div>
+                    </div>
+                );
+            }
+            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
+            return (
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                    {broadcasts.map(b => (
+                        <div key={b.id} className="card" style={{padding:'12px 16px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                                {b.is_live ? (
+                                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                        <div style={{width:8,height:8,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>
+                                        <span style={{color:'var(--f1-red)',fontWeight:700,fontSize:11,textTransform:'uppercase'}}>Live</span>
+                                    </div>
+                                ) : (
+                                    <span style={{fontSize:14}}>📺</span>
+                                )}
+                                <div style={{flex:1}}>
+                                    <div style={{fontWeight:700,fontSize:14}}>{b.title || sessionLabels[b.session_type] || b.session_type}</div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{sessionLabels[b.session_type]}</div>
+                                </div>
+                            </div>
+                            {b.embed_url ? (
+                                <VKVideoPlayer embedUrl={b.embed_url} title={b.title}/>
+                            ) : b.video_url ? (
+                                <a href={b.video_url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'12px 16px',background:'rgba(255,255,255,0.06)',borderRadius:10,color:'var(--f1-text)',textDecoration:'none',fontSize:14,fontWeight:600,textAlign:'center'}}>
+                                    Открыть видео ↗
+                                </a>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // ==== SPOILER WARNING DIALOG ====
+        const SpoilerWarningOverlay = ({onDismiss}) => (
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+                <div className="card" style={{maxWidth:340,width:'100%',textAlign:'center',padding:'28px 24px'}}>
+                    <div style={{fontSize:48,marginBottom:12}}>🙈</div>
+                    <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>Антиспойлер включён</div>
+                    <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:20,lineHeight:1.5}}>
+                        На этой странице отображается полная таблица чемпионата, которая может содержать спойлеры последних гонок.
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                        <button onClick={onDismiss} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'var(--f1-red)',color:'white'}}>
+                            Всё равно показать
+                        </button>
+                        <button onClick={()=>history.back?history.back():null} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-muted)'}}>
+                            Назад
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // ==== ADMIN BROADCAST PANEL ====
+        const AdminBroadcastPanel = ({userId}) => {
+            const [broadcasts, setBroadcasts] = useState([]);
+            const [form, setForm] = useState({race_round:'',session_type:'race',video_url:'',title:'',is_live:false});
+            const [saving, setSaving] = useState(false);
+            const [schedule, setSchedule] = useState([]);
+
+            useEffect(() => {
+                loadBroadcasts();
+                api.get('/api/schedule').then(d => {
+                    if (d?.races) setSchedule(d.races.filter(r=>r.round));
+                });
+            }, []);
+
+            const loadBroadcasts = () => api.get('/api/admin/broadcasts').then(d => { if(d?.broadcasts) setBroadcasts(d.broadcasts); });
+
+            const handleSave = async () => {
+                if (!form.race_round || !form.video_url) return;
+                setSaving(true);
+                await api.post('/api/admin/broadcast', {...form, race_round: parseInt(form.race_round)});
+                setForm({race_round:'',session_type:'race',video_url:'',title:'',is_live:false});
+                await loadBroadcasts();
+                setSaving(false);
+            };
+
+            const handleEnd = async (id) => {
+                await api.post(`/api/admin/broadcast/${id}/end`);
+                await loadBroadcasts();
+            };
+
+            const handleDelete = async (id) => {
+                if (!confirm('Удалить трансляцию?')) return;
+                await fetch(`/api/admin/broadcast/${id}`, {method:'DELETE', headers:{'X-Telegram-Init-Data':window.Telegram?.WebApp?.initData||''}});
+                await loadBroadcasts();
+            };
+
+            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квали'};
+
+            return (
+                <div className="card" style={{marginBottom:16}}>
+                    <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>📺 Управление трансляциями</div>
+
+                    {/* Add form */}
+                    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16,padding:12,background:'rgba(255,255,255,0.04)',borderRadius:10}}>
+                        <select value={form.race_round} onChange={e=>setForm(f=>({...f,race_round:e.target.value}))} style={{padding:'8px 12px',borderRadius:8,border:'1px solid var(--f1-border)',background:'var(--f1-gray)',color:'var(--f1-text)',fontSize:13,fontFamily:'inherit'}}>
+                            <option value="">Выберите гран-при...</option>
+                            {schedule.map(r=><option key={r.round} value={r.round}>R{r.round} — {r.name}</option>)}
+                        </select>
+                        <div style={{display:'flex',gap:6}}>
+                            {Object.entries(sessionLabels).map(([k,v])=>(
+                                <button key={k} onClick={()=>setForm(f=>({...f,session_type:k}))} style={{flex:1,padding:'6px 0',borderRadius:6,border:'none',fontFamily:'inherit',fontSize:11,fontWeight:700,cursor:'pointer',background:form.session_type===k?'var(--f1-red)':'rgba(255,255,255,0.08)',color:form.session_type===k?'white':'var(--f1-text-muted)'}}>
+                                    {v}
+                                </button>
+                            ))}
+                        </div>
+                        <input value={form.video_url} onChange={e=>setForm(f=>({...f,video_url:e.target.value}))} placeholder="VK Video URL (vk.com/video...)" style={{padding:'8px 12px',borderRadius:8,border:'1px solid var(--f1-border)',background:'var(--f1-gray)',color:'var(--f1-text)',fontSize:13,fontFamily:'inherit'}}/>
+                        <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Название (необязательно)" style={{padding:'8px 12px',borderRadius:8,border:'1px solid var(--f1-border)',background:'var(--f1-gray)',color:'var(--f1-text)',fontSize:13,fontFamily:'inherit'}}/>
+                        <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'var(--f1-text-secondary)'}}>
+                            <input type="checkbox" checked={form.is_live} onChange={e=>setForm(f=>({...f,is_live:e.target.checked}))}/>
+                            Сейчас в эфире (Live)
+                        </label>
+                        <button onClick={handleSave} disabled={saving||!form.race_round||!form.video_url} style={{padding:'10px 0',borderRadius:8,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:13,cursor:'pointer',background:form.race_round&&form.video_url?'var(--f1-red)':'rgba(255,255,255,0.08)',color:form.race_round&&form.video_url?'white':'var(--f1-text-muted)'}}>
+                            {saving ? 'Сохранение...' : 'Добавить / Обновить'}
+                        </button>
+                    </div>
+
+                    {/* List */}
+                    {broadcasts.length === 0 ? (
+                        <div style={{textAlign:'center',padding:12,color:'var(--f1-text-muted)',fontSize:13}}>Нет трансляций</div>
+                    ) : broadcasts.map(b=>(
+                        <div key={b.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid var(--f1-border)'}}>
+                            {b.is_live && <div style={{width:6,height:6,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>}
+                            <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>R{b.race_round} · {sessionLabels[b.session_type]||b.session_type}</div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{b.title || 'Без названия'}</div>
+                            </div>
+                            {b.is_live && <button onClick={()=>handleEnd(b.id)} style={{padding:'4px 10px',borderRadius:6,border:'none',fontFamily:'inherit',fontSize:11,fontWeight:700,cursor:'pointer',background:'rgba(255,128,0,0.2)',color:'#FF8000'}}>Завершить</button>}
+                            <button onClick={()=>handleDelete(b.id)} style={{padding:'4px 8px',borderRadius:6,border:'none',fontFamily:'inherit',fontSize:11,cursor:'pointer',background:'rgba(255,0,0,0.1)',color:'var(--f1-red)'}}>✕</button>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
         // ==== RACE DETAIL PAGE ====
         const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab}) => {
             const [tyreData, setTyreData] = useState(null);
@@ -2672,6 +2867,7 @@
             const [revealed, setRevealed] = useState(false);
             const [qualiData, setQualiData] = useState(null);
             const [qualiSegment, setQualiSegment] = useState('q3');
+            const [broadcastData, setBroadcastData] = useState(null);
             const [raceTab, setRaceTab] = useState(defaultTab || 'race');
             const isPastRace = race && race.date && new Date(race.date) < new Date();
             useEffect(() => {
@@ -2686,6 +2882,9 @@
                     }).finally(() => setTyreLoading(false));
                     api.get(`/api/race/${race.round}/qualifying?season=${season}`).then(d => {
                         if (d?.results?.length > 0) setQualiData(d);
+                    });
+                    api.get(`/api/broadcasts?race_round=${race.round}&season=${season}`).then(d => {
+                        if (d?.broadcasts?.length > 0) setBroadcastData(d.broadcasts);
                     });
                 }
             }, [race?.round]);
@@ -2726,15 +2925,19 @@
                     {/* Race/Qualifying tabs for past races */}
                     {isPastRace && (
                         <div style={{display:'flex',gap:6,marginBottom:16}}>
-                            {['race','qualifying'].map(t=>(
+                            {[...(broadcastData?['race','qualifying','broadcast']:['race','qualifying'])].map(t=>(
                                 <button key={t} onClick={()=>setRaceTab(t)} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
-                                    {t==='race'?'🏁 Гонка':'⏱️ Квалификация'}
+                                    {t==='race'?'🏁 Гонка':t==='qualifying'?'⏱️ Квалификация':'📺 Запись'}
                                 </button>
                             ))}
                         </div>
                     )}
 
                     {/* Sessions schedule (for future races) */}
+                    {raceTab === 'broadcast' && broadcastData && (
+                        <BroadcastTab broadcasts={broadcastData} raceName={race.name}/>
+                    )}
+
                     {race.sessions && !race.podium && (() => {
                         const sessionNames = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
                         const sessionOrder = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
@@ -3614,6 +3817,7 @@
             const [weather, setWeather] = useState(null);
             const [raceControl, setRaceControl] = useState(null);
             const [streams, setStreams] = useState(null);
+            const [liveBroadcasts, setLiveBroadcasts] = useState([]);
             const [seasonResults, setSeasonResults] = useState(null);
             const [selectedRound, setSelectedRound] = useState(null);
             const [raceDetailTab, setRaceDetailTab] = useState('race');
@@ -3626,6 +3830,12 @@
                 (async () => {
                     const [u, s] = await Promise.all([api.get('/api/user/me'), api.get('/api/live/session')]);
                     setUser(u); setSession(s); setLoading(false);
+                    // Check admin status
+                    if (u?.user_id) {
+                        api.get('/api/user/is-admin').then(d => {
+                            if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id];
+                        }).catch(()=>{});
+                    }
                 })();
             }, []);
 
@@ -3633,9 +3843,9 @@
                 if (loading) return;
                 const s = currentSeason;
                 setNextRace(null); setLastRace(null); setDriversStandings(null); setConstructorsStandings(null); setSchedule(null); setSeasonResults(null);
-                Promise.all([api.get(`/api/home?season=${s}`),api.get(`/api/standings/drivers?season=${s}`),api.get(`/api/standings/constructors?season=${s}`),api.get(`/api/schedule?season=${s}`),api.get('/api/streams'),api.get(`/api/season/${s}/results`)]).then(([home,ds,cs,sched,str,sr])=>{
+                Promise.all([api.get(`/api/home?season=${s}`),api.get(`/api/standings/drivers?season=${s}`),api.get(`/api/standings/constructors?season=${s}`),api.get(`/api/schedule?season=${s}`),api.get('/api/streams'),api.get(`/api/season/${s}/results`),api.get('/api/broadcasts/live')]).then(([home,ds,cs,sched,str,sr,lb])=>{
                     if(home){setNextRace(home.next_race);setLastRace(home.last_race);}
-                    setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str); setSeasonResults(sr);
+                    setDriversStandings(ds); setConstructorsStandings(cs); setSchedule(sched); setStreams(str); setSeasonResults(sr); if(lb?.broadcasts) setLiveBroadcasts(lb.broadcasts);
                 });
             }, [loading, currentSeason]);
 
@@ -3683,13 +3893,13 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} liveBroadcasts={liveBroadcasts} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
                     case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
                     case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
-                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
+                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
                     case 'analytics': return <AnalyticsPage/>;
