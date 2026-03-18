@@ -1156,8 +1156,15 @@ async def admin_list_broadcasts(request: Request):
 
 
 async def resolve_vk_embed(video_url: str) -> str:
-    """Construct VK video embed URL from a standard VK video URL."""
-    match = re.search(r'video(-?\d+)_(\d+)', video_url)
+    """Construct embed URL from VK or YouTube video URL."""
+    # YouTube — return embed URL
+    import re as _re
+    yt = _re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]+)', video_url)
+    if yt:
+        return f"https://www.youtube.com/embed/{yt.group(1)}?rel=0"
+
+    # VK video
+    match = _re.search(r'video(-?\d+)_(\d+)', video_url)
     if not match:
         return None
     oid, vid = match.group(1), match.group(2)
