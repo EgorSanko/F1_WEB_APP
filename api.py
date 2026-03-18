@@ -170,7 +170,7 @@ async def health():
 
 @app.get("/")
 async def serve_index():
-    return FileResponse("index.html")
+    return FileResponse("index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/{filename}.html")
