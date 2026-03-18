@@ -88,6 +88,23 @@ TEAM_COLORS = {
 }
 TEAM_COLORS_2025 = TEAM_COLORS
 
+# ============ ERGAST API → INTERNAL NAME MAP ============
+# Jolpica/Ergast uses different team names than our internal config
+TEAM_NAME_MAP = {
+    "Red Bull": "Red Bull Racing",
+    "RB F1 Team": "Racing Bulls",
+    "Alpine F1 Team": "Alpine",
+    "Haas F1 Team": "Haas",
+    "Cadillac F1 Team": "Cadillac",
+    "Kick Sauber": "Kick Sauber",
+    "Sauber": "Kick Sauber",
+}
+
+def normalize_team_name(name: str) -> str:
+    """Map Ergast API team name to internal canonical name."""
+    return TEAM_NAME_MAP.get(name, name)
+
+
 TEAM_COLORS_2026 = {
     "McLaren": "#FF8000",
     "Mercedes": "#27F4D2",
@@ -442,44 +459,56 @@ def get_f1_cdn_card_photo(driver_number, season=2026):
 # ============ TEAM ASSETS (logos, car photos) ============
 TEAM_ASSETS = {
     "Red Bull Racing": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/red-bull-racing-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/red-bull-racing.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/redbullracing/2026redbullracinglogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/redbullracing/2026redbullracingcarright.webp",
     },
     "Ferrari": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/ferrari-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/ferrari.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/ferrari/2026ferrarilogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/ferrari/2026ferraricarright.webp",
     },
     "McLaren": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/mclaren-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/mclaren.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/mclaren/2026mclarenlogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/mclaren/2026mclarencarright.webp",
     },
     "Mercedes": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/mercedes-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/mercedes.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/mercedes/2026mercedeslogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/mercedes/2026mercedescarright.webp",
     },
     "Aston Martin": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/aston-martin-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/aston-martin.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/astonmartin/2026astonmartinlogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/astonmartin/2026astonmartincarright.webp",
     },
     "Alpine": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/alpine-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/alpine.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/alpine/2026alpinelogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/alpine/2026alpinecarright.webp",
     },
     "Williams": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/williams-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/williams.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/williams/2026williamslogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/williams/2026williamscarright.webp",
     },
     "Haas F1 Team": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/haas-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/haas.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/haasf1team/2026haasf1teamlogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/haasf1team/2026haasf1teamcarright.webp",
     },
     "Racing Bulls": {
-        "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/rb-logo.png.transform/2col/image.png",
-        "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/rb.png.transform/4col/image.png",
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/racingbulls/2026racingbullslogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/racingbulls/2026racingbullscarright.webp",
     },
     "Kick Sauber": {
         "logo": "https://media.formula1.com/content/dam/fom-website/teams/2025/kick-sauber-logo.png.transform/2col/image.png",
         "car": "https://media.formula1.com/content/dam/fom-website/teams/2025/kick-sauber.png.transform/4col/image.png",
+    },
+    "Haas": {
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/haasf1team/2026haasf1teamlogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/haasf1team/2026haasf1teamcarright.webp",
+    },
+    "Audi": {
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/audi/2026audilogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/audi/2026audicarright.webp",
+    },
+    "Cadillac": {
+        "logo": "https://media.formula1.com/image/upload/c_fit,h_128/q_auto/v1740000001/common/f1/2026/cadillac/2026cadillaclogowhite.webp",
+        "car": "https://media.formula1.com/image/upload/c_lfill,w_512/q_auto/v1740000001/common/f1/2026/cadillac/2026cadillaccarright.webp",
     },
 }
 

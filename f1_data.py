@@ -20,7 +20,7 @@ from config import (
     STANDINGS_2025_DRIVERS, STANDINGS_2025_CONSTRUCTORS,
     SEASON_2025_RESULTS, CIRCUITS, PAST_RACES_VK, VK_DIRECT_2025,
     DRIVERS_2025, DRIVERS_2026, TEAM_COLORS_2025, TEAM_COLORS_2026,
-    get_drivers, get_team_colors, CURRENT_SEASON, GROQ_API_KEY,
+    get_drivers, get_team_colors, CURRENT_SEASON, normalize_team_name, GROQ_API_KEY,
     CIRCUIT_LAPS, CIRCUIT_BASE_LAP,
     get_f1_cdn_photo, get_f1_cdn_card_photo, get_circuit_card_url,
 )
@@ -924,7 +924,7 @@ async def get_driver_standings(season: int = None) -> Dict[str, Any]:
 
         driver_id = sd["Driver"].get("driverId", "")
         driver_num = ergast_driver_id_to_number(driver_id, s) or int(sd["Driver"].get("permanentNumber", 0))
-        team_name = sd["Constructors"][0]["name"] if sd.get("Constructors") else ""
+        team_name = normalize_team_name(sd["Constructors"][0]["name"]) if sd.get("Constructors") else ""
 
         entry = enrich_driver(driver_num, {
             "position": int(sd["position"]),
@@ -1003,7 +1003,7 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
         if not leader_points:
             leader_points = points
 
-        team_name = sc["Constructor"]["name"]
+        team_name = normalize_team_name(sc["Constructor"]["name"])
 
         team_drivers = [
             enrich_driver(num, season=s)

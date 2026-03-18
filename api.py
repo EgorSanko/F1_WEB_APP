@@ -24,6 +24,7 @@ import re
 import database as db
 import f1_data
 from config import (
+    normalize_team_name,
     TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_IDS,
     DRIVERS, TEAM_COLORS, TYRE_COLORS,
     PREDICTION_POINTS, ACHIEVEMENTS, GAME_COOLDOWN_SECONDS,
