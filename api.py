@@ -1090,6 +1090,136 @@ async def user_is_admin(request: Request):
         return {"is_admin": False}
 
 
+
+# ============ POSITION CHART (f1report.ru) ============
+
+CIRCUIT_SLUG_MAP = {
+    "albert_park": "australia-albert-park", "shanghai": "china-shanghai",
+    "suzuka": "japan-suzuka", "bahrain": "bahrain-sakhir",
+    "jeddah": "saudi-arabia-jeddah", "miami": "usa-miami",
+    "imola": "emilia-romagna-imola", "monaco": "monaco-monte-carlo",
+    "catalunya": "spain-barcelona", "villeneuve": "canada-montreal",
+    "red_bull_ring": "austria-spielberg", "silverstone": "great-britain-silverstone",
+    "spa": "belgium-spa", "hungaroring": "hungary-budapest",
+    "zandvoort": "netherlands-zandvoort", "monza": "italy-monza",
+    "baku": "azerbaijan-baku", "marina_bay": "singapore-marina-bay",
+    "americas": "usa-austin", "rodriguez": "mexico-mexico-city",
+    "interlagos": "brazil-sao-paulo", "vegas": "usa-las-vegas",
+    "losail": "qatar-lusail", "yas_marina": "abu-dhabi-yas-marina",
+    "madrid": "spain-madrid",
+}
+
+
+@app.get("/api/race/{round_num}/positions")
+async def get_position_chart(round_num: int, season: int = CURRENT_SEASON):
+    """Get lap-by-lap position data from f1report.ru animation page."""
+    cache_key = f"positions_chart:{season}:{round_num}"
+    cached = f1_data.cache_get(cache_key)
+    if cached:
+        return cached
+
+    # Find circuit_id for this round
+    schedule = await f1_data.get_schedule(season)
+    race = None
+    for r in schedule.get("races", []):
+        if r.get("round") == round_num:
+            race = r
+            break
+    if not race:
+        raise HTTPException(status_code=404, detail="Race not found")
+
+    circuit_id = race.get("circuit_id", "")
+    slug = CIRCUIT_SLUG_MAP.get(circuit_id)
+    if not slug:
+        raise HTTPException(status_code=404, detail=f"No f1report mapping for {circuit_id}")
+
+    url = f"https://f1report.ru/animation/{season}/{slug}.html"
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code != 200:
+                raise HTTPException(status_code=404, detail="f1report page not found")
+            html = resp.text
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Failed to fetch f1report data")
+
+    # Parse JavaScript data arrays
+    import re as _re
+
+    # Extract TNAME (driver names)
+    drivers = {}
+    for m in _re.finditer(r'TNAME\[(\d+)\]="([^"]+)"', html):
+        drivers[int(m.group(1))] = m.group(2)
+
+    if not drivers:
+        raise HTTPException(status_code=404, detail="No driver data found")
+
+    # Extract S[][] (cumulative times) to compute positions
+    s_data = {}
+    for m in _re.finditer(r'S\[(\d+)\]\[(\d+)\]=([0-9.]+)', html):
+        lap, idx, time = int(m.group(1)), int(m.group(2)), float(m.group(3))
+        if idx == 0:
+            continue
+        if lap not in s_data:
+            s_data[lap] = {}
+        s_data[lap][idx] = time
+
+    if not s_data:
+        raise HTTPException(status_code=404, detail="No timing data found")
+
+    # Compute positions per lap
+    max_lap = max(s_data.keys())
+    driver_indices = sorted(drivers.keys())
+
+    # Build position arrays per driver
+    positions = {}
+    for idx in driver_indices:
+        name = drivers[idx]
+        positions[idx] = {"name": name, "laps": []}
+
+    for lap in range(1, max_lap + 1):
+        if lap not in s_data:
+            continue
+        # Get active drivers (non-zero time)
+        active = [(idx, s_data[lap].get(idx, 0)) for idx in driver_indices if s_data[lap].get(idx, 0) > 0]
+        active.sort(key=lambda x: x[1])
+
+        for pos, (idx, _) in enumerate(active, 1):
+            positions[idx]["laps"].append({"lap": lap, "position": pos})
+
+        # Mark DNF drivers
+        for idx in driver_indices:
+            if idx not in dict(active):
+                if positions[idx]["laps"] and positions[idx]["laps"][-1].get("lap", 0) < lap:
+                    pass  # Already stopped
+
+    # Get team colors
+    result_data = []
+    for idx in driver_indices:
+        p = positions[idx]
+        if not p["laps"]:
+            continue
+        # Try to get driver info for color
+        driver_info = f1_data.enrich_driver_by_name(p["name"], season=season)
+        result_data.append({
+            "name": p["name"],
+            "code": driver_info.get("code", p["name"][:3].upper()),
+            "team_color": driver_info.get("team_color", "#888"),
+            "positions": [l["position"] for l in p["laps"]],
+            "laps": [l["lap"] for l in p["laps"]],
+        })
+
+    response = {
+        "round": round_num,
+        "season": season,
+        "total_laps": max_lap,
+        "drivers": result_data,
+    }
+    f1_data.cache_set(cache_key, response)
+    return response
+
+
 # ============ BROADCASTS ============
 
 @app.get("/api/broadcasts")
@@ -1110,11 +1240,9 @@ async def admin_upsert_broadcast(req: BroadcastRequest, request: Request):
     if tg_user["id"] not in ADMIN_IDS:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # Resolve VK embed URL
-    embed_url = None
+    # Resolve embed URL (VK or YouTube)
     video_url = req.video_url.strip()
-    if 'vk.com/video' in video_url or 'vkvideo.ru' in video_url:
-        embed_url = await resolve_vk_embed(video_url)
+    embed_url = await resolve_vk_embed(video_url)
 
     bid = db.upsert_broadcast(
         race_round=req.race_round,

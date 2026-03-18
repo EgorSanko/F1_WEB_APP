@@ -1562,6 +1562,23 @@ def _get_2025_hardcoded_stats(driver_number: int) -> Dict[str, Any]:
 
 # ============ COMBINED DASHBOARD DATA ============
 
+
+def enrich_driver_by_name(surname: str, season: int = None) -> dict:
+    """Find driver info by surname for f1report integration."""
+    s = season or CURRENT_SEASON
+    drivers = get_drivers(s)
+    surname_lower = surname.lower()
+    for num, info in drivers.items():
+        full_name = info.get("name", "").lower()
+        # Match surname against last part of full name or code
+        parts = full_name.split()
+        last = parts[-1] if parts else ""
+        if last == surname_lower or surname_lower in full_name:
+            return enrich_driver(num, season=s)
+    # Fallback
+    return {"code": surname[:3].upper(), "team_color": "#888", "name": surname}
+
+
 async def get_home_data(season: int = None) -> Dict[str, Any]:
     """
     Get all data needed for the home screen in parallel.
