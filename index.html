@@ -2892,13 +2892,13 @@
                 setRaceTab(defaultTab || 'race');
                 // Fetch broadcasts for any race
                 if (race?.round) {
-                    api.get(`/api/broadcasts?race_round=${race.round}`).then(d => {
+                    api.get(`/api/broadcasts?race_round=${race.round}&season=${season}`).then(d => {
                         if (d?.broadcasts?.length > 0) setBroadcastData(d.broadcasts);
                     });
                 }
                 if (race?.round && isPastRace) {
                     setTyreLoading(true);
-                    api.get(`/api/race/${race.round}/tyres`).then(d => {
+                    api.get(`/api/race/${race.round}/tyres?season=${season}`).then(d => {
                         if (d?.drivers?.length > 0) setTyreData(d);
                     }).finally(() => setTyreLoading(false));
                     api.get(`/api/race/${race.round}/qualifying?season=${season}`).then(d => {
@@ -2939,7 +2939,7 @@
                         </div>
                     </div>
 
-                    {isSpoilerHidden && (
+                    {isSpoilerHidden && (race.podium || race.top_10 || race.results) && (
                         <div className="card" style={{padding:'28px 20px',textAlign:'center',marginBottom:16}}>
                             <div style={{fontSize:40,marginBottom:10}}>🙈</div>
                             <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>Антиспойлер включён</div>
@@ -2952,7 +2952,7 @@
                     )}
 
                     {/* Race/Qualifying tabs for past races */}
-                    {isPastRace && !isSpoilerHidden && (
+                    {isPastRace && !isSpoilerHidden && (race.podium || race.top_10 || race.results) && (
                         <div style={{display:'flex',gap:6,marginBottom:16}}>
                             {[...(broadcastData?['race','qualifying','broadcast']:['race','qualifying'])].map(t=>(
                                 <button key={t} onClick={()=>{if(t!=='broadcast'&&isSpoilerHidden)return;setRaceTab(t);}} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>

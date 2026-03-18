@@ -926,8 +926,10 @@ async def get_season_results(season: int):
 
 
 @app.get("/api/race/{round_num}/tyres")
-async def get_race_tyres(round_num: int):
+async def get_race_tyres(round_num: int, season: int = 2025):
     """Get tyre strategy data for a specific race round."""
+    if season != 2025:
+        raise HTTPException(status_code=404, detail=f"No tyre data for season {season}")
     race = SEASON_2025_RESULTS.get(round_num)
     if not race:
         raise HTTPException(status_code=404, detail=f"Race round {round_num} not found")
