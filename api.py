@@ -1161,7 +1161,7 @@ async def resolve_vk_embed(video_url: str) -> str:
     if not match:
         return None
     oid, vid = match.group(1), match.group(2)
-    return f"https://vkvideo.ru/video_ext.php?oid={oid}&id={vid}"
+    return f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hd=2"
 
 
 # ============ ADMIN ============

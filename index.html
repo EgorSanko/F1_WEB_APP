@@ -454,8 +454,9 @@
                         if (!upcoming.length) return null;
                         return (
                             <div className="card" style={{padding:'16px 12px'}}>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                                    Ближайшие гонки
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5}}>Ближайшие гонки</div>
+                                    <button onClick={()=>onChange('schedule')} style={{background:'none',border:'none',color:'var(--f1-red)',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>Все гонки ›</button>
                                 </div>
                                 {upcoming.map((race, i) => {
                                     const rd = new Date(race.race_datetime.replace('Z',''));
@@ -1209,7 +1210,7 @@
             return `${String(msk).padStart(2,'0')}:${m} МСК`;
         };
 
-        const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree, onToggleSpoiler}) => {
+        const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree}) => {
             const races = (seasonResults?.races?.length ? seasonResults.races : null) || schedule?.races || [];
             if (!races.length) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка расписания..."/></div>;
 
@@ -1221,12 +1222,7 @@
                 <div className="page-container fade-in" style={{padding:'12px 16px'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <h2 style={{fontSize:22,fontWeight:900}}>Сезон {season}</h2>
-                        {season === 2026 && <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <span style={{fontSize:11,color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontWeight:600}}>🔒 Без спойлеров</span>
-                            <div onClick={onToggleSpoiler} style={{width:44,height:24,borderRadius:12,background:spoilerFree?'var(--f1-red)':'#333',position:'relative',cursor:'pointer',transition:'background 0.3s'}}>
-                                <div style={{width:20,height:20,borderRadius:10,background:'#fff',position:'absolute',top:2,left:spoilerFree?22:2,transition:'left 0.3s'}}/>
-                            </div>
-                        </div>}
+
                     </div>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при{seasonResults?.races?.length ? ' · Все результаты' : ''}</div>
 
@@ -2882,6 +2878,7 @@
             const [qualiData, setQualiData] = useState(null);
             const [qualiSegment, setQualiSegment] = useState('q3');
             const [broadcastData, setBroadcastData] = useState(null);
+            const [raceResults, setRaceResults] = useState(null);
             const [raceTab, setRaceTab] = useState(defaultTab || 'race');
             const isPastRace = race && race.date && new Date(race.date) < new Date();
             useEffect(() => {
@@ -2889,6 +2886,7 @@
                 setTyreData(null);
                 setQualiData(null);
                 setBroadcastData(null);
+                setRaceResults(null);
                 setRaceTab(defaultTab || 'race');
                 // Fetch broadcasts for any race
                 if (race?.round) {
@@ -2904,6 +2902,12 @@
                     api.get(`/api/race/${race.round}/qualifying?season=${season}`).then(d => {
                         if (d?.results?.length > 0) setQualiData(d);
                     });
+                    // Fetch race results from API if not in hardcoded data
+                    if (!race.podium && !race.top_10) {
+                        api.get(`/api/race/${race.round}/results?season=${season}`).then(d => {
+                            if (d?.results?.length > 0) setRaceResults(d.results);
+                        });
+                    }
                 }
             }, [race?.round]);
 
@@ -2939,7 +2943,7 @@
                         </div>
                     </div>
 
-                    {isSpoilerHidden && (race.podium || race.top_10 || race.results) && (
+                    {isSpoilerHidden && (race.podium || race.top_10 || raceResults) && (
                         <div className="card" style={{padding:'28px 20px',textAlign:'center',marginBottom:16}}>
                             <div style={{fontSize:40,marginBottom:10}}>🙈</div>
                             <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>Антиспойлер включён</div>
@@ -2952,7 +2956,7 @@
                     )}
 
                     {/* Race/Qualifying tabs for past races */}
-                    {isPastRace && !isSpoilerHidden && (race.podium || race.top_10 || race.results) && (
+                    {isPastRace && !isSpoilerHidden && (race.podium || race.top_10 || raceResults || qualiData) && (
                         <div style={{display:'flex',gap:6,marginBottom:16}}>
                             {[...(broadcastData?['race','qualifying','broadcast']:['race','qualifying'])].map(t=>(
                                 <button key={t} onClick={()=>{if(t!=='broadcast'&&isSpoilerHidden)return;setRaceTab(t);}} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
@@ -3938,7 +3942,7 @@
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
                     case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
                     case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
-                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
+                    case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
                     case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
