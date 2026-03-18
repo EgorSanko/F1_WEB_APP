@@ -790,40 +790,46 @@
                     {liveTab==='track' && (trackMapData?.track?.points?.length > 0 ? (() => {
                         const pts = trackMapData.track.points;
                         const cars = trackMapData.cars || [];
-                        const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+                        const allPts = [...pts, ...cars.filter(c=>c.x!=null&&c.y!=null)];
+                        const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
                         const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
                         const rangeX=maxX-minX||1, rangeY=maxY-minY||1;
-                        const pad=30, size=400;
-                        const scale=Math.min((size-2*pad)/rangeX,(size-2*pad)/rangeY);
-                        const cx=(size-(rangeX*scale))/2, cy=(size-(rangeY*scale))/2;
-                        const tx = (x) => cx + (x-minX)*scale;
-                        const ty = (y) => cy + (y-minY)*scale;
-                        const trackPath = pts.map((p,i)=>`${i===0?'M':'L'}${tx(p.x).toFixed(1)},${ty(p.y).toFixed(1)}`).join(' ')+'Z';
+                        const padX=rangeX*0.1||50, padY=rangeY*0.1||50;
+                        const vbX=minX-padX, vbY=minY-padY, vbW=rangeX+padX*2, vbH=rangeY+padY*2;
+                        const strokeScale = Math.max(rangeX,rangeY)/400;
+                        const outlineStr = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
                         const leader = cars.length > 0 ? cars[0] : null;
+                        // Check if outline forms a closed loop (first/last points close enough)
+                        const f=pts[0], l=pts[pts.length-1];
+                        const gapDist=Math.sqrt((f.x-l.x)**2+(f.y-l.y)**2);
+                        const isClosed = gapDist / Math.max(rangeX,rangeY) < 0.15;
+                        const TrackLine = isClosed ? 'polygon' : 'polyline';
                         return (
                             <div style={{padding:'8px 12px'}}>
-                                <svg viewBox={`0 0 ${size} ${size}`} style={{width:'100%',maxWidth:400,margin:'0 auto',display:'block'}}>
+                                <div style={{width:'100%',height:380,position:'relative'}}>
+                                <svg viewBox={`${vbX.toFixed(0)} ${vbY.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" style={{width:'100%',height:'100%',display:'block'}}>
                                     {/* Track glow */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <TrackLine points={outlineStr} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={Math.max(16*strokeScale,4)} strokeLinejoin="round" strokeLinecap="round"/>
                                     {/* Track outline */}
-                                    <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <TrackLine points={outlineStr} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={Math.max(8*strokeScale,2)} strokeLinejoin="round" strokeLinecap="round"/>
                                     {/* Car dots */}
                                     {cars.map(car => {
-                                        const carX = tx(car.x), carY = ty(car.y);
                                         const isLeader = car.driver_number === leader?.driver_number;
                                         const isSel = selectedCar === car.driver_number;
+                                        const r = Math.max(6*strokeScale,2);
                                         return (
                                             <g key={car.driver_number} style={{cursor:'pointer'}} onClick={()=>setSelectedCar(isSel?null:car.driver_number)}>
-                                                <circle cx={carX} cy={carY} r="6" fill={car.team_color||'#888'} style={{transition:'cx 0.8s ease, cy 0.8s ease'}}/>
-                                                {isLeader && <circle cx={carX} cy={carY} r="10" fill="none" stroke={car.team_color||'#888'} strokeWidth="1.5" opacity="0.6">
-                                                    <animate attributeName="r" values="10;14;10" dur="1.5s" repeatCount="indefinite"/>
+                                                <circle cx={car.x} cy={car.y} r={r} fill={car.team_color||'#888'}/>
+                                                {isLeader && <circle cx={car.x} cy={car.y} r={r*1.7} fill="none" stroke={car.team_color||'#888'} strokeWidth={strokeScale*1.5} opacity="0.6">
+                                                    <animate attributeName="r" values={`${r*1.7};${r*2.3};${r*1.7}`} dur="1.5s" repeatCount="indefinite"/>
                                                     <animate attributeName="opacity" values="0.6;0.1;0.6" dur="1.5s" repeatCount="indefinite"/>
                                                 </circle>}
-                                                <text x={carX} y={carY-10} textAnchor="middle" fill="white" fontSize="8" fontWeight="700" fontFamily="Titillium Web,sans-serif" style={{transition:'x 0.8s ease, y 0.8s ease'}}>{car.code}</text>
+                                                <text x={car.x} y={car.y-r*1.8} textAnchor="middle" fill="white" fontSize={Math.max(8*strokeScale,3)} fontWeight="700" fontFamily="Titillium Web,sans-serif">{car.code}</text>
                                             </g>
                                         );
                                     })}
                                 </svg>
+                                </div>
                                 {/* Selected car popup */}
                                 {selectedCar && (() => {
                                     const car = cars.find(c=>c.driver_number===selectedCar);
@@ -1691,7 +1697,7 @@
             useEffect(() => { (async()=>{ const [a,p] = await Promise.all([api.get('/api/predictions/available'),api.get('/api/user/predictions')]); setAvailable(a); setMyPredictions(p?.predictions||[]); setLoading(false); })(); }, []);
             const handlePredict = async (type, value) => {
                 if (!available?.race?.round) return; setSubmitting(true);
-                const result = await api.post('/api/predictions/make',{race_round:available.race.round,season:2025,prediction_type:type,prediction_value:value});
+                const result = await api.post('/api/predictions/make',{race_round:available.race.round,season:new Date().getFullYear(),prediction_type:type,prediction_value:value});
                 if (result?.status==='ok') { setSelected(prev=>({...prev,[type]:value})); const p=await api.get('/api/user/predictions'); setMyPredictions(p?.predictions||[]); }
                 setSubmitting(false);
             };
@@ -2989,7 +2995,7 @@
                                 Тапай по каждому колесу 3 раза:<br/>Открути → Смени → Закрути
                             </div>
                             <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>
-                                {'< 2.0с = 50 очков · < 2.5с = 30 · < 3.0с = 20 · < 4.0с = 10'}
+Мировой рекорд Red Bull — 1.80с!
                             </div>
                             <div onClick={start} className="btn-primary" style={{display:'inline-block',fontSize:18,padding:'16px 40px'}}>СТАРТ</div>
                         </div>
@@ -3022,7 +3028,9 @@
                         <div>
                             <div style={{fontSize:60,marginBottom:16}}>{endTime<2000?'🏆':endTime<3000?'🥈':'👍'}</div>
                             <div style={{fontSize:40,fontWeight:800,fontFamily:'monospace',color:'#27F4D2'}}>{timeStr(endTime)}</div>
-                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            <div style={{fontSize:14,color:'rgba(255,255,255,0.4)',marginTop:12}}>
+                                {endTime<2000?'Мировой уровень!':endTime<2500?'Отличный пит-стоп!':endTime<3000?'Неплохо!':'Тренируйся!'}
+                            </div>
                             {result?.new_achievements?.length>0 && <div style={{fontSize:14,color:'#27F4D2',marginTop:8}}>🏅 Новое достижение!</div>}
                             <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
                                 <div onClick={start} className="btn-primary" style={{padding:'12px 24px'}}>Ещё раз</div>
@@ -3034,6 +3042,76 @@
             );
         };
 
+        const REACTION_FACTS = [
+            {max:150,text:'Быстрее чем моргание глаза (150мс)! Ты вообще человек?'},
+            {max:150,text:'Это на уровне рефлекса — мозг даже не успел подумать!'},
+            {max:150,text:'Быстрее чем хамелеон выстреливает языком!'},
+            {max:220,text:'Реакция уровня пилота F1 на стартовых огнях!'},
+            {max:220,text:'Ферстаппен на старте Гран-при — примерно так же!'},
+            {max:220,text:'Гепард реагирует на добычу за ~200мс — ты на его уровне!'},
+            {max:220,text:'Быстрее чем нервный импульс проходит от ноги до мозга!'},
+            {max:220,text:'Снайперская реакция! Олимпийские стрелки завидуют!'},
+            {max:220,text:'Льюис Хэмилтон: средняя реакция на старте ~210мс. Ты рядом!'},
+            {max:220,text:'Сапсан начинает пикирование с такой же задержкой!'},
+            {max:220,text:'Как удар каратиста — тело реагирует раньше мысли!'},
+            {max:300,text:'Реакция боксёра на джеб — примерно 250мс!'},
+            {max:300,text:'Как вратарь на пенальти — прыжок начинается за ~250мс!'},
+            {max:300,text:'Джокович принимает подачу за ~250мс — ты в этой лиге!'},
+            {max:300,text:'Профи в настольном теннисе реагируют за ~250мс!'},
+            {max:300,text:'Атака кобры длится 200-300мс — ты примерно так же быстр!'},
+            {max:300,text:'Топовые киберспортсмены CS2 — 200-250мс. Почти!'},
+            {max:300,text:'Механик F1 видит машину в боксах и реагирует за ~250мс!'},
+            {max:300,text:'Средний пит-стоп Red Bull — 1.8с, а ты нажал за {time}мс!'},
+            {max:300,text:'Средний возраст реакции 20-летнего — 250мс. Норма!'},
+            {max:300,text:'Геккон ловит насекомое за ~280мс — вы на равных!'},
+            {max:300,text:'Бейсболист видит мяч и решает бить за ~275мс!'},
+            {max:400,text:'Средняя реакция человека — 250мс. Чуть медленнее, но нормально!'},
+            {max:400,text:'Время реакции для экзамена на права в Германии — 400мс!'},
+            {max:400,text:'Лягушка ловит муху за 300-400мс — вы примерно одинаковы!'},
+            {max:400,text:'Собака реагирует на команду "сидеть" примерно за 350мс!'},
+            {max:400,text:'Боттас однажды среагировал на старт за 340мс. Бывает у всех!'},
+            {max:400,text:'После кофе реакция улучшается на ~10%. Может, заварить?'},
+            {max:400,text:'Среднее время тапа по уведомлению — 350мс. Ты в норме!'},
+            {max:400,text:'Спринтер реагирует на стартовый пистолет за ~150мс. Ещё есть куда расти!'},
+            {max:400,text:'Пианист нажимает клавишу по нотам за ~350мс!'},
+            {max:400,text:'В 2023 Леклер среагировал на Монце за 360мс. Ты рядом!'},
+            {max:500,text:'Время реакции водителя на светофор — 400-500мс!'},
+            {max:500,text:'После 6 часов без сна реакция падает до ~450мс!'},
+            {max:500,text:'Черепаха втягивает голову за ~400мс. Конкуренция!'},
+            {max:500,text:'Кофеин улучшает реакцию на 10-15%. Стоит попробовать!'},
+            {max:500,text:'Казуальный геймер — 400-500мс. Норма для нетренированного!'},
+            {max:500,text:'Если смотришь в телефон за рулём — реакция ~500мс+!'},
+            {max:500,text:'Штраф за фальстарт в F1 — 10 секунд. Лучше подождать!'},
+            {max:500,text:'При температуре тела +38° реакция замедляется на ~30%!'},
+            {max:700,text:'Может, пора размяться? Средняя реакция — 250мс!'},
+            {max:700,text:'Ленивец одобряет твой дзен-подход!'},
+            {max:700,text:'Заморожен? В холоде реакция падает на 40%!'},
+            {max:700,text:'После плотного обеда реакция замедляется. Это нормально!'},
+            {max:700,text:'Сразу после пробуждения реакция ~500мс. Ты только встал?'},
+            {max:700,text:'С такой реакцией в F1 ты бы терял 3-4 позиции на каждом старте!'},
+            {max:700,text:'Средняя реакция 70-летнего — ~350мс. Так что всё впереди!'},
+            {max:99999,text:'Ты точно смотрел на экран? Попробуй ещё!'},
+            {max:99999,text:'Улитка проползает 1мм за то время что ты думал!'},
+            {max:99999,text:'За {time}мс болид F1 проезжает {dist} метров!'},
+            {max:99999,text:'Нервный импульс у динозавра от хвоста до мозга шёл ~1000мс!'},
+            {max:99999,text:'Может, второй раз будет лучше? Разминка нужна всем!'},
+            {max:150,text:'Как бросок мантис-креветки — 150мс и мощнейший удар!'},
+            {max:150,text:'Реакция пилота истребителя на катапультирование!'},
+            {max:220,text:'Скорость удара скорпиона — ~230мс. Ты на уровне!'},
+            {max:220,text:'Профессиональный барабанщик попадает в бит за ~200мс!'},
+            {max:300,text:'Орёл замечает мышь с высоты 1.5 км и реагирует за ~280мс!'},
+            {max:300,text:'Шумахер славился реакцией ~220мс. Легендарный уровень!'},
+            {max:400,text:'Реакция пешехода на сигнал — около 400мс. В норме!'},
+            {max:400,text:'Хоккейный вратарь реагирует на шайбу за ~380мс!'},
+            {max:500,text:'С каждым часом без сна реакция замедляется на ~5%!'},
+            {max:500,text:'Среднее время ответа техподдержки — быстрее не бывает!'},
+            {max:700,text:'Кот реагирует на огурец за ~400мс. Ты чуть медленнее кота!'},
+            {max:700,text:'После марафона реакция падает до 600мс. Устал?'},
+            {max:99999,text:'Тектонические плиты двигаются быстрее... ну почти!'},
+            {max:99999,text:'Между молнией и громом проходит 1 сек на 330м. Далеко!'},
+            {max:99999,text:'Попробуй закрыть глаза, сделать глубокий вдох и снова!'},
+        ];
+
         const ReactionGame = ({onBack}) => {
             const [state, setState] = useState('ready');
             const [lights, setLights] = useState(0);
@@ -3042,6 +3120,20 @@
             const [result, setResult] = useState(null);
             const timeoutRef = useRef(null);
             const lightsRef = useRef([]);
+            const usedFactsRef = useRef(new Set());
+
+            const getReactionFact = (rt) => {
+                let suitable = REACTION_FACTS.filter(f => rt <= f.max && !usedFactsRef.current.has(f.text));
+                if (suitable.length === 0) {
+                    usedFactsRef.current.clear();
+                    suitable = REACTION_FACTS.filter(f => rt <= f.max);
+                }
+                suitable.sort((a,b) => a.max - b.max);
+                const pool = suitable.slice(0, Math.min(5, suitable.length));
+                const fact = pool[Math.floor(Math.random() * pool.length)];
+                usedFactsRef.current.add(fact.text);
+                return fact.text.replace('{time}', rt).replace('{dist}', Math.round(rt * 0.0972));
+            };
 
             const startSequence = () => {
                 setState('lights'); setLights(0); setResult(null);
@@ -3089,7 +3181,7 @@
                     {state==='ready' && (
                         <div>
                             <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>Жди зелёный свет, потом тапни!</div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>{'< 0.2с = 50 очков · < 0.3с = 30 · < 0.5с = 10'}</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>Средняя реакция пилота F1 — 200мс</div>
                             <div onClick={e=>{e.stopPropagation();startSequence();}} className="btn-primary" style={{display:'inline-block',fontSize:18,padding:'16px 40px'}}>СТАРТ</div>
                         </div>
                     )}
@@ -3102,160 +3194,308 @@
                         <div>
                             <div style={{fontSize:48,marginBottom:12}}>❌</div>
                             <div style={{fontSize:22,fontWeight:800,color:'#ff4444'}}>ФАЛЬСТАРТ!</div>
-                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:8}}>0 очков</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:8}}>Рано нажал!</div>
                             <div onClick={e=>{e.stopPropagation();setState('ready');setLights(0);}} className="btn-primary" style={{display:'inline-block',padding:'12px 24px',marginTop:20}}>Попробовать снова</div>
                         </div>
                     )}
-                    {state==='finished' && (
+                    {state==='finished' && (() => {
+                        const factText = getReactionFact(reaction);
+                        return (
                         <div>
                             <div style={{fontSize:48,marginBottom:12}}>{reaction<200?'⚡':reaction<300?'🏎️':'👍'}</div>
                             <div style={{fontSize:40,fontWeight:800,fontFamily:'monospace',color:'#27F4D2'}}>{reaction}ms</div>
                             <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>
                                 {reaction<200?'Нечеловеческая реакция!':reaction<300?'Отличная реакция!':reaction<500?'Неплохо!':'Можно лучше!'}
                             </div>
-                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
+                            <div style={{background:'rgba(255,255,255,0.06)',borderRadius:14,padding:16,margin:'16px 0',textAlign:'center'}}>
+                                <div style={{fontSize:15,fontWeight:600,lineHeight:1.5}}>{factText}</div>
+                            </div>
                             {result?.new_achievements?.length>0 && <div style={{fontSize:14,color:'#27F4D2',marginTop:8}}>🏅 Новое достижение!</div>}
                             <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
                                 <div onClick={e=>{e.stopPropagation();setState('ready');setLights(0);}} className="btn-primary" style={{padding:'12px 24px'}}>Ещё раз</div>
                                 <div onClick={e=>{e.stopPropagation();onBack();}} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
                             </div>
                         </div>
+                        );
+                    })()}
+                </div>
+            );
+        };
+
+        const F1_CARDS = [
+            {name:'Макс Ферстаппен',code:'VER',number:1,team:'Red Bull Racing',teamColor:'#3671C6',country:'🇳🇱',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/verstappen.jpg.img.640.medium.jpg/1738086499498.jpg',stats:{speed:98,racecraft:97,experience:85,wins:63,points:437}},
+            {name:'Льюис Хэмилтон',code:'HAM',number:44,team:'Ferrari',teamColor:'#E8002D',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hamilton.jpg.img.640.medium.jpg/1738086522tried.jpg',stats:{speed:93,racecraft:96,experience:100,wins:105,points:198}},
+            {name:'Шарль Леклер',code:'LEC',number:16,team:'Ferrari',teamColor:'#E8002D',country:'🇲🇨',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/leclerc.jpg.img.640.medium.jpg/1738086534424.jpg',stats:{speed:95,racecraft:90,experience:70,wins:8,points:280}},
+            {name:'Ландо Норрис',code:'NOR',number:4,team:'McLaren',teamColor:'#FF8000',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/norris.jpg.img.640.medium.jpg/1738086505498.jpg',stats:{speed:94,racecraft:89,experience:65,wins:4,points:350}},
+            {name:'Оскар Пиастри',code:'PIA',number:81,team:'McLaren',teamColor:'#FF8000',country:'🇦🇺',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/piastri.jpg.img.640.medium.jpg/1738086516198.jpg',stats:{speed:91,racecraft:86,experience:40,wins:3,points:268}},
+            {name:'Карлос Сайнс',code:'SAI',number:55,team:'Williams',teamColor:'#64C4FF',country:'🇪🇸',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/sainz.jpg.img.640.medium.jpg/1738086546752.jpg',stats:{speed:89,racecraft:88,experience:75,wins:4,points:120}},
+            {name:'Джордж Расселл',code:'RUS',number:63,team:'Mercedes',teamColor:'#27F4D2',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/russell.jpg.img.640.medium.jpg/1738086527564.jpg',stats:{speed:92,racecraft:87,experience:60,wins:3,points:195}},
+            {name:'Кими Антонелли',code:'ANT',number:12,team:'Mercedes',teamColor:'#27F4D2',country:'🇮🇹',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/antonelli.jpg.img.640.medium.jpg/1738086593898.jpg',stats:{speed:88,racecraft:78,experience:15,wins:0,points:95}},
+            {name:'Фернандо Алонсо',code:'ALO',number:14,team:'Aston Martin',teamColor:'#229971',country:'🇪🇸',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/alonso.jpg.img.640.medium.jpg/1738086558245.jpg',stats:{speed:85,racecraft:95,experience:100,wins:32,points:65}},
+            {name:'Лэнс Стролл',code:'STR',number:18,team:'Aston Martin',teamColor:'#229971',country:'🇨🇦',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/stroll.jpg.img.640.medium.jpg/1738086563648.jpg',stats:{speed:78,racecraft:72,experience:65,wins:0,points:30}},
+            {name:'Юки Цунода',code:'TSU',number:22,team:'Red Bull Racing',teamColor:'#3671C6',country:'🇯🇵',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/tsunoda.jpg.img.640.medium.jpg/1738086573898.jpg',stats:{speed:87,racecraft:82,experience:55,wins:0,points:105}},
+            {name:'Пьер Гасли',code:'GAS',number:10,team:'Alpine',teamColor:'#0093CC',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/gasly.jpg.img.640.medium.jpg/1738086580148.jpg',stats:{speed:86,racecraft:83,experience:70,wins:1,points:52}},
+            {name:'Эстебан Окон',code:'OCO',number:31,team:'Haas',teamColor:'#B6BABD',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/ocon.jpg.img.640.medium.jpg/1738086587248.jpg',stats:{speed:83,racecraft:80,experience:68,wins:1,points:38}},
+            {name:'Александр Албон',code:'ALB',number:23,team:'Williams',teamColor:'#64C4FF',country:'🇹🇭',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/albon.jpg.img.640.medium.jpg/1738086540298.jpg',stats:{speed:84,racecraft:82,experience:58,wins:0,points:42}},
+            {name:'Нико Хюлькенберг',code:'HUL',number:27,team:'Sauber',teamColor:'#52E252',country:'🇩🇪',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hulkenberg.jpg.img.640.medium.jpg/1738086599898.jpg',stats:{speed:82,racecraft:84,experience:82,wins:0,points:28}},
+            {name:'Лиам Лоусон',code:'LAW',number:30,team:'Racing Bulls',teamColor:'#6692FF',country:'🇳🇿',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/lawson.jpg.img.640.medium.jpg/1738086569348.jpg',stats:{speed:85,racecraft:79,experience:30,wins:0,points:45}},
+            {name:'Исаак Хаджар',code:'HAD',number:6,team:'Racing Bulls',teamColor:'#6692FF',country:'🇫🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/hadjar.jpg.img.640.medium.jpg/1738086605898.jpg',stats:{speed:86,racecraft:78,experience:15,wins:0,points:62}},
+            {name:'Оливер Бирман',code:'BEA',number:7,team:'Haas',teamColor:'#B6BABD',country:'🇬🇧',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/bearman.jpg.img.640.medium.jpg/1738086611898.jpg',stats:{speed:84,racecraft:77,experience:15,wins:0,points:36}},
+            {name:'Франко Колапинто',code:'COL',number:43,team:'Alpine',teamColor:'#0093CC',country:'🇦🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/colapinto.jpg.img.640.medium.jpg/1738086617898.jpg',stats:{speed:83,racecraft:76,experience:20,wins:0,points:18}},
+            {name:'Габриэль Бортолето',code:'BOR',number:5,team:'Sauber',teamColor:'#52E252',country:'🇧🇷',photo:'https://media.formula1.com/content/dam/fom-website/drivers/2025Drivers/bortoleto.jpg.img.640.medium.jpg/1738086623898.jpg',stats:{speed:82,racecraft:75,experience:10,wins:0,points:15}},
+        ];
+
+        const STAT_LABELS = {
+            speed:{label:'Скорость',icon:'⚡'},
+            racecraft:{label:'Мастерство',icon:'🏎️'},
+            experience:{label:'Опыт',icon:'📅'},
+            wins:{label:'Победы',icon:'🏆'},
+            points:{label:'Очки 2025',icon:'🔢'},
+        };
+
+        const DriverCard = ({driver,isPlayer,isRevealed,selectedStat,wonStat,onSelectStat}) => (
+            <div style={{
+                width:'100%',borderRadius:14,overflow:'hidden',
+                background:`linear-gradient(145deg, ${driver.teamColor}22, #1a1a2e, ${driver.teamColor}11)`,
+                border:`2px solid ${driver.teamColor}`,
+                boxShadow:`0 6px 24px ${driver.teamColor}33, 0 0 0 1px rgba(255,255,255,0.05)`,
+            }}>
+                <div style={{position:'relative',height:100,overflow:'hidden'}}>
+                    <div style={{position:'absolute',bottom:0,left:0,right:0,height:'70%',background:'linear-gradient(transparent, #1a1a2e)',zIndex:2}}/>
+                    <img src={driver.photo} alt={driver.name} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top'}} onError={e=>{e.target.style.display='none';}}/>
+                    <div style={{position:'absolute',top:4,right:6,fontSize:32,fontWeight:900,color:`${driver.teamColor}44`,fontStyle:'italic',zIndex:1,fontFamily:'monospace',lineHeight:1}}>{driver.number}</div>
+                    <div style={{position:'absolute',top:5,left:5,zIndex:3,padding:'2px 6px',borderRadius:6,fontSize:8,fontWeight:700,background:`${driver.teamColor}cc`,color:'#fff'}}>{driver.team}</div>
+                    <div style={{position:'absolute',bottom:4,left:6,zIndex:3}}>
+                        <div style={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>{driver.country} {driver.code}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:'#fff',lineHeight:1.2}}>{driver.name}</div>
+                    </div>
+                </div>
+                <div style={{padding:'6px 6px 4px'}}>
+                    {Object.entries(driver.stats).map(([key,value]) => {
+                        const isSel = selectedStat===key;
+                        const info = STAT_LABELS[key];
+                        return (
+                            <div key={key} onClick={()=>isPlayer&&onSelectStat&&onSelectStat(key)}
+                                 style={{
+                                     display:'flex',alignItems:'center',justifyContent:'space-between',
+                                     padding:'5px 8px',marginBottom:2,borderRadius:8,
+                                     cursor:isPlayer&&onSelectStat?'pointer':'default',
+                                     background:isSel?(wonStat===true?'rgba(0,200,0,0.15)':wonStat===false?'rgba(255,0,0,0.15)':`${driver.teamColor}22`):'rgba(255,255,255,0.03)',
+                                     border:isSel?`1px solid ${wonStat===true?'#4CAF50':wonStat===false?'#f44336':driver.teamColor}`:'1px solid transparent',
+                                     transition:'all 0.2s',
+                                 }}>
+                                <div style={{fontSize:11,fontWeight:600,color:'rgba(255,255,255,0.7)'}}>{info.icon} {info.label}</div>
+                                <div style={{fontSize:13,fontWeight:800,color:isRevealed||isPlayer?'#fff':'transparent'}}>{isRevealed||isPlayer?value:'?'}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div style={{height:3,background:driver.teamColor}}/>
+            </div>
+        );
+
+        const CardBack = ({count}) => (
+            <div style={{
+                width:'100%',height:320,borderRadius:14,overflow:'hidden',
+                background:'linear-gradient(145deg, #e10600, #8b0000, #e10600)',
+                border:'2px solid #e10600',boxShadow:'0 6px 24px rgba(225,6,0,0.3)',
+                display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+                position:'relative',
+            }}>
+                <div style={{position:'absolute',inset:0,opacity:0.1,backgroundImage:'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)'}}/>
+                <div style={{fontSize:40,marginBottom:6}}>🏎️</div>
+                <div style={{fontSize:20,fontWeight:900,color:'#fff',fontStyle:'italic'}}>F1</div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginTop:6}}>{count} карт</div>
+            </div>
+        );
+
+        const TopTrumpsGame = ({onBack}) => {
+            const [state, setState] = useState('ready');
+            const [playerDeck, setPlayerDeck] = useState([]);
+            const [aiDeck, setAiDeck] = useState([]);
+            const [playerCard, setPlayerCard] = useState(null);
+            const [aiCard, setAiCard] = useState(null);
+            const [selectedStat, setSelectedStat] = useState(null);
+            const [roundWinner, setRoundWinner] = useState(null);
+            const [isRevealed, setIsRevealed] = useState(false);
+            const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+            const [score, setScore] = useState({player:0,ai:0});
+            const [roundNum, setRoundNum] = useState(0);
+            const [message, setMessage] = useState('');
+            const totalRounds = 10;
+
+            const startGame = () => {
+                const shuffled = [...F1_CARDS].sort(()=>Math.random()-0.5);
+                const p = shuffled.slice(0,10), a = shuffled.slice(10,20);
+                setPlayerDeck(p); setAiDeck(a);
+                setPlayerCard(p[0]); setAiCard(a[0]);
+                setScore({player:0,ai:0}); setRoundNum(1);
+                setIsPlayerTurn(true); setSelectedStat(null);
+                setIsRevealed(false); setRoundWinner(null);
+                setState('playerTurn'); setMessage('Выбери характеристику!');
+            };
+
+            const selectStat = (stat) => {
+                if (state!=='playerTurn'||!isPlayerTurn) return;
+                setSelectedStat(stat); setState('revealing'); setIsRevealed(true);
+                const pVal = playerCard.stats[stat], aVal = aiCard.stats[stat];
+                setTimeout(()=>{
+                    let winner;
+                    if (pVal>aVal) { winner='player'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} > ${aVal} — Ты выиграл!`); setScore(s=>({...s,player:s.player+1})); }
+                    else if (aVal>pVal) { winner='ai'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} < ${aVal} — AI выиграл!`); setScore(s=>({...s,ai:s.ai+1})); }
+                    else { winner='draw'; setMessage(`${STAT_LABELS[stat].icon} ${pVal} = ${aVal} — Ничья!`); }
+                    setRoundWinner(winner); setState('roundResult');
+                }, 1000);
+            };
+
+            const nextRound = () => {
+                const nextIdx = roundNum;
+                if (nextIdx>=totalRounds||nextIdx>=playerDeck.length||nextIdx>=aiDeck.length) { setState('finished'); return; }
+                setPlayerCard(playerDeck[nextIdx]); setAiCard(aiDeck[nextIdx]);
+                setRoundNum(roundNum+1); setSelectedStat(null); setIsRevealed(false); setRoundWinner(null);
+                const aiTurn = roundWinner==='ai';
+                setIsPlayerTurn(!aiTurn);
+                if (aiTurn) {
+                    setState('aiThinking'); setMessage('🤖 AI думает...');
+                    setTimeout(()=>{
+                        const ac = aiDeck[nextIdx];
+                        const keys = Object.keys(ac.stats);
+                        let best=keys[0]; keys.forEach(k=>{if(ac.stats[k]>ac.stats[best])best=k;});
+                        setSelectedStat(best); setIsRevealed(true); setState('revealing');
+                        const pV=playerDeck[nextIdx].stats[best], aV=ac.stats[best];
+                        setTimeout(()=>{
+                            let w;
+                            if(pV>aV){w='player';setMessage(`AI: ${STAT_LABELS[best].icon} ${aV} < ${pV}. Ты выиграл!`);setScore(s=>({...s,player:s.player+1}));}
+                            else if(aV>pV){w='ai';setMessage(`AI: ${STAT_LABELS[best].icon} ${aV} > ${pV}. AI выиграл!`);setScore(s=>({...s,ai:s.ai+1}));}
+                            else{w='draw';setMessage('Ничья!');}
+                            setRoundWinner(w); setState('roundResult');
+                        },1000);
+                    },1500);
+                } else { setState('playerTurn'); setMessage('Твой ход! Выбери характеристику.'); }
+            };
+
+            return (
+                <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'rgba(255,255,255,0.5)'}}>← Назад</div>
+                        <div style={{fontWeight:800,fontSize:17}}>🃏 Top Trumps</div>
+                        <div style={{width:50}}/>
+                    </div>
+                    {state==='ready' && (
+                        <div style={{textAlign:'center',paddingTop:40}}>
+                            <div style={{fontSize:64,marginBottom:16}}>🃏</div>
+                            <div style={{fontSize:22,fontWeight:800,marginBottom:8}}>F1 Top Trumps</div>
+                            <div style={{fontSize:14,color:'rgba(255,255,255,0.5)',marginBottom:8,lineHeight:1.6}}>20 пилотов F1 · 5 характеристик<br/>Выбирай стат — у кого больше, тот выигрывает!</div>
+                            <div style={{fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:28}}>10 раундов · Ты vs AI</div>
+                            <div onClick={startGame} style={{padding:'16px 48px',borderRadius:16,background:'linear-gradient(135deg, #e10600, #8b0000)',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',boxShadow:'0 4px 20px rgba(225,6,0,0.4)'}}>РАЗДАТЬ КАРТЫ</div>
+                        </div>
+                    )}
+                    {state!=='ready'&&state!=='finished' && (
+                        <div>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,padding:'6px 12px',borderRadius:10,background:'rgba(255,255,255,0.04)'}}>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>Ты</div><div style={{fontSize:20,fontWeight:800,color:'#4CAF50'}}>{score.player}</div></div>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)'}}>Раунд {roundNum}/{totalRounds}</div><div style={{fontSize:10,color:'rgba(255,255,255,0.3)',marginTop:1}}>{isPlayerTurn?'🟢 Твой ход':'🔴 Ход AI'}</div></div>
+                                <div style={{textAlign:'center'}}><div style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>AI</div><div style={{fontSize:20,fontWeight:800,color:'#f44336'}}>{score.ai}</div></div>
+                            </div>
+                            <div style={{textAlign:'center',fontSize:12,fontWeight:600,color:'rgba(255,255,255,0.6)',marginBottom:10,minHeight:18}}>{message}</div>
+                            <div style={{display:'flex',gap:6,alignItems:'flex-start'}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:10,fontWeight:700,textAlign:'center',color:'rgba(255,255,255,0.4)',marginBottom:4}}>ТВОЯ КАРТА</div>
+                                    {playerCard && <DriverCard driver={playerCard} isPlayer={true} isRevealed={true} selectedStat={selectedStat} wonStat={roundWinner==='player'?true:roundWinner==='ai'?false:null} onSelectStat={state==='playerTurn'&&isPlayerTurn?selectStat:null}/>}
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,color:'#e10600',alignSelf:'center',minWidth:24,flexShrink:0}}>VS</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:10,fontWeight:700,textAlign:'center',color:'rgba(255,255,255,0.4)',marginBottom:4}}>КАРТА AI</div>
+                                    {aiCard && (isRevealed ? <DriverCard driver={aiCard} isPlayer={false} isRevealed={true} selectedStat={selectedStat} wonStat={roundWinner==='ai'?true:roundWinner==='player'?false:null}/> : <CardBack count={aiDeck.length-roundNum+1}/>)}
+                                </div>
+                            </div>
+                            {state==='roundResult' && (
+                                <div style={{textAlign:'center',marginTop:12}}>
+                                    <div onClick={nextRound} style={{padding:'10px 28px',borderRadius:12,background:roundWinner==='player'?'#4CAF50':roundWinner==='ai'?'#f44336':'#666',fontWeight:700,fontSize:14,cursor:'pointer',display:'inline-block'}}>
+                                        {roundNum>=totalRounds?'Результат':'Следующий раунд →'}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {state==='finished' && (
+                        <div style={{textAlign:'center',paddingTop:30}}>
+                            <div style={{fontSize:64,marginBottom:12}}>{score.player>score.ai?'🏆':score.player<score.ai?'😤':'🤝'}</div>
+                            <div style={{fontSize:28,fontWeight:800,color:score.player>score.ai?'#4CAF50':score.player<score.ai?'#f44336':'#FF9800'}}>{score.player>score.ai?'ПОБЕДА!':score.player<score.ai?'ПОРАЖЕНИЕ':'НИЧЬЯ'}</div>
+                            <div style={{fontSize:36,fontWeight:800,marginTop:8}}>{score.player} : {score.ai}</div>
+                            <div style={{fontSize:14,color:'rgba(255,255,255,0.4)',marginTop:8}}>{score.player>score.ai?'Ты настоящий стратег!':score.player<score.ai?'AI оказался хитрее. Попробуй ещё!':'Достойная битва!'}</div>
+                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
+                                <div onClick={startGame} style={{padding:'14px 28px',borderRadius:12,background:'linear-gradient(135deg, #e10600, #8b0000)',fontWeight:700,cursor:'pointer'}}>Играть снова</div>
+                                <div onClick={onBack} style={{padding:'14px 28px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
+                            </div>
+                        </div>
                     )}
                 </div>
             );
         };
 
-        const TRACKS_QUIZ = [
-            {name:'Монца',country:'IT',svg:'M30,80 L35,60 L50,40 L70,35 L85,50 L80,70 L60,85 Z'},
-            {name:'Спа',country:'BE',svg:'M20,70 L30,30 L45,20 L55,35 L50,55 L65,60 L80,40 L85,65 L70,80 Z'},
-            {name:'Сильверстоун',country:'GB',svg:'M25,50 L35,25 L55,20 L70,30 L75,50 L65,70 L45,75 L30,65 Z'},
-            {name:'Монако',country:'MC',svg:'M30,30 L50,25 L70,35 L75,55 L60,70 L40,75 L25,60 Z'},
-            {name:'Сузука',country:'JP',svg:'M20,50 L30,25 L50,20 L60,35 L55,50 L65,55 L75,40 L80,60 L65,75 L40,80 Z'},
-            {name:'Интерлагос',country:'BR',svg:'M25,40 L45,20 L70,25 L80,45 L75,65 L55,80 L30,75 L20,55 Z'},
-            {name:'Баку',country:'AZ',svg:'M30,80 L25,50 L35,25 L55,20 L65,35 L60,60 L70,75 L50,85 Z'},
-            {name:'Джидда',country:'SA',svg:'M20,70 L25,35 L40,20 L60,25 L70,15 L80,30 L75,55 L65,70 L45,80 Z'},
-            {name:'Мельбурн',country:'AU',svg:'M30,30 L55,20 L75,30 L80,55 L70,75 L45,80 L25,65 L20,45 Z'},
-            {name:'Барселона',country:'ES',svg:'M25,45 L40,20 L65,25 L75,45 L70,65 L50,75 L30,70 Z'},
+        const QUIZ_BANK = [
+            {q:'Кто выиграл первый чемпионат мира F1 в 1950?',o:['Хуан Мануэль Фанхио','Джузеппе Фарина','Альберто Аскари','Стирлинг Мосс'],a:1,d:1},
+            {q:'Сколько чемпионских титулов у Михаэля Шумахера?',o:['5','6','7','8'],a:2,d:1},
+            {q:'Какая команда выиграла больше всего Кубков конструкторов?',o:['McLaren','Mercedes','Ferrari','Williams'],a:2,d:1},
+            {q:'В каком году Льюис Хэмилтон стал чемпионом впервые?',o:['2007','2008','2010','2014'],a:1,d:1},
+            {q:'Какой гран-при считается самым престижным?',o:['Монако','Сильверстоун','Монца','Спа'],a:0,d:1},
+            {q:'Сколько очков даётся за победу в гонке (2025)?',o:['20','25','30','50'],a:1,d:1},
+            {q:'Какой цвет флага означает конец гонки?',o:['Красный','Жёлтый','Клетчатый','Синий'],a:2,d:1},
+            {q:'Кто самый молодой чемпион мира F1?',o:['Льюис Хэмилтон','Фернандо Алонсо','Себастьян Феттель','Макс Ферстаппен'],a:3,d:1},
+            {q:'Какая максимальная скорость болида F1 (примерно)?',o:['280 км/ч','320 км/ч','370 км/ч','420 км/ч'],a:2,d:2},
+            {q:'Что такое DRS в Формуле 1?',o:['Система торможения','Подвижное заднее крыло','Система рекуперации','Ограничитель скорости'],a:1,d:2},
+            {q:'Сколько поворотов на трассе Монако?',o:['14','17','19','22'],a:2,d:2},
+            {q:'Какой пилот имеет рекорд по количеству побед?',o:['Шумахер','Хэмилтон','Ферстаппен','Сенна'],a:1,d:2},
+            {q:'Что означает синий флаг?',o:['Опасность','Пропусти быструю машину','Конец сессии','Мокрая трасса'],a:1,d:2},
+            {q:'Какой минимальный вес болида F1 (2025)?',o:['650 кг','722 кг','798 кг','850 кг'],a:2,d:2},
+            {q:'Сколько передач в коробке болида F1?',o:['6','7','8','10'],a:2,d:2},
+            {q:'Что такое пейс-кар (Safety Car)?',o:['Запасной болид','Машина безопасности','Машина врача','Машина судьи'],a:1,d:2},
+            {q:'Кто выиграл последний чемпионат с Ferrari до 2025?',o:['Шумахер (2004)','Райкконен (2007)','Алонсо (2006)','Феттель (2013)'],a:1,d:3},
+            {q:'Какой пилот погиб в Имоле в 1994?',o:['Ники Лауда','Жиль Вильнёв','Айртон Сенна','Ронни Петерсон'],a:2,d:3},
+            {q:'На какой трассе самый длинный круг в календаре 2025?',o:['Джидда','Спа','Баку','Лас-Вегас'],a:1,d:3},
+            {q:'Сколько цилиндров в двигателе F1 (с 2014)?',o:['4','6','8','10'],a:1,d:3},
+            {q:'Какую перегрузку испытывает пилот при торможении?',o:['2G','4G','6G','8G'],a:2,d:3},
+            {q:'Кто единственный выиграл чемпионат посмертно?',o:['Сенна','Риндт','Кларк','Хоторн'],a:1,d:3},
+            {q:'В каком году FIA ввела систему гало?',o:['2016','2017','2018','2019'],a:2,d:3},
+            {q:'Какой рекорд Ферстаппена в 2023 — побед за сезон?',o:['15','17','19','21'],a:2,d:3},
         ];
 
-        const GuessTrackGame = ({onBack}) => {
+        const QuizGame = ({onBack}) => {
             const [state, setState] = useState('ready');
-            const [qIdx, setQIdx] = useState(0);
-            const [score, setScore] = useState(0);
             const [questions, setQuestions] = useState([]);
+            const [qIdx, setQIdx] = useState(0);
             const [selected, setSelected] = useState(null);
+            const [score, setScore] = useState(0);
             const [result, setResult] = useState(null);
             const totalQ = 5;
 
             const generateQuestions = () => {
-                const shuffled = [...TRACKS_QUIZ].sort(()=>Math.random()-0.5);
-                return shuffled.slice(0,totalQ).map(correct => {
-                    const others = TRACKS_QUIZ.filter(t=>t.name!==correct.name).sort(()=>Math.random()-0.5).slice(0,3);
-                    return {track:correct, options:[correct,...others].sort(()=>Math.random()-0.5)};
-                });
+                const easy = QUIZ_BANK.filter(q=>q.d===1).sort(()=>Math.random()-0.5).slice(0,2);
+                const med = QUIZ_BANK.filter(q=>q.d===2).sort(()=>Math.random()-0.5).slice(0,2);
+                const hard = QUIZ_BANK.filter(q=>q.d===3).sort(()=>Math.random()-0.5).slice(0,1);
+                return [...easy,...med,...hard];
             };
 
             const startGame = () => { setQuestions(generateQuestions()); setQIdx(0); setScore(0); setSelected(null); setResult(null); setState('playing'); };
 
-            const answer = (name) => {
-                if (selected) return;
-                const isCorrect = name===questions[qIdx].track.name;
+            const answer = (idx) => {
+                if (selected!==null) return;
+                setSelected(idx);
+                const isCorrect = idx===questions[qIdx].a;
                 const newScore = score + (isCorrect?1:0);
                 if(isCorrect) setScore(s=>s+1);
-                setSelected(name);
                 setTimeout(()=>{
                     if (qIdx+1<totalQ) { setQIdx(i=>i+1); setSelected(null); }
                     else {
                         setState('finished');
-                        api.post('/api/games/result',{game_type:'guess_track',score:newScore}).then(r=>setResult(r));
+                        api.post('/api/games/result',{game_type:'quiz',score:newScore}).then(res=>setResult(res));
                     }
                 }, 1200);
             };
 
-            return (
-                <div className="page-container fade-in" style={{padding:'20px 16px',textAlign:'center'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-                        <div onClick={onBack} style={{cursor:'pointer',fontSize:14,color:'var(--f1-text-muted)'}}>← Назад</div>
-                        <div style={{fontWeight:800,fontSize:18}}>🗺️ Угадай трассу</div>
-                        <div style={{width:50}}/>
-                    </div>
-                    {state==='ready' && (
-                        <div>
-                            <div style={{fontSize:60,marginBottom:20}}>🗺️</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>Узнай трассу по контуру!<br/>{totalQ} вопросов</div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>Каждый правильный ответ = 5 очков</div>
-                            <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#FF8000',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
-                        </div>
-                    )}
-                    {state==='playing' && questions[qIdx] && (
-                        <div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
-                            <svg viewBox="0 0 100 100" style={{width:200,height:200,margin:'0 auto 24px',display:'block'}}>
-                                <path d={questions[qIdx].track.svg} fill="none" stroke="#e10600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,maxWidth:320,margin:'0 auto'}}>
-                                {questions[qIdx].options.map(opt => {
-                                    const isCorrectAnswer = opt.name===questions[qIdx].track.name;
-                                    const isSel = selected===opt.name;
-                                    let bg = 'rgba(255,255,255,0.06)';
-                                    if (selected) { if(isCorrectAnswer) bg='rgba(0,200,0,0.2)'; else if(isSel) bg='rgba(255,0,0,0.2)'; }
-                                    return (
-                                        <div key={opt.name} onClick={()=>answer(opt.name)}
-                                             style={{padding:'14px 10px',borderRadius:12,background:bg,cursor:selected?'default':'pointer',
-                                                 fontWeight:700,fontSize:14,border:isSel?'2px solid white':'2px solid transparent',transition:'all 0.2s'}}>
-                                            {opt.name}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    {state==='finished' && (
-                        <div>
-                            <div style={{fontSize:48,marginBottom:12}}>{score>=4?'🏆':score>=2?'👏':'🤔'}</div>
-                            <div style={{fontSize:32,fontWeight:800,color:'#FF8000'}}>{score}/{totalQ}</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>{score>=4?'Настоящий знаток!':score>=2?'Неплохо!':'Попробуй ещё!'}</div>
-                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
-                            <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
-                                <div onClick={startGame} style={{padding:'12px 24px',borderRadius:12,background:'#FF8000',fontWeight:700,cursor:'pointer',color:'#fff'}}>Ещё раз</div>
-                                <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const QuizGame = ({onBack}) => {
-            const [state, setState] = useState('ready');
-            const [question, setQuestion] = useState(null);
-            const [selected, setSelected] = useState(null);
-            const [correctIdx, setCorrectIdx] = useState(null);
-            const [score, setScore] = useState(0);
-            const [qNum, setQNum] = useState(0);
-            const [result, setResult] = useState(null);
-            const totalQ = 5;
-
-            const loadQuestion = () => { api.get('/api/quiz/question').then(q=>{setQuestion(q);setSelected(null);setCorrectIdx(null);}); };
-            const startGame = () => { setScore(0);setQNum(1);setResult(null);setState('playing');loadQuestion(); };
-
-            const answer = (idx) => {
-                if (selected!==null) return;
-                setSelected(idx);
-                api.post('/api/quiz/answer',{question_id:question.question_id||question.id,answer:idx}).then(r=>{
-                    setCorrectIdx(r.correct_answer);
-                    const isCorrect = r.correct;
-                    if(isCorrect) setScore(s=>s+1);
-                    setTimeout(()=>{
-                        if (qNum<totalQ) { setQNum(n=>n+1); loadQuestion(); }
-                        else {
-                            setState('finished');
-                            const finalScore = score + (isCorrect?1:0);
-                            api.post('/api/games/result',{game_type:'quiz',score:finalScore}).then(res=>setResult(res));
-                        }
-                    }, 1500);
-                });
-            };
+            const diffLabel = (d) => d===1?'Легко':d===2?'Средне':'Сложно';
+            const diffColor = (d) => d===1?'#27F4D2':d===2?'#FF8000':'#e10600';
 
             return (
                 <div className="page-container fade-in" style={{padding:'20px 16px'}}>
@@ -3267,17 +3507,21 @@
                     {state==='ready' && (
                         <div style={{textAlign:'center'}}>
                             <div style={{fontSize:60,marginBottom:20}}>🧠</div>
-                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:24}}>{totalQ} вопросов об истории F1</div>
+                            <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:8}}>{totalQ} вопросов об истории F1</div>
+                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:24}}>2 лёгких · 2 средних · 1 сложный</div>
                             <div onClick={startGame} style={{padding:'16px 40px',borderRadius:14,background:'#6692FF',fontWeight:800,fontSize:18,cursor:'pointer',display:'inline-block',fontFamily:'inherit',border:'none',color:'#fff'}}>СТАРТ</div>
                         </div>
                     )}
-                    {state==='playing' && question && (
+                    {state==='playing' && questions[qIdx] && (
                         <div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:12,textAlign:'center'}}>Вопрос {qNum}/{totalQ} · Счёт: {score}</div>
-                            <div style={{fontSize:16,fontWeight:700,marginBottom:20,textAlign:'center',lineHeight:1.4}}>{question.question}</div>
-                            {question.options.map((opt,idx)=>{
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                                <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>Вопрос {qIdx+1}/{totalQ} · Счёт: {score}</div>
+                                <div style={{fontSize:10,fontWeight:700,color:diffColor(questions[qIdx].d),background:`${diffColor(questions[qIdx].d)}22`,padding:'3px 8px',borderRadius:6}}>{diffLabel(questions[qIdx].d)}</div>
+                            </div>
+                            <div style={{fontSize:16,fontWeight:700,marginBottom:20,textAlign:'center',lineHeight:1.4}}>{questions[qIdx].q}</div>
+                            {questions[qIdx].o.map((opt,idx)=>{
                                 let bg = 'rgba(255,255,255,0.06)';
-                                if (selected!==null) { if(idx===correctIdx) bg='rgba(0,200,0,0.2)'; else if(idx===selected) bg='rgba(255,0,0,0.2)'; }
+                                if (selected!==null) { if(idx===questions[qIdx].a) bg='rgba(0,200,0,0.2)'; else if(idx===selected) bg='rgba(255,0,0,0.2)'; }
                                 return (
                                     <div key={idx} onClick={()=>answer(idx)} style={{padding:'14px 16px',marginBottom:8,borderRadius:12,background:bg,cursor:selected!==null?'default':'pointer',fontWeight:600,fontSize:14,transition:'all 0.2s'}}>
                                         {opt}
@@ -3291,7 +3535,6 @@
                             <div style={{fontSize:48,marginBottom:12}}>{score>=4?'🏆':score>=2?'👏':'📚'}</div>
                             <div style={{fontSize:32,fontWeight:800,color:'#6692FF'}}>{score}/{totalQ}</div>
                             <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginTop:4}}>{score>=4?'Настоящий знаток!':score>=2?'Неплохо!':'Почитай про F1!'}</div>
-                            {result && <div style={{fontSize:18,fontWeight:700,color:'#ffaa00',marginTop:12}}>+{result.points_earned} очков!</div>}
                             <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:24}}>
                                 <div onClick={startGame} style={{padding:'12px 24px',borderRadius:12,background:'#6692FF',fontWeight:700,cursor:'pointer',color:'#fff'}}>Ещё раз</div>
                                 <div onClick={onBack} style={{padding:'12px 24px',borderRadius:12,background:'rgba(255,255,255,0.08)',fontWeight:700,cursor:'pointer'}}>Назад</div>
@@ -3311,15 +3554,15 @@
             const goBack = () => { setActiveGame(null); api.get('/api/games/status').then(setStatus); };
 
             if (activeGame==='pit_stop') return <PitStopGame onBack={goBack}/>;
-            if (activeGame==='guess_track') return <GuessTrackGame onBack={goBack}/>;
+            if (activeGame==='top_trumps') return <TopTrumpsGame onBack={goBack}/>;
             if (activeGame==='reaction') return <ReactionGame onBack={goBack}/>;
             if (activeGame==='quiz') return <QuizGame onBack={goBack}/>;
 
             const games = [
                 {id:'pit_stop',icon:'🔧',name:'Пит-стоп',desc:'Смени шины быстрее всех!',color:'#e10600'},
-                {id:'guess_track',icon:'🗺️',name:'Угадай трассу',desc:'Узнай трассу по контуру',color:'#FF8000'},
+                {id:'top_trumps',icon:'🃏',name:'Top Trumps',desc:'Карточная битва пилотов F1',color:'#FFD700'},
                 {id:'reaction',icon:'🚦',name:'Реакция',desc:'Стартуй по зелёному!',color:'#27F4D2'},
-                {id:'quiz',icon:'🧠',name:'F1 Квиз',desc:'5 вопросов о Формуле 1',color:'#6692FF'},
+                {id:'quiz',icon:'🧠',name:'F1 Квиз',desc:'Проверь свои знания',color:'#6692FF'},
             ];
 
             return (

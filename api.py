@@ -527,20 +527,7 @@ async def submit_game_result(body: GameResultRequest, request: Request):
 
 
 def _calc_game_points(game_type: str, score: int) -> int:
-    if game_type == "pit_stop":
-        if score < 2000: return 50
-        if score < 2500: return 30
-        if score < 3000: return 20
-        if score < 4000: return 10
-        return 5
-    if game_type == "reaction":
-        if score < 200: return 50
-        if score < 300: return 30
-        if score < 500: return 10
-        return 5
-    if game_type in ("guess_track", "quiz"):
-        return score * 5
-    return 0
+    return 0  # Games are for fun only, points only from predictions
 
 
 # ============ QUIZ ============

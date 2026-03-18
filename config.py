@@ -60,7 +60,7 @@ CACHE_TTL = {
 }
 
 # ============ GAME SETTINGS ============
-GAME_COOLDOWN_SECONDS = 4 * 3600  # 4 hours between plays
+GAME_COOLDOWN_SECONDS = 0  # No cooldown
 INITIAL_USER_POINTS = 100
 
 # ============ PREDICTION POINTS ============
