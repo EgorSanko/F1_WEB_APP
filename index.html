@@ -2696,8 +2696,20 @@
         };
 
         // ==== VK VIDEO PLAYER ====
-        const VKVideoPlayer = ({embedUrl, title}) => {
-            if (!embedUrl) return null;
+        const VKVideoPlayer = ({embedUrl, videoUrl, title}) => {
+            const [embedFailed, setEmbedFailed] = useState(false);
+            // Build direct VK link (strip timestamp, use standard format)
+            const directUrl = videoUrl || embedUrl;
+
+            if (!embedUrl || embedFailed) {
+                return (
+                    <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                        Смотреть во ВКонтакте
+                    </a>
+                );
+            }
+
             return (
                 <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
                     <iframe
@@ -2706,6 +2718,7 @@
                         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                         allowFullScreen
                         title={title || 'F1 Video'}
+                        onError={()=>setEmbedFailed(true)}
                     />
                 </div>
             );
@@ -2742,7 +2755,7 @@
                                 </div>
                             </div>
                             {b.embed_url ? (
-                                <VKVideoPlayer embedUrl={b.embed_url} title={b.title}/>
+                                <VKVideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={b.title}/>
                             ) : b.video_url ? (
                                 <a href={b.video_url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'12px 16px',background:'rgba(255,255,255,0.06)',borderRadius:10,color:'var(--f1-text)',textDecoration:'none',fontSize:14,fontWeight:600,textAlign:'center'}}>
                                     Открыть видео ↗
@@ -2983,7 +2996,7 @@
                         </div>
                     )}
 
-                    {race.sessions && !race.podium && (() => {
+                    {race.sessions && !race.podium && !raceResults && (() => {
                         const sessionNames = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
                         const sessionOrder = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
                         const entries = typeof race.sessions === 'object' && !Array.isArray(race.sessions) ? Object.entries(race.sessions).sort((a,b)=>sessionOrder.indexOf(a[0])-sessionOrder.indexOf(b[0])) : [];
@@ -3089,6 +3102,52 @@
                     )}
 
                     </>)}
+
+                    {/* API-loaded race results (2026+) */}
+                    {raceTab === 'race' && !race.podium && raceResults && (
+                        <div>
+                            <div className="card" style={{padding:'16px 12px',marginBottom:16,position:'relative',overflow:'hidden'}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>&#x1F3C6; Подиум</div>
+                                <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:4}}>
+                                    {[1,0,2].map(idx => {
+                                        const d = raceResults[idx]; if(!d) return null;
+                                        const pc = ['#FFD700','#C0C0C0','#CD7F32'];
+                                        const ph = [130,100,85]; const ps = [64,48,48];
+                                        return (
+                                            <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
+                                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:ps[idx],height:ps[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${pc[idx]}`,background:'var(--f1-gray)',margin:'0 auto 6px'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                <div style={{fontWeight:900,fontSize:idx===0?16:14}}>{d.code}</div>
+                                                <div style={{fontSize:10,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</div>
+                                                <div style={{background:`${pc[idx]}22`,borderRadius:'8px 8px 0 0',padding:'10px 0',marginTop:6,height:ph[idx],display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',paddingTop:10}}>
+                                                    <div style={{fontSize:28,fontWeight:900,color:pc[idx]}}>{d.position}</div>
+                                                    {d.time && <div style={{fontSize:9,color:'var(--f1-text-muted)',marginTop:2}}>{d.time}</div>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="card" style={{padding:'16px 12px',marginBottom:16}}>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>&#x1F4CB; Результаты гонки</div>
+                                {raceResults.map((d,i) => (
+                                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<raceResults.length-1?'1px solid var(--f1-border)':'none'}}>
+                                        <div style={{width:28,fontWeight:900,fontSize:14,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',textAlign:'center'}}>{d.position}</div>
+                                        <div style={{background:d.team_color,width:3,height:28,borderRadius:2}}/>
+                                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <span style={{fontWeight:700,fontSize:13}}>{d.code}</span>
+                                            <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{d.first_name} {d.last_name}</span>
+                                        </div>
+                                        <div style={{textAlign:'right'}}>
+                                            {d.time && <div style={{fontSize:11,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.time}</div>}
+                                            {d.is_dnf && <div style={{fontSize:10,color:'var(--f1-red)',fontWeight:700}}>DNF</div>}
+                                            {!d.is_dnf && d.points > 0 && <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.points} очк.</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Qualifying Results */}
                     {raceTab === 'qualifying' && qualiData?.results?.length > 0 && (
