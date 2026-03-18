@@ -1154,37 +1154,11 @@ async def admin_list_broadcasts(request: Request):
 
 
 async def resolve_vk_embed(video_url: str) -> str:
-    """Try to resolve a VK video URL to an embed URL using VK API."""
-    # Extract oid and id from URL like vk.com/video-12345_67890
+    """Construct VK video embed URL from a standard VK video URL."""
     match = re.search(r'video(-?\d+)_(\d+)', video_url)
     if not match:
         return None
     oid, vid = match.group(1), match.group(2)
-
-    if not VK_SERVICE_KEY:
-        # Fallback: construct embed URL without hash (may not work for all videos)
-        return f"https://vkvideo.ru/video_ext.php?oid={oid}&id={vid}"
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get("https://api.vk.com/method/video.get", params={
-                "videos": f"{oid}_{vid}",
-                "count": 1,
-                "extended": 0,
-                "v": "5.199",
-                "access_token": VK_SERVICE_KEY,
-            })
-            data = resp.json()
-            items = data.get("response", {}).get("items", [])
-            if items and items[0].get("player"):
-                player_url = items[0]["player"]
-                # Convert player URL to embed URL if needed
-                if 'video_ext.php' in player_url or 'vkvideo.ru' in player_url:
-                    return player_url
-                return player_url
-    except Exception as e:
-        logger.warning(f"VK API error: {e}")
-
     return f"https://vkvideo.ru/video_ext.php?oid={oid}&id={vid}"
 
 

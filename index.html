@@ -2723,7 +2723,7 @@
                     </div>
                 );
             }
-            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
+            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация',review:'Обзор'};
             return (
                 <div style={{display:'flex',flexDirection:'column',gap:12}}>
                     {broadcasts.map(b => (
@@ -2812,7 +2812,7 @@
                 await loadBroadcasts();
             };
 
-            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квали'};
+            const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квали',review:'Обзор'};
 
             return (
                 <div className="card" style={{marginBottom:16}}>
@@ -2874,7 +2874,14 @@
                 setRevealed(false);
                 setTyreData(null);
                 setQualiData(null);
+                setBroadcastData(null);
                 setRaceTab(defaultTab || 'race');
+                // Fetch broadcasts for any race
+                if (race?.round) {
+                    api.get(`/api/broadcasts?race_round=${race.round}`).then(d => {
+                        if (d?.broadcasts?.length > 0) setBroadcastData(d.broadcasts);
+                    });
+                }
                 if (race?.round && isPastRace) {
                     setTyreLoading(true);
                     api.get(`/api/race/${race.round}/tyres`).then(d => {
@@ -2882,9 +2889,6 @@
                     }).finally(() => setTyreLoading(false));
                     api.get(`/api/race/${race.round}/qualifying?season=${season}`).then(d => {
                         if (d?.results?.length > 0) setQualiData(d);
-                    });
-                    api.get(`/api/broadcasts?race_round=${race.round}&season=${season}`).then(d => {
-                        if (d?.broadcasts?.length > 0) setBroadcastData(d.broadcasts);
                     });
                 }
             }, [race?.round]);
@@ -2936,6 +2940,15 @@
                     {/* Sessions schedule (for future races) */}
                     {raceTab === 'broadcast' && broadcastData && (
                         <BroadcastTab broadcasts={broadcastData} raceName={race.name}/>
+                    )}
+
+                    {/* Broadcast tab for future races */}
+                    {!isPastRace && broadcastData && (
+                        <div style={{display:'flex',gap:6,marginBottom:16}}>
+                            <button onClick={()=>setRaceTab('broadcast')} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab==='broadcast'?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab==='broadcast'?'#fff':'var(--f1-text-muted)'}}>
+                                📺 Запись
+                            </button>
+                        </div>
                     )}
 
                     {race.sessions && !race.podium && (() => {
