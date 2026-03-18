@@ -2697,30 +2697,12 @@
 
         // ==== VK VIDEO PLAYER ====
         const VKVideoPlayer = ({embedUrl, videoUrl, title}) => {
-            const [embedFailed, setEmbedFailed] = useState(false);
-            // Build direct VK link (strip timestamp, use standard format)
             const directUrl = videoUrl || embedUrl;
-
-            if (!embedUrl || embedFailed) {
-                return (
-                    <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-                        Смотреть во ВКонтакте
-                    </a>
-                );
-            }
-
             return (
-                <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
-                    <iframe
-                        src={embedUrl}
-                        style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
-                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                        allowFullScreen
-                        title={title || 'F1 Video'}
-                        onError={()=>setEmbedFailed(true)}
-                    />
-                </div>
+                <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                    Смотреть запись
+                </a>
             );
         };
 
@@ -3104,7 +3086,7 @@
                     </>)}
 
                     {/* API-loaded race results (2026+) */}
-                    {raceTab === 'race' && !race.podium && raceResults && (
+                    {raceTab === 'race' && !race.podium && raceResults && !isSpoilerHidden && (
                         <div>
                             <div className="card" style={{padding:'16px 12px',marginBottom:16,position:'relative',overflow:'hidden'}}>
                                 <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>&#x1F3C6; Подиум</div>
@@ -3139,9 +3121,12 @@
                                             <span style={{fontSize:11,color:'var(--f1-text-muted)',marginLeft:6}}>{d.first_name} {d.last_name}</span>
                                         </div>
                                         <div style={{textAlign:'right'}}>
-                                            {d.time && <div style={{fontSize:11,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.time}</div>}
-                                            {d.is_dnf && <div style={{fontSize:10,color:'var(--f1-red)',fontWeight:700}}>DNF</div>}
-                                            {!d.is_dnf && d.points > 0 && <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.points} очк.</div>}
+                                            {d.is_dnf ? (
+                                                <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700}}>DNF</div>
+                                            ) : (<>
+                                                {d.time && <div style={{fontSize:11,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.time}</div>}
+                                                {d.points > 0 && <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.points} очк.</div>}
+                                            </>)}
                                         </div>
                                     </div>
                                 ))}
@@ -3150,7 +3135,7 @@
                     )}
 
                     {/* Qualifying Results */}
-                    {raceTab === 'qualifying' && qualiData?.results?.length > 0 && (
+                    {raceTab === 'qualifying' && !isSpoilerHidden && qualiData?.results?.length > 0 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
                             <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>КВАЛИФИКАЦИЯ · {qualiData.race_name || ''}</div>
@@ -3199,7 +3184,7 @@
                         </div>
                     )}
 
-                    {raceTab === 'qualifying' && (!qualiData || !qualiData.results?.length) && (
+                    {raceTab === 'qualifying' && !isSpoilerHidden && (!qualiData || !qualiData.results?.length) && (
                         <div className="card" style={{padding:'30px 20px',marginBottom:16,textAlign:'center'}}>
                             <div style={{fontSize:36,marginBottom:8}}>⏱️</div>
                             <div style={{fontSize:14,fontWeight:600,color:'var(--f1-text-muted)'}}>Нет данных квалификации</div>

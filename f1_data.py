@@ -792,13 +792,15 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
     return response
 
 
-async def get_last_race() -> Dict[str, Any]:
-    """Get results of the most recent race."""
-    cached = cache_get("race_results:last")
+async def get_last_race(season: int = None) -> Dict[str, Any]:
+    """Get results of the most recent race for given season."""
+    s = season or CURRENT_SEASON
+    cache_key = f"race_results:last:{s}"
+    cached = cache_get(cache_key)
     if cached:
         return cached
 
-    prefix = ergast_season(CURRENT_SEASON)
+    prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/last/results")
     if not data:
         return {"error": "Failed to fetch last race"}
@@ -827,7 +829,7 @@ async def get_last_race() -> Dict[str, Any]:
         "date": race["date"],
         "results": results,
     }
-    cache_set("race_results:last", response)
+    cache_set(cache_key, response)
     return response
 
 
@@ -1568,7 +1570,7 @@ async def get_home_data(season: int = None) -> Dict[str, Any]:
     s = season or CURRENT_SEASON
     next_race, last_race, standings = await asyncio.gather(
         get_next_race(s),
-        get_last_race(),
+        get_last_race(s),
         get_driver_standings(s),
     )
 
