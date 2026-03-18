@@ -387,7 +387,7 @@
         );
 
         // ==== HOME PAGE ====
-        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onRaceClick, onRefresh, liveBroadcasts}) => {
+        const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onToggleSpoiler, onRaceClick, onRefresh, liveBroadcasts}) => {
             const ptr = usePullToRefresh(onRefresh);
             if (!nextRace && !lastRace) return (
                 <div className="page-container fade-in" style={{padding:16}}>
@@ -410,6 +410,9 @@
                         <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
                             {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
                         </div>
+                        <button onClick={onToggleSpoiler} style={{marginTop:8,display:'flex',alignItems:'center',gap:6,margin:'8px auto 0',background:spoilerFree?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(spoilerFree?'rgba(225,6,0,0.3)':'var(--f1-border)'),borderRadius:8,padding:'5px 14px',color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
+                            {spoilerFree ? '🙈' : '👁️'} Антиспойлер {spoilerFree ? 'вкл' : 'выкл'}
+                        </button>
                     </div>
 
                     {nextRace && nextRace.name && (
@@ -1291,7 +1294,7 @@
         // ==== STANDINGS PAGE ====
         const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh, spoilerFree}) => {
             const [tab, setTab] = useState('drivers');
-            const [spoilerDismissed, setSpoilerDismissed] = useState(false);
+            const [spoilerDismissed, setSpoilerDismissed] = useState(() => localStorage.getItem('f1hub_spoiler_standings_skip') === 'true');
             const showSpoilerWarning = spoilerFree && !spoilerDismissed;
             const [selectedDriver, setSelectedDriver] = useState(null);
             const [driverDetail, setDriverDetail] = useState(null);
@@ -1408,7 +1411,7 @@
 
             return (
                 <div className="page-container fade-in flex-layout" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
-                    {showSpoilerWarning && <SpoilerWarningOverlay onDismiss={()=>setSpoilerDismissed(true)}/>}
+                    {showSpoilerWarning && <SpoilerWarningOverlay onDismiss={()=>setSpoilerDismissed(true)} onBack={()=>history.back()}/>}
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         {ptr.indicatorEl}
@@ -2756,25 +2759,36 @@
         };
 
         // ==== SPOILER WARNING DIALOG ====
-        const SpoilerWarningOverlay = ({onDismiss}) => (
-            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-                <div className="card" style={{maxWidth:340,width:'100%',textAlign:'center',padding:'28px 24px'}}>
-                    <div style={{fontSize:48,marginBottom:12}}>🙈</div>
-                    <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>Антиспойлер включён</div>
-                    <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:20,lineHeight:1.5}}>
-                        На этой странице отображается полная таблица чемпионата, которая может содержать спойлеры последних гонок.
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                        <button onClick={onDismiss} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'var(--f1-red)',color:'white'}}>
-                            Всё равно показать
-                        </button>
-                        <button onClick={()=>history.back?history.back():null} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-muted)'}}>
-                            Назад
-                        </button>
+        const SpoilerWarningOverlay = ({onDismiss, onBack}) => {
+            const [dontShow, setDontShow] = useState(false);
+            const handleDismiss = () => {
+                if (dontShow) localStorage.setItem('f1hub_spoiler_standings_skip', 'true');
+                onDismiss();
+            };
+            return (
+                <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'#000',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+                    <div className="card" style={{maxWidth:340,width:'100%',textAlign:'center',padding:'28px 24px'}}>
+                        <div style={{fontSize:48,marginBottom:12}}>🙈</div>
+                        <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>Антиспойлер включён</div>
+                        <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:20,lineHeight:1.5}}>
+                            Таблица чемпионата содержит спойлеры последних гонок. Хотите всё равно посмотреть?
+                        </div>
+                        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                            <button onClick={handleDismiss} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'var(--f1-red)',color:'white'}}>
+                                Всё равно показать
+                            </button>
+                            <button onClick={onBack || (()=>{})} style={{padding:'12px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-muted)'}}>
+                                Назад
+                            </button>
+                        </div>
+                        <label style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14,fontSize:12,color:'var(--f1-text-muted)',cursor:'pointer'}}>
+                            <input type="checkbox" checked={dontShow} onChange={e=>setDontShow(e.target.checked)} style={{accentColor:'var(--f1-red)'}}/>
+                            Не показывать это предупреждение
+                        </label>
                     </div>
                 </div>
-            </div>
-        );
+            );
+        };
 
         // ==== ADMIN BROADCAST PANEL ====
         const AdminBroadcastPanel = ({userId}) => {
@@ -2895,10 +2909,9 @@
 
             if (!race) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка гран-при..."/></div>;
 
-            // Determine if this race should be spoiler-hidden
+            // Determine if this race should be spoiler-hidden (any past race when spoilerFree)
             const now = new Date();
-            const lastCompletedRound = allRaces?.filter(r => new Date(r.date) < now).pop();
-            const isSpoilerHidden = spoilerFree && !revealed && lastCompletedRound && race.round === lastCompletedRound.round;
+            const isSpoilerHidden = spoilerFree && !revealed && isPastRace;
 
             const flag = circuitFlags[race.circuit_id] || '🏁';
             const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
@@ -2926,11 +2939,23 @@
                         </div>
                     </div>
 
+                    {isSpoilerHidden && (
+                        <div className="card" style={{padding:'28px 20px',textAlign:'center',marginBottom:16}}>
+                            <div style={{fontSize:40,marginBottom:10}}>🙈</div>
+                            <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>Антиспойлер включён</div>
+                            <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16,lineHeight:1.5}}>Результаты этого гран-при скрыты.<br/>Вкладка «Запись» доступна без спойлеров.</div>
+                            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+                                <button onClick={()=>setRevealed(true)} style={{padding:'10px 24px',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'var(--f1-red)',color:'white'}}>Показать результаты</button>
+                                {broadcastData && <button onClick={()=>setRaceTab('broadcast')} style={{padding:'10px 24px',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-secondary)'}}>📺 Запись</button>}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Race/Qualifying tabs for past races */}
-                    {isPastRace && (
+                    {isPastRace && !isSpoilerHidden && (
                         <div style={{display:'flex',gap:6,marginBottom:16}}>
                             {[...(broadcastData?['race','qualifying','broadcast']:['race','qualifying'])].map(t=>(
-                                <button key={t} onClick={()=>setRaceTab(t)} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
+                                <button key={t} onClick={()=>{if(t!=='broadcast'&&isSpoilerHidden)return;setRaceTab(t);}} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
                                     {t==='race'?'🏁 Гонка':t==='qualifying'?'⏱️ Квалификация':'📺 Запись'}
                                 </button>
                             ))}
@@ -2942,8 +2967,11 @@
                         <BroadcastTab broadcasts={broadcastData} raceName={race.name}/>
                     )}
 
-                    {/* Broadcast tab for future races */}
-                    {!isPastRace && broadcastData && (
+                    {/* Broadcast tab for any race with broadcasts */}
+                    {((!isPastRace && broadcastData) || (isSpoilerHidden && broadcastData)) && raceTab === 'broadcast' && (
+                        <BroadcastTab broadcasts={broadcastData} raceName={race.name}/>
+                    )}
+                    {!isPastRace && broadcastData && !isSpoilerHidden && (
                         <div style={{display:'flex',gap:6,marginBottom:16}}>
                             <button onClick={()=>setRaceTab('broadcast')} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab==='broadcast'?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab==='broadcast'?'#fff':'var(--f1-text-muted)'}}>
                                 📺 Запись
@@ -3906,7 +3934,7 @@
 
             const renderTab = () => {
                 switch(tab) {
-                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} liveBroadcasts={liveBroadcasts} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
+                    case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onToggleSpoiler={toggleSpoiler} liveBroadcasts={liveBroadcasts} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
                     case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
                     case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
                     case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
