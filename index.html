@@ -1236,7 +1236,7 @@
 
                         return (
                             <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
-                                 style={{marginBottom:8, padding:12, cursor: shouldHide ? 'default' : 'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
+                                 style={{marginBottom:8, padding:12, cursor: 'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
                                 {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'40%',height:'100%',objectFit:'cover',opacity:0.12,pointerEvents:'none',borderRadius:'0 12px 12px 0'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                 <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
                                     <div style={{width:36,height:36,borderRadius:10,background:isPast?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0,color:isPast?'var(--f1-red)':'var(--f1-text-muted)'}}>{race.round}</div>
@@ -2697,7 +2697,9 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
-            const url = videoUrl || embedUrl || '';
+            const [embedFailed, setEmbedFailed] = useState(false);
+            const url = embedUrl || videoUrl || '';
+            const directUrl = videoUrl || embedUrl || '';
 
             // YouTube detection
             const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
@@ -2716,9 +2718,31 @@
                 );
             }
 
-            // VK video — direct link button (embed blocked by VPN/geo)
+            // VK video — try embed iframe, with direct link fallback
+            const vkEmbed = embedUrl && embedUrl.includes('video_ext.php');
+            if (vkEmbed && !embedFailed) {
+                return (
+                    <div style={{marginBottom:12}}>
+                        <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000'}}>
+                            <iframe
+                                src={embedUrl}
+                                style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
+                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                allowFullScreen
+                                title={title || 'F1 Video'}
+                                onError={() => setEmbedFailed(true)}
+                            />
+                        </div>
+                        <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px',color:'var(--f1-text-muted)',textDecoration:'none',fontSize:11,marginTop:6}}>
+                            Не работает? Открыть в VK ↗
+                        </a>
+                    </div>
+                );
+            }
+
+            // Fallback: direct link button
             return (
-                <a href={url} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
+                <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                     Смотреть запись
                 </a>
@@ -2949,27 +2973,46 @@
                     tension: 0.1,
                     fill: false,
                 }));
+                const maxDrivers = posChart.drivers.length;
                 posChartInstance.current = new Chart(ctx, {
                     type: 'line',
                     data: {datasets},
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {duration: 800, easing: 'easeOutQuart'},
                         scales: {
-                            x: {type:'linear',title:{display:true,text:'Круг',color:'#888',font:{size:11}},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10}}},
-                            y: {reverse:true,min:1,max:20,title:{display:true,text:'Позиция',color:'#888',font:{size:11}},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#888',font:{size:10},stepSize:1}}
+                            x: {
+                                type:'linear',
+                                title:{display:true,text:'Круг',color:'#666',font:{size:10,weight:600}},
+                                grid:{color:'rgba(255,255,255,0.04)',drawBorder:false},
+                                ticks:{color:'#666',font:{size:9},maxTicksLimit:15}
+                            },
+                            y: {
+                                reverse:true,min:1,max:maxDrivers,
+                                title:{display:false},
+                                grid:{color:'rgba(255,255,255,0.04)',drawBorder:false},
+                                ticks:{color:'#666',font:{size:9},stepSize:1,callback:(v)=>'P'+v}
+                            }
                         },
                         plugins: {
                             legend:{display:false},
                             tooltip:{
-                                backgroundColor:'rgba(0,0,0,0.9)',
+                                backgroundColor:'rgba(20,20,20,0.95)',
+                                titleFont:{size:11,weight:700},
+                                bodyFont:{size:11},
+                                padding:10,
+                                cornerRadius:8,
+                                displayColors:true,
+                                boxWidth:8,
+                                boxHeight:3,
                                 callbacks:{
                                     title: (items) => `Круг ${items[0].parsed.x}`,
-                                    label: (item) => `${item.dataset.label}: P${item.parsed.y}`
+                                    label: (item) => ` ${item.dataset.label}  P${item.parsed.y}`
                                 }
                             }
                         },
-                        interaction:{mode:'nearest',intersect:false}
+                        interaction:{mode:'nearest',intersect:false,axis:'x'}
                     }
                 });
                 return () => { if (posChartInstance.current) posChartInstance.current.destroy(); };
@@ -3202,16 +3245,24 @@
 
                     {/* Position change chart */}
                     {isPastRace && !isSpoilerHidden && raceTab === 'race' && posChart && (
-                        <div className="card" style={{padding:'16px 12px',marginBottom:16}}>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📊 Смена позиций</div>
-                            <div style={{height:300,position:'relative'}}>
-                                <canvas ref={posChartRef}/>
+                        <div className="card" style={{padding:0,marginBottom:16,overflow:'hidden'}}>
+                            <div style={{padding:'14px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                    <div style={{width:3,height:16,borderRadius:2,background:'var(--f1-red)'}}/>
+                                    <span style={{fontSize:13,fontWeight:700,color:'var(--f1-text)',letterSpacing:0.3}}>Смена позиций</span>
+                                </div>
+                                <span style={{fontSize:10,color:'var(--f1-text-muted)'}}>{posChart.total_laps} кругов</span>
                             </div>
-                            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+                            <div style={{padding:'0 8px 8px'}}>
+                                <div style={{height:280,position:'relative',background:'rgba(0,0,0,0.15)',borderRadius:10,padding:'8px 4px 4px'}}>
+                                    <canvas ref={posChartRef}/>
+                                </div>
+                            </div>
+                            <div style={{padding:'6px 16px 14px',display:'flex',flexWrap:'wrap',gap:'4px 10px'}}>
                                 {posChart.drivers.map(d => (
-                                    <div key={d.code} style={{display:'flex',alignItems:'center',gap:3,fontSize:10}}>
-                                        <div style={{width:8,height:3,borderRadius:1,background:d.team_color}}/>
-                                        <span style={{color:'var(--f1-text-muted)'}}>{d.code}</span>
+                                    <div key={d.code} style={{display:'flex',alignItems:'center',gap:4,fontSize:10,padding:'2px 0'}}>
+                                        <div style={{width:12,height:3,borderRadius:2,background:d.team_color,opacity:0.9}}/>
+                                        <span style={{color:'var(--f1-text-muted)',fontWeight:500}}>{d.code}</span>
                                     </div>
                                 ))}
                             </div>
