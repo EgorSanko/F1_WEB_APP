@@ -2697,6 +2697,8 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
+            const [vkResolvedUrl, setVkResolvedUrl] = useState(null);
+            const [vkLoading, setVkLoading] = useState(false);
             const [embedFailed, setEmbedFailed] = useState(false);
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
@@ -2718,14 +2720,47 @@
                 );
             }
 
-            // VK video — try embed iframe, with direct link fallback
-            const vkEmbed = embedUrl && embedUrl.includes('video_ext.php');
-            if (vkEmbed && !embedFailed) {
+            // VK video — resolve embed URL client-side via oEmbed
+            const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
+            useEffect(() => {
+                if (!isVk || vkResolvedUrl || vkLoading) return;
+                setVkLoading(true);
+                // Try oEmbed from client side to get proper embed URL with hash
+                const vkUrl = directUrl.includes('video-') || directUrl.includes('video_ext')
+                    ? directUrl : directUrl;
+                api.get(`/api/vk-embed?url=${encodeURIComponent(directUrl)}`)
+                    .then(data => {
+                        if (data?.embed_url) {
+                            setVkResolvedUrl(data.embed_url);
+                        } else if (embedUrl && embedUrl.includes('video_ext.php')) {
+                            setVkResolvedUrl(embedUrl);
+                        } else {
+                            setEmbedFailed(true);
+                        }
+                    })
+                    .catch(() => {
+                        if (embedUrl && embedUrl.includes('video_ext.php')) {
+                            setVkResolvedUrl(embedUrl);
+                        } else {
+                            setEmbedFailed(true);
+                        }
+                    })
+                    .finally(() => setVkLoading(false));
+            }, [isVk, directUrl]);
+
+            if (isVk && !embedFailed) {
+                if (vkLoading || !vkResolvedUrl) {
+                    return (
+                        <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#111',marginBottom:12}}>
+                            <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',color:'#666',fontSize:13}}>Загрузка плеера...</div>
+                        </div>
+                    );
+                }
                 return (
                     <div style={{marginBottom:12}}>
                         <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000'}}>
                             <iframe
-                                src={embedUrl}
+                                src={vkResolvedUrl}
                                 style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
                                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                                 allowFullScreen

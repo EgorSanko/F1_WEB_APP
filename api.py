@@ -1284,19 +1284,108 @@ async def admin_list_broadcasts(request: Request):
 
 
 async def resolve_vk_embed(video_url: str) -> str:
-    """Construct embed URL from VK or YouTube video URL."""
-    # YouTube — return embed URL
+    """Construct embed URL from VK or YouTube video URL, fetching hash for VK."""
     import re as _re
+    import httpx as _httpx
+
+    # YouTube — return embed URL
     yt = _re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]+)', video_url)
     if yt:
         return f"https://www.youtube.com/embed/{yt.group(1)}?rel=0"
 
-    # VK video
+    # VK video — extract oid and id
     match = _re.search(r'video(-?\d+)_(\d+)', video_url)
     if not match:
         return None
     oid, vid = match.group(1), match.group(2)
+
+    # Fetch the VK video page to extract embed hash
+    vk_page_url = f"https://vk.com/video{oid}_{vid}"
+    try:
+        async with _httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(vk_page_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            if resp.status_code == 200:
+                hash_match = _re.search(r'hash=([a-f0-9]+)', resp.text)
+                if hash_match:
+                    h = hash_match.group(1)
+                    logging.info(f"VK embed hash found: {h[:8]}...")
+                    return f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hash={h}&hd=2"
+    except Exception as e:
+        logging.warning(f"Failed to fetch VK hash: {e}")
+
+    # Fallback without hash (may not work for some videos)
     return f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hd=2"
+
+
+@app.get("/api/vk-embed")
+async def vk_embed_proxy(url: str):
+    """Proxy VK oEmbed to resolve proper embed URL with hash."""
+    import httpx as _httpx
+    import re as _re
+
+    # Validate it's a VK URL
+    if not _re.search(r'vk\.com|vkvideo\.ru|vksport', url):
+        raise HTTPException(status_code=400, detail="Not a VK URL")
+
+    # Extract video oid_id for canonical URL
+    m = _re.search(r'video(-?\d+)_(\d+)', url)
+    if not m:
+        raise HTTPException(status_code=400, detail="No video ID found")
+
+    oid, vid = m.group(1), m.group(2)
+    canonical = f"https://vk.com/video{oid}_{vid}"
+
+    # Try oEmbed first
+    try:
+        async with _httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(
+                f"https://vk.com/video_oembed.json?url={canonical}",
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                html = data.get("html", "")
+                src_match = _re.search(r'src="([^"]+)"', html)
+                if src_match:
+                    return {"embed_url": src_match.group(1)}
+    except Exception:
+        pass
+
+    # Fallback: scrape video page for hash
+    try:
+        async with _httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(
+                canonical,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            if resp.status_code == 200:
+                # Look for the correct embed hash pattern
+                # VK stores it in various JSON structures on the page
+                text = resp.text
+
+                # Try to find embed URL directly
+                embed_match = _re.search(r'video_ext\.php\?oid=' + _re.escape(oid) + r'&id=' + _re.escape(vid) + r'&hash=([a-f0-9]+)', text)
+                if embed_match:
+                    h = embed_match.group(1)
+                    return {"embed_url": f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hash={h}&hd=2"}
+
+                # Try to find any usable hash near video references
+                # Look for access_hash in JSON
+                for pattern in [
+                    r'"access_hash"\s*:\s*"([^"]+)"',
+                    r'"hash"\s*:\s*"([a-f0-9]{10,})"',
+                ]:
+                    hm = _re.search(pattern, text)
+                    if hm:
+                        h = hm.group(1)
+                        return {"embed_url": f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hash={h}&hd=2"}
+    except Exception:
+        pass
+
+    # No hash found - return URL without hash
+    return {"embed_url": f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hd=2"}
 
 
 # ============ ADMIN ============
