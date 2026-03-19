@@ -222,6 +222,26 @@
             z-index: 999999 !important;
             border-radius: 0 !important;
         }
+        .plyr--fullscreen-fallback video {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: none !important;
+            object-fit: contain !important;
+        }
+        video:fullscreen, video:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: contain !important;
+        }
+        .plyr:fullscreen, .plyr:-webkit-full-screen {
+            border-radius: 0 !important;
+        }
+        .plyr:fullscreen video, .plyr:-webkit-full-screen video {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: none !important;
+            object-fit: contain !important;
+        }
     </style>
 </head>
 <body>
@@ -235,6 +255,12 @@
 
         // Global fullscreen ↔ TG WebApp sync
         (() => {
+            // When native video fullscreen exits, make sure body scroll is restored
+            document.addEventListener('webkitfullscreenchange', () => {
+                if (!document.webkitFullscreenElement) {
+                    document.body.style.overflow = '';
+                }
+            });
             const tgApp = window.Telegram?.WebApp;
             if (!tgApp) return;
 
@@ -2770,6 +2796,40 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         // ==== PLYR VIDEO PLAYER ====
+        const setupPlyrFullscreen = (player, videoEl) => {
+            // Override Plyr fullscreen to work in TG WebView
+            const tgApp = window.Telegram?.WebApp;
+
+            player.on('enterfullscreen', () => {
+                // Plyr entered fullscreen (either native or CSS fallback)
+                try { tgApp?.requestFullscreen?.(); } catch(e) {}
+                document.body.style.overflow = 'hidden';
+
+                // Check if REAL fullscreen happened (not just CSS)
+                setTimeout(() => {
+                    const isRealFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+                    if (!isRealFS && videoEl) {
+                        // Plyr used CSS fallback — try native video fullscreen instead
+                        console.log('[F1Player] Plyr CSS fallback detected, trying native video FS');
+                        try {
+                            if (videoEl.requestFullscreen) {
+                                videoEl.requestFullscreen().catch(() => {});
+                            } else if (videoEl.webkitRequestFullscreen) {
+                                videoEl.webkitRequestFullscreen();
+                            } else if (videoEl.webkitEnterFullscreen) {
+                                videoEl.webkitEnterFullscreen();
+                            }
+                        } catch(e) { console.log('[F1Player] Native video FS failed:', e); }
+                    }
+                }, 200);
+            });
+
+            player.on('exitfullscreen', () => {
+                try { tgApp?.exitFullscreen?.(); } catch(e) {}
+                document.body.style.overflow = '';
+            });
+        };
+
         const F1VideoPlayer = ({src, title, poster, streamType}) => {
             const videoRef = useRef(null);
             const playerRef = useRef(null);
@@ -2833,16 +2893,7 @@
 
                         const player = new Plyr(video, plyrOptions);
                         playerRef.current = player;
-
-                        // Hook TG WebApp fullscreen
-                        player.on('enterfullscreen', () => {
-                            try { window.Telegram?.WebApp?.requestFullscreen?.(); } catch(e) {}
-                            document.body.style.overflow = 'hidden';
-                        });
-                        player.on('exitfullscreen', () => {
-                            try { window.Telegram?.WebApp?.exitFullscreen?.(); } catch(e) {}
-                            document.body.style.overflow = '';
-                        });
+                        setupPlyrFullscreen(player, video);
 
                         // Update Auto label with current resolution
                         hls.on(Hls.Events.LEVEL_SWITCHED, (evt2, d) => {
@@ -2876,12 +2927,7 @@
                     video.src = src;
                     const player = new Plyr(video, plyrOptions);
                     playerRef.current = player;
-                    player.on('enterfullscreen', () => {
-                        try { window.Telegram?.WebApp?.requestFullscreen?.(); } catch(e) {}
-                    });
-                    player.on('exitfullscreen', () => {
-                        try { window.Telegram?.WebApp?.exitFullscreen?.(); } catch(e) {}
-                    });
+                    setupPlyrFullscreen(player, video);
                     return () => { if (playerRef.current) { try { playerRef.current.destroy(); } catch(e) {} } };
 
                 } else {
@@ -2890,12 +2936,7 @@
                     video.src = src;
                     const player = new Plyr(video, plyrOptions);
                     playerRef.current = player;
-                    player.on('enterfullscreen', () => {
-                        try { window.Telegram?.WebApp?.requestFullscreen?.(); } catch(e) {}
-                    });
-                    player.on('exitfullscreen', () => {
-                        try { window.Telegram?.WebApp?.exitFullscreen?.(); } catch(e) {}
-                    });
+                    setupPlyrFullscreen(player, video);
                     return () => { if (playerRef.current) { try { playerRef.current.destroy(); } catch(e) {} } };
                 }
             }, [src, streamType]);
@@ -2904,6 +2945,7 @@
                 <div style={{width:'100%',marginBottom:12}}>
                     <video
                         ref={videoRef}
+                        controls
                         playsInline
                         poster={poster || ''}
                         preload="metadata"
