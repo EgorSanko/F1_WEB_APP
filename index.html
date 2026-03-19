@@ -2699,260 +2699,224 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         // ==== CUSTOM VIDEO PLAYER ====
-        const F1VideoPlayer = ({src, title, onClose, formats, poster, streamType}) => {
+        const F1VideoPlayer = ({src, title, poster, streamType}) => {
             const videoRef = useRef(null);
             const hlsRef = useRef(null);
             const containerRef = useRef(null);
-            const progressRef = useRef(null);
-            const [playing, setPlaying] = useState(false);
-            const [currentTime, setCurrentTime] = useState(0);
-            const [duration, setDuration] = useState(0);
-            const [buffered, setBuffered] = useState(0);
-            const [showControls, setShowControls] = useState(true);
             const [isFullscreen, setIsFullscreen] = useState(false);
-            const [speed, setSpeed] = useState(1);
-            const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-            const [quality, setQuality] = useState(-1);
             const [qualities, setQualities] = useState([]);
-            const [showQualityMenu, setShowQualityMenu] = useState(false);
-            const [volume, setVolume] = useState(1);
-            const hideTimer = useRef(null);
+            const [currentQuality, setCurrentQuality] = useState(-1);
+            const [speed, setSpeed] = useState(1);
+            const [showQMenu, setShowQMenu] = useState(false);
+            const [showSMenu, setShowSMenu] = useState(false);
 
             useEffect(() => {
                 const video = videoRef.current;
                 if (!video || !src) return;
 
-                if ((streamType === 'hls' || src.includes('.m3u8')) && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                console.log('[F1Player] init', {src: src.substring(0,80), streamType});
+
+                if (streamType === 'hls' && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                    console.log('[F1Player] Using HLS.js');
                     const hls = new Hls({maxBufferLength: 30, maxMaxBufferLength: 60});
                     hlsRef.current = hls;
                     hls.loadSource(src);
                     hls.attachMedia(video);
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        const levels = hls.levels.map((l, i) => ({
-                            index: i,
-                            height: l.height,
-                            label: l.height ? l.height + 'p' : 'Auto'
-                        }));
-                        setQualities([{index: -1, height: 0, label: '\u0410\u0432\u0442\u043e'}, ...levels]);
-                        video.play().catch(() => {});
+                        console.log('[F1Player] HLS manifest parsed, levels:', hls.levels.length);
+                        const lvls = hls.levels.map((l, i) => ({index: i, height: l.height, label: l.height ? l.height+'p' : 'Auto'}));
+                        setQualities([{index: -1, height: 0, label: '\u0410\u0432\u0442\u043e'}, ...lvls]);
                     });
-                    return () => { hls.destroy(); };
-                } else {
-                    // MP4 or native HLS (Safari)
+                    hls.on(Hls.Events.ERROR, (_, data) => {
+                        console.error('[F1Player] HLS error:', data.type, data.details);
+                    });
+                    return () => hls.destroy();
+                } else if (streamType === 'hls' && video.canPlayType('application/vnd.apple.mpegurl')) {
+                    console.log('[F1Player] Using native HLS (Safari)');
                     video.src = src;
-                    video.load();
-                    video.play().catch(() => {});
-                    // If formats provided (YouTube), populate quality list
-                    if (formats && formats.length > 1) {
-                        setQualities(formats.map((f, i) => ({index: i, height: f.height, label: f.label, url: f.url})));
-                    }
+                } else {
+                    console.log('[F1Player] Using direct src');
+                    video.src = src;
                 }
-            }, [src]);
+            }, [src, streamType]);
 
+            // Lock body scroll when fullscreen
             useEffect(() => {
-                const video = videoRef.current;
-                if (!video) return;
-                const onTime = () => { setCurrentTime(video.currentTime); };
-                const onDur = () => { setDuration(video.duration); };
-                const onBuf = () => {
-                    if (video.buffered.length > 0) {
-                        setBuffered(video.buffered.end(video.buffered.length - 1));
+                if (isFullscreen) {
+                    document.body.style.overflow = 'hidden';
+                    // Try native fullscreen first (works on desktop/some browsers)
+                    const el = containerRef.current;
+                    if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
+                    else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                } else {
+                    document.body.style.overflow = '';
+                    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+                    else if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+                }
+                return () => { document.body.style.overflow = ''; };
+            }, [isFullscreen]);
+
+            // Listen for native fullscreen exit (Esc key etc)
+            useEffect(() => {
+                const onFsChange = () => {
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                        setIsFullscreen(false);
                     }
                 };
-                const onPlay = () => setPlaying(true);
-                const onPause = () => setPlaying(false);
-                const onError = (e) => { console.error('Video error:', video.error); };
-                video.addEventListener('timeupdate', onTime);
-                video.addEventListener('error', onError);
-                video.addEventListener('durationchange', onDur);
-                video.addEventListener('progress', onBuf);
-                video.addEventListener('play', onPlay);
-                video.addEventListener('pause', onPause);
+                document.addEventListener('fullscreenchange', onFsChange);
+                document.addEventListener('webkitfullscreenchange', onFsChange);
                 return () => {
-                    video.removeEventListener('timeupdate', onTime);
-                    video.removeEventListener('durationchange', onDur);
-                    video.removeEventListener('progress', onBuf);
-                    video.removeEventListener('play', onPlay);
-                    video.removeEventListener('pause', onPause);
+                    document.removeEventListener('fullscreenchange', onFsChange);
+                    document.removeEventListener('webkitfullscreenchange', onFsChange);
                 };
             }, []);
 
-            const formatTime = (s) => {
-                if (!s || isNaN(s)) return '0:00';
-                const h = Math.floor(s / 3600);
-                const m = Math.floor((s % 3600) / 60);
-                const sec = Math.floor(s % 60);
-                return h > 0
-                    ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
-                    : `${m}:${String(sec).padStart(2,'0')}`;
-            };
+            // Back button exits fullscreen
+            useEffect(() => {
+                if (!isFullscreen) return;
+                const onBack = (e) => { e.preventDefault(); setIsFullscreen(false); };
+                window.addEventListener('popstate', onBack);
+                window.history.pushState({f1fs: true}, '');
+                return () => window.removeEventListener('popstate', onBack);
+            }, [isFullscreen]);
 
-            const togglePlay = () => {
-                const v = videoRef.current;
-                if (!v) return;
-                v.paused ? v.play() : v.pause();
-            };
-
-            const seek = (e) => {
-                const rect = progressRef.current.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const pct = Math.max(0, Math.min(1, x / rect.width));
-                videoRef.current.currentTime = pct * duration;
+            const changeQuality = (idx) => {
+                setCurrentQuality(idx);
+                if (hlsRef.current) {
+                    hlsRef.current.currentLevel = idx;
+                }
+                setShowQMenu(false);
             };
 
             const changeSpeed = (s) => {
                 setSpeed(s);
-                videoRef.current.playbackRate = s;
-                setShowSpeedMenu(false);
+                if (videoRef.current) videoRef.current.playbackRate = s;
+                setShowSMenu(false);
             };
 
-            const changeQuality = (idx) => {
-                setQuality(idx);
-                if (hlsRef.current) {
-                    hlsRef.current.currentLevel = idx;
-                } else if (qualities[idx]?.url) {
-                    // YouTube: switch to different quality URL
-                    const video = videoRef.current;
-                    const time = video.currentTime;
-                    const wasPlaying = !video.paused;
-                    video.src = qualities[idx].url;
-                    video.currentTime = time;
-                    if (wasPlaying) video.play().catch(() => {});
-                }
-                setShowQualityMenu(false);
+            const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+            const btnStyle = {
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                color: '#fff',
+                padding: '6px 10px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                position: 'relative',
+                whiteSpace: 'nowrap',
             };
 
-            const toggleFullscreen = () => {
-                setIsFullscreen(!isFullscreen);
+            const menuStyle = {
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: 6,
+                background: '#1a1a1a',
+                borderRadius: 10,
+                padding: '4px 0',
+                minWidth: 90,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+                zIndex: 100001,
+                maxHeight: 200,
+                overflowY: 'auto',
             };
 
-            const showControlsTemporarily = () => {
-                setShowControls(true);
-                setShowSpeedMenu(false);
-                setShowQualityMenu(false);
-                clearTimeout(hideTimer.current);
-                hideTimer.current = setTimeout(() => {
-                    if (playing) setShowControls(false);
-                }, 3000);
-            };
+            const menuItemStyle = (active) => ({
+                display: 'block',
+                width: '100%',
+                padding: '8px 14px',
+                background: active ? 'rgba(225,6,0,0.3)' : 'transparent',
+                border: 'none',
+                color: active ? '#e10600' : '#ccc',
+                fontSize: 13,
+                fontWeight: active ? 700 : 400,
+                cursor: 'pointer',
+                textAlign: 'center',
+            });
 
-            const containerStyle = isFullscreen
-                ? {position:'fixed',top:0,left:0,width:'100vw',height:'100vh',zIndex:99999,background:'#000'}
-                : {position:'relative',width:'100%',paddingBottom:'56.25%',background:'#000',borderRadius:12,overflow:'hidden'};
-
-            const videoWrapStyle = isFullscreen
-                ? {width:'100%',height:'100%'}
-                : {position:'absolute',top:0,left:0,width:'100%',height:'100%'};
-
-            const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
-            const currentQualityLabel = quality === -1
-                ? '\u0410\u0432\u0442\u043e'
-                : (qualities.find(q => q.index === quality)?.label || '?');
-
-            const Wrapper = isFullscreen ? ({children}) => ReactDOM.createPortal(children, document.body) : ({children}) => children;
-
-            return (
-                <Wrapper>
-                    <div ref={containerRef} style={containerStyle}>
-                        <div
-                            style={videoWrapStyle}
-                            onClick={(e) => { if (e.target === e.currentTarget || e.target.tagName === 'VIDEO') { showControlsTemporarily(); togglePlay(); } else { showControlsTemporarily(); } }}
-                            onTouchEnd={(e) => { if (e.target.tagName === 'VIDEO') { showControlsTemporarily(); } }}
-                        >
-                            <video
-                                ref={videoRef}
-                                playsInline
-                                webkit-playsinline="true"
-                                poster={poster||''}
-                                preload="metadata"
-                                style={{width:'100%',height:'100%',display:'block',objectFit:isFullscreen?'contain':'contain'}}
-                            />
-
-                            {/* Center play button when paused */}
-                            {!playing && (
-                                <div onClick={(e)=>{e.stopPropagation();togglePlay();}} style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.9)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',zIndex:5}}>
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+            const toolbar = (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',background:'#111',gap:8}} onClick={(e) => e.stopPropagation()}>
+                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        {qualities.length > 0 && (
+                            <div style={{position:'relative'}}>
+                                <button style={btnStyle} onClick={() => {setShowQMenu(!showQMenu); setShowSMenu(false);}}>
+                                    {currentQuality === -1 ? '\u0410\u0432\u0442\u043e' : qualities.find(q=>q.index===currentQuality)?.label || '\u0410\u0432\u0442\u043e'}
+                                </button>
+                                {showQMenu && (
+                                    <div style={menuStyle}>
+                                        {qualities.map(q => (
+                                            <button key={q.index} style={menuItemStyle(q.index === currentQuality)} onClick={() => changeQuality(q.index)}>
+                                                {q.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div style={{position:'relative'}}>
+                            <button style={btnStyle} onClick={() => {setShowSMenu(!showSMenu); setShowQMenu(false);}}>
+                                {speed === 1 ? '1x' : speed + 'x'}
+                            </button>
+                            {showSMenu && (
+                                <div style={menuStyle}>
+                                    {speeds.map(s => (
+                                        <button key={s} style={menuItemStyle(s === speed)} onClick={() => changeSpeed(s)}>
+                                            {s}x
+                                        </button>
+                                    ))}
                                 </div>
                             )}
-
-                            {/* Controls overlay */}
-                            <div style={{position:'absolute',bottom:0,left:0,right:0,background:'linear-gradient(transparent,rgba(0,0,0,0.85))',padding:'20px 12px 10px',opacity:showControls?1:0,transition:'opacity 0.3s',pointerEvents:showControls?'auto':'none'}}>
-                                {/* Progress bar */}
-                                <div
-                                    ref={progressRef}
-                                    onClick={seek}
-                                    onTouchMove={seek}
-                                    style={{height:24,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none',marginBottom:4}}
-                                >
-                                    <div style={{width:'100%',height:4,background:'rgba(255,255,255,0.2)',borderRadius:2,position:'relative'}}>
-                                        <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${duration?(buffered/duration)*100:0}%`,background:'rgba(255,255,255,0.3)',borderRadius:2}}/>
-                                        <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${duration?(currentTime/duration)*100:0}%`,background:'var(--f1-red, #e10600)',borderRadius:2}}/>
-                                        <div style={{position:'absolute',top:'50%',left:`${duration?(currentTime/duration)*100:0}%`,transform:'translate(-50%,-50%)',width:14,height:14,borderRadius:'50%',background:'#fff',boxShadow:'0 0 4px rgba(0,0,0,0.5)'}}/>
-                                    </div>
-                                </div>
-
-                                {/* Bottom controls row */}
-                                <div style={{display:'flex',alignItems:'center',gap:10}}>
-                                    {/* Play/Pause */}
-                                    <button onClick={togglePlay} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',padding:4,display:'flex'}}>
-                                        {playing
-                                            ? <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                                            : <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-                                        }
-                                    </button>
-
-                                    {/* Time */}
-                                    <span style={{fontSize:11,color:'#ccc',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',minWidth:80}}>{formatTime(currentTime)} / {formatTime(duration)}</span>
-
-                                    <div style={{flex:1}}/>
-
-                                    {/* Speed */}
-                                    <div style={{position:'relative'}}>
-                                        <button onClick={(e)=>{e.stopPropagation();setShowSpeedMenu(!showSpeedMenu);setShowQualityMenu(false);}} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:700,padding:'4px 6px'}}>
-                                            {speed === 1 ? '1x' : speed + 'x'}
-                                        </button>
-                                        {showSpeedMenu && (
-                                            <div style={{position:'absolute',bottom:'100%',right:0,background:'rgba(20,20,20,0.95)',borderRadius:8,padding:4,marginBottom:4,backdropFilter:'blur(10px)',minWidth:60}} onClick={e=>e.stopPropagation()}>
-                                                {speeds.map(s => (
-                                                    <div key={s} onClick={()=>changeSpeed(s)} style={{padding:'6px 12px',fontSize:12,color:speed===s?'var(--f1-red, #e10600)':'#fff',cursor:'pointer',fontWeight:speed===s?700:400,borderRadius:4,textAlign:'center'}}>{s}x</div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Quality */}
-                                    {qualities.length > 1 && (
-                                        <div style={{position:'relative'}}>
-                                            <button onClick={(e)=>{e.stopPropagation();setShowQualityMenu(!showQualityMenu);setShowSpeedMenu(false);}} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:700,padding:'4px 6px'}}>
-                                                {currentQualityLabel}
-                                            </button>
-                                            {showQualityMenu && (
-                                                <div style={{position:'absolute',bottom:'100%',right:0,background:'rgba(20,20,20,0.95)',borderRadius:8,padding:4,marginBottom:4,backdropFilter:'blur(10px)',minWidth:70}} onClick={e=>e.stopPropagation()}>
-                                                    {qualities.map(q => (
-                                                        <div key={q.index} onClick={()=>changeQuality(q.index)} style={{padding:'6px 12px',fontSize:12,color:quality===q.index?'var(--f1-red, #e10600)':'#fff',cursor:'pointer',fontWeight:quality===q.index?700:400,borderRadius:4,textAlign:'center'}}>{q.label}</div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Fullscreen */}
-                                    <button onClick={(e)=>{e.stopPropagation();toggleFullscreen();}} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',padding:4,display:'flex'}}>
-                                        {isFullscreen
-                                            ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
-                                            : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
-                                        }
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     </div>
-                </Wrapper>
+                    <button style={{...btnStyle, display:'flex', alignItems:'center', gap:4}} onClick={() => setIsFullscreen(!isFullscreen)}>
+                        {isFullscreen ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+                        )}
+                        <span>{isFullscreen ? '\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c' : '\u041d\u0430 \u0432\u0435\u0441\u044c \u044d\u043a\u0440\u0430\u043d'}</span>
+                    </button>
+                </div>
             );
+
+            const playerContent = (
+                <div ref={containerRef} style={isFullscreen ? {
+                    position:'fixed', top:0, left:0, width:'100vw', height:'100vh',
+                    zIndex:100000, background:'#000', display:'flex', flexDirection:'column',
+                } : {
+                    width:'100%', borderRadius:12, overflow:'hidden', background:'#000', marginBottom:12,
+                }}>
+                    <div style={{flex: isFullscreen ? 1 : 'none', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden'}}>
+                        <video
+                            ref={videoRef}
+                            controls
+                            playsInline
+                            webkit-playsinline="true"
+                            poster={poster || ''}
+                            preload="metadata"
+                            style={isFullscreen ? {
+                                width:'100%', height:'100%', display:'block', objectFit:'contain',
+                            } : {
+                                width:'100%', display:'block', maxHeight:'70vh',
+                            }}
+                        />
+                    </div>
+                    {toolbar}
+                </div>
+            );
+
+            // Use portal for fullscreen to escape any parent overflow:hidden
+            if (isFullscreen && typeof ReactDOM.createPortal === 'function') {
+                return ReactDOM.createPortal(playerContent, document.body);
+            }
+            return playerContent;
         };
 
-        const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
+                const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
             const [streamData, setStreamData] = useState(null);
