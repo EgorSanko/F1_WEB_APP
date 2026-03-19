@@ -2838,6 +2838,14 @@
                 textAlign: 'center',
             });
 
+            // Close menus on outside click
+            useEffect(() => {
+                if (!showQMenu && !showSMenu) return;
+                const close = () => { setShowQMenu(false); setShowSMenu(false); };
+                document.addEventListener('click', close);
+                return () => document.removeEventListener('click', close);
+            }, [showQMenu, showSMenu]);
+
             const toolbar = (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',background:'#111',gap:8}} onClick={(e) => e.stopPropagation()}>
                     <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -2909,10 +2917,6 @@
                 </div>
             );
 
-            // Use portal for fullscreen to escape any parent overflow:hidden
-            if (isFullscreen && typeof ReactDOM.createPortal === 'function') {
-                return ReactDOM.createPortal(playerContent, document.body);
-            }
             return playerContent;
         };
 

@@ -1484,7 +1484,7 @@ async def youtube_stream(video_id: str):
             'duration': data.get('duration', 0),
             'thumbnail': data.get('thumbnail', ''),
             'formats': formats,
-            'best_url': '/api/proxy-stream?url=' + __import__('urllib.parse', fromlist=['quote']).quote(formats[-1]['url'], safe='') if formats else None,
+            'best_url': formats[-1]['url'] if formats else None,
         }
         f1_data.cache_set(cache_key, response)
         return response
