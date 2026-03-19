@@ -1417,8 +1417,10 @@ async def rutube_stream(video_id: str):
             hls = data.get("video_balancer", {}).get("m3u8")
             if not hls:
                 raise HTTPException(status_code=404, detail="No HLS stream")
+            from urllib.parse import quote
+            proxied_hls = f"/api/proxy-stream?url={quote(hls, safe='')}"
             result = {
-                "hls_url": hls,
+                "hls_url": proxied_hls,
                 "title": data.get("title", ""),
                 "duration": data.get("duration", 0),
                 "thumbnail": data.get("thumbnail_url", ""),
@@ -1482,7 +1484,7 @@ async def youtube_stream(video_id: str):
             'duration': data.get('duration', 0),
             'thumbnail': data.get('thumbnail', ''),
             'formats': formats,
-            'best_url': formats[-1]['url'] if formats else None,
+            'best_url': '/api/proxy-stream?url=' + __import__('urllib.parse', fromlist=['quote']).quote(formats[-1]['url'], safe='') if formats else None,
         }
         f1_data.cache_set(cache_key, response)
         return response
@@ -1491,6 +1493,64 @@ async def youtube_stream(video_id: str):
     except Exception as e:
         logging.error(f"YouTube stream error: {e}")
         raise HTTPException(status_code=502, detail="Failed to get stream")
+
+
+import base64 as _b64
+
+@app.get("/api/proxy-stream")
+async def proxy_stream(request: Request, url: str):
+    """Proxy HLS/video streams to bypass CORS."""
+    import httpx as _httpx
+
+    # Only allow rutube and googlevideo domains
+    allowed = ['rutube.ru', 'googlevideo.com', 'youtube.com', 'bl.rutube.ru']
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if not any(parsed.hostname and parsed.hostname.endswith(d) for d in allowed):
+        raise HTTPException(status_code=403, detail="Domain not allowed")
+
+    try:
+        async with _httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://rutube.ru/",
+            })
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Upstream error")
+
+            content = resp.content
+            ct = resp.headers.get("content-type", "application/octet-stream")
+
+            # If it's an m3u8 playlist, rewrite URLs to go through our proxy
+            if 'mpegurl' in ct.lower() or url.endswith('.m3u8'):
+                text = content.decode('utf-8', errors='ignore')
+                import re as _re
+                from urllib.parse import urljoin, quote
+
+                lines = text.split('\n')
+                new_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        # This is a URL - make it absolute and proxy it
+                        abs_url = urljoin(url, line)
+                        new_lines.append(f"/api/proxy-stream?url={quote(abs_url, safe='')}")
+                    else:
+                        new_lines.append(line)
+                content = '\n'.join(new_lines).encode('utf-8')
+                ct = 'application/vnd.apple.mpegurl'
+
+            from fastapi.responses import Response
+            return Response(
+                content=content,
+                media_type=ct,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=300",
+                }
+            )
+    except _httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # ============ ADMIN ============

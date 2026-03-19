@@ -2699,7 +2699,7 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         // ==== CUSTOM VIDEO PLAYER ====
-        const F1VideoPlayer = ({src, title, onClose, formats}) => {
+        const F1VideoPlayer = ({src, title, onClose, formats, poster}) => {
             const videoRef = useRef(null);
             const hlsRef = useRef(null);
             const containerRef = useRef(null);
@@ -2862,7 +2862,9 @@
                                 ref={videoRef}
                                 playsInline
                                 webkit-playsinline="true"
-                                style={{width:'100%',height:'100%',display:'block',objectFit:isFullscreen?'contain':'cover'}}
+                                poster={poster||''}
+                                preload="metadata"
+                                style={{width:'100%',height:'100%',display:'block',objectFit:isFullscreen?'contain':'contain'}}
                             />
 
                             {/* Center play button when paused */}
@@ -2964,13 +2966,13 @@
                 if (rtMatch) {
                     setLoading(true);
                     api.get(`/api/rutube-stream/${rtMatch[1]}`)
-                        .then(d => { if (d?.hls_url) setStreamData({type:'hls', src:d.hls_url, title:d.title||title}); else setError(true); })
+                        .then(d => { if (d?.hls_url) setStreamData({type:'hls', src:d.hls_url, title:d.title||title, thumbnail:d.thumbnail}); else setError(true); })
                         .catch(() => setError(true))
                         .finally(() => setLoading(false));
                 } else if (ytMatch) {
                     setLoading(true);
                     api.get(`/api/youtube-stream/${ytMatch[1]}`)
-                        .then(d => { if (d?.best_url) setStreamData({type:'mp4', src:d.best_url, title:d.title||title, formats:d.formats}); else setError(true); })
+                        .then(d => { if (d?.best_url) setStreamData({type:'mp4', src:d.best_url, title:d.title||title, formats:d.formats, thumbnail:d.thumbnail}); else setError(true); })
                         .catch(() => setError(true))
                         .finally(() => setLoading(false));
                 }
@@ -2990,7 +2992,7 @@
 
             // Custom player for resolved streams
             if (streamData) {
-                return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title || title} formats={streamData.formats}/></div>;
+                return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title || title} formats={streamData.formats} poster={streamData.thumbnail}/></div>;
             }
 
             // Error or VK/other: fallback
