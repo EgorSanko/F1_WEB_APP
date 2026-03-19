@@ -2934,7 +2934,7 @@
                     );
                 }
                 return (
-                    <div onClick={() => window.open(directUrl, '_blank')} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}>
+                    <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}>
                         <div style={{fontSize:14,fontWeight:700,color:'white'}}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043d\u0430 Rutube \u2197</div>
                     </div>
                 );
@@ -2943,7 +2943,7 @@
             // VK / other \u2014 card button
             const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
             return (
-                <div onClick={() => window.open(directUrl, '_blank')} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)',position:'relative'}}>
+                <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)',position:'relative'}}>
                     <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>
                         <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
