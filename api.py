@@ -1392,6 +1392,43 @@ async def vk_embed_proxy(url: str):
     return {"embed_url": f"https://vk.com/video_ext.php?oid={oid}&id={vid}&hd=2"}
 
 
+@app.get("/api/rutube-stream/{video_id}")
+async def rutube_stream(video_id: str):
+    """Get HLS stream URL from Rutube API."""
+    import httpx as _httpx
+    import re as _re
+    if not _re.match(r'^[a-f0-9]+$', video_id):
+        raise HTTPException(status_code=400, detail="Invalid video ID")
+
+    cache_key = f"rutube_stream:{video_id}"
+    cached = f1_data.cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        async with _httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"https://rutube.ru/api/play/options/{video_id}/?no_404=true&referer=&pver=v2",
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=404, detail="Video not found")
+            data = resp.json()
+            hls = data.get("video_balancer", {}).get("m3u8")
+            if not hls:
+                raise HTTPException(status_code=404, detail="No HLS stream")
+            result = {
+                "hls_url": hls,
+                "title": data.get("title", ""),
+                "duration": data.get("duration", 0),
+                "thumbnail": data.get("thumbnail_url", ""),
+            }
+            f1_data.cache_set(cache_key, result)
+            return result
+    except _httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Rutube API error")
+
+
 # ============ ADMIN ============
 
 @app.post("/api/admin/settle/{race_round}")
