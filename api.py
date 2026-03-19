@@ -1429,6 +1429,70 @@ async def rutube_stream(video_id: str):
         raise HTTPException(status_code=502, detail="Rutube API error")
 
 
+@app.get("/api/youtube-stream/{video_id}")
+async def youtube_stream(video_id: str):
+    """Get direct video URL from YouTube via yt-dlp."""
+    import re as _re
+    if not _re.match(r'^[\w-]+$', video_id):
+        raise HTTPException(status_code=400, detail="Invalid video ID")
+
+    cache_key = f"yt_stream:{video_id}"
+    cached = f1_data.cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['yt-dlp', '-j', '--no-download', f'https://www.youtube.com/watch?v={video_id}'],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        import json as _json
+        data = _json.loads(result.stdout)
+
+        # Get available formats with direct URLs
+        formats = []
+        for f in data.get('formats', []):
+            if f.get('vcodec', 'none') != 'none' and f.get('acodec', 'none') != 'none':
+                h = f.get('height', 0)
+                if h and f.get('url'):
+                    formats.append({
+                        'url': f['url'],
+                        'height': h,
+                        'label': f'{h}p',
+                    })
+
+        if not formats:
+            # Try best combined format
+            result2 = subprocess.run(
+                ['yt-dlp', '-g', '-f', 'best[height<=1080]', f'https://www.youtube.com/watch?v={video_id}'],
+                capture_output=True, text=True, timeout=30
+            )
+            if result2.stdout.strip():
+                formats = [{'url': result2.stdout.strip(), 'height': 720, 'label': '720p'}]
+
+        # Sort by quality
+        formats.sort(key=lambda x: x['height'])
+
+        response = {
+            'title': data.get('title', ''),
+            'duration': data.get('duration', 0),
+            'thumbnail': data.get('thumbnail', ''),
+            'formats': formats,
+            'best_url': formats[-1]['url'] if formats else None,
+        }
+        f1_data.cache_set(cache_key, response)
+        return response
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="yt-dlp timeout")
+    except Exception as e:
+        logging.error(f"YouTube stream error: {e}")
+        raise HTTPException(status_code=502, detail="Failed to get stream")
+
+
 # ============ ADMIN ============
 
 @app.post("/api/admin/settle/{race_round}")
