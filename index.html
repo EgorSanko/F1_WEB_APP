@@ -11,6 +11,9 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
 
     <style>
         :root {
@@ -180,6 +183,13 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
 
+
+        /* Plyr dark theme */
+        .plyr { --plyr-color-main: #E10600; --plyr-video-background: #000; --plyr-menu-background: #1a1a1a; --plyr-menu-color: #fff; border-radius: 12px; overflow: hidden; }
+        .plyr--full-ui.plyr--video .plyr__control--overlaid { background: rgba(225,6,0,0.85); }
+        .plyr--full-ui.plyr--video .plyr__control--overlaid:hover { background: #E10600; }
+        .plyr--fullscreen-fallback { position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; width:100%!important; height:100%!important; z-index:999999!important; border-radius:0!important; }
+        .plyr--fullscreen-fallback video { width:100%!important; height:100%!important; max-height:none!important; object-fit:contain!important; }
     </style>
 </head>
 <body>
@@ -2721,55 +2731,129 @@
         };
 
         // ==== VIDEO PLAYER ====
+        const F1VideoPlayer = ({src, title, poster, streamType}) => {
+            const videoRef = useRef(null);
+            const playerRef = useRef(null);
+            const hlsRef = useRef(null);
+
+            useEffect(() => {
+                const video = videoRef.current;
+                if (!video || !src) return;
+                const tgApp = window.Telegram?.WebApp;
+
+                const plyrOpts = {
+                    controls: ['play-large','play','progress','current-time','mute','volume','settings','fullscreen'],
+                    settings: ['quality','speed'],
+                    speed: { selected:1, options:[0.5,0.75,1,1.25,1.5,2] },
+                    fullscreen: { enabled:true, fallback:true, iosNative:true },
+                    invertTime: false,
+                    i18n: { speed:'\u0421\u043a\u043e\u0440\u043e\u0441\u0442\u044c', quality:'\u041a\u0430\u0447\u0435\u0441\u0442\u0432\u043e', normal:'\u041e\u0431\u044b\u0447\u043d\u0430\u044f' },
+                };
+
+                const hookFS = (p) => {
+                    p.on('enterfullscreen', () => { try { tgApp?.requestFullscreen?.(); } catch(e) {} });
+                    p.on('exitfullscreen', () => { try { tgApp?.exitFullscreen?.(); } catch(e) {} });
+                };
+
+                if (streamType === 'hls' && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                    const hls = new Hls({maxBufferLength:30, maxMaxBufferLength:60});
+                    hlsRef.current = hls;
+                    hls.loadSource(src);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        const lvls = hls.levels.map(l => l.height);
+                        plyrOpts.quality = {
+                            default: 0, options: [0, ...lvls], forced: true,
+                            onChange: (q) => { hls.currentLevel = q === 0 ? -1 : hls.levels.findIndex(l => l.height === q); },
+                        };
+                        plyrOpts.i18n.qualityLabel = { 0: '\u0410\u0432\u0442\u043e' };
+                        const p = new Plyr(video, plyrOpts);
+                        playerRef.current = p;
+                        hookFS(p);
+                    });
+                    hls.on(Hls.Events.ERROR, (_, d) => {
+                        if (d.fatal) { if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad(); else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError(); }
+                    });
+                    return () => { playerRef.current?.destroy?.(); hls.destroy(); };
+                } else {
+                    video.src = src;
+                    const p = new Plyr(video, plyrOpts);
+                    playerRef.current = p;
+                    hookFS(p);
+                    return () => { playerRef.current?.destroy?.(); };
+                }
+            }, [src, streamType]);
+
+            return (
+                <div style={{width:'100%',marginBottom:12}}>
+                    <video ref={videoRef} controls playsInline poster={poster||''} preload="metadata" />
+                </div>
+            );
+        };
+
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
+            const [streamData, setStreamData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(false);
 
-            // YouTube \u2014 iframe embed
             const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
-            if (ytMatch) {
-                const ytId = ytMatch[1];
-                return (
-                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
-                        <iframe
-                            src={'https://www.youtube.com/embed/' + ytId + '?rel=0&playsinline=1'}
-                            style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            allowFullScreen
-                            title={title || 'F1 Video'}
-                        />
-                    </div>
-                );
-            }
-
-            // Rutube \u2014 iframe embed
             const rtMatch = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
-            if (rtMatch) {
-                const rtId = rtMatch[1];
+
+            useEffect(() => {
+                if (streamData || loading || error) return;
+                if (rtMatch) {
+                    setLoading(true);
+                    api.get('/api/rutube-stream/' + rtMatch[1])
+                        .then(d => { if (d?.hls_url) setStreamData({type:'hls', src:d.hls_url, title:d.title||title, thumbnail:d.thumbnail}); else setError(true); })
+                        .catch(() => setError(true)).finally(() => setLoading(false));
+                } else if (ytMatch) {
+                    setLoading(true);
+                    api.get('/api/youtube-stream/' + ytMatch[1])
+                        .then(d => { if (d?.best_url) setStreamData({type:'mp4', src:d.best_url, title:d.title||title, thumbnail:d.thumbnail}); else setError(true); })
+                        .catch(() => setError(true)).finally(() => setLoading(false));
+                }
+            }, [url]);
+
+            if (loading) {
                 return (
-                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
-                        <iframe
-                            src={'https://rutube.ru/play/embed/' + rtId}
-                            style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                            allowFullScreen
-                            title={title || 'F1 Video'}
-                        />
+                    <div style={{width:'100%',paddingBottom:'56.25%',borderRadius:12,background:'#111',position:'relative',marginBottom:12}}>
+                        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',textAlign:'center'}}>
+                            <div style={{width:40,height:40,border:'3px solid rgba(225,6,0,0.3)',borderTopColor:'#e10600',borderRadius:'50%',animation:'spin 1s linear infinite',margin:'0 auto 8px'}}/>
+                            <div style={{color:'#666',fontSize:12}}>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div>
+                        </div>
                     </div>
                 );
             }
 
-            // VK / other \u2014 card button (VK captcha blocks iframe in TG WebView)
+            if (streamData) {
+                return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title||title} poster={streamData.thumbnail} streamType={streamData.type}/></div>;
+            }
+
+            // Error fallback: YouTube iframe, Rutube link
+            if (error && ytMatch) {
+                return (
+                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                        <iframe src={'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1'} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen title={title||'Video'}/>
+                    </div>
+                );
+            }
+            if (error && rtMatch) {
+                return <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}><div style={{fontSize:14,fontWeight:700,color:'white'}}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043d\u0430 Rutube \u2197</div></div>;
+            }
+
+            // VK / other
             const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
             return (
-                <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)',position:'relative'}}>
+                <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)'}}>
                     <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>
                         <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:2}}>\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043f\u0438\u0441\u044c</div>
-                            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title || (isVk?'VK Video':'\u0412\u0438\u0434\u0435\u043e')}</div>
+                            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title||(isVk?'VK Video':'\u0412\u0438\u0434\u0435\u043e')}</div>
                         </div>
                         <div style={{flexShrink:0,color:'rgba(255,255,255,0.8)',fontSize:18}}>\u2197</div>
                     </div>
