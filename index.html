@@ -179,56 +179,7 @@
         .ptr-indicator { display:flex; align-items:center; justify-content:center; overflow:hidden; transition:height 0.2s ease; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Video player fullscreen overlay */
-        .f1-video-fs {
-            position: fixed !important;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 99999;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .f1-video-fs iframe {
-            width: 100% !important;
-            height: 100% !important;
-            border: none !important;
-            border-radius: 0 !important;
-        }
-        .f1-fs-exit-btn {
-            position: absolute;
-            top: max(12px, env(safe-area-inset-top, 12px));
-            left: 12px;
-            padding: 8px 16px;
-            border-radius: 12px;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.15);
-            cursor: pointer;
-            z-index: 100000;
-        }
-        .f1-fs-btn {
-            position: absolute;
-            bottom: 12px; right: 12px;
-            padding: 6px 12px;
-            border-radius: 8px;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            font-size: 12px;
-            font-weight: 600;
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.15);
-            cursor: pointer;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
+
     </style>
 </head>
 <body>
@@ -239,6 +190,26 @@
 
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.expand(); tg.setHeaderColor('#0F0F15'); tg.setBackgroundColor('#0F0F15'); }
+
+        // Sync browser fullscreen with TG app
+        (() => {
+            const tgApp = window.Telegram?.WebApp;
+            if (!tgApp) return;
+            document.addEventListener('fullscreenchange', () => {
+                if (document.fullscreenElement) {
+                    try { tgApp.requestFullscreen?.(); } catch(e) {}
+                } else {
+                    try { tgApp.exitFullscreen?.(); } catch(e) {}
+                }
+            });
+            document.addEventListener('webkitfullscreenchange', () => {
+                if (document.webkitFullscreenElement) {
+                    try { tgApp.requestFullscreen?.(); } catch(e) {}
+                } else {
+                    try { tgApp.exitFullscreen?.(); } catch(e) {}
+                }
+            });
+        })();
 
 
         const initData = tg?.initData || '';
@@ -2753,112 +2724,54 @@
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
-            const [isFS, setIsFS] = useState(false);
 
-            // Convert URL to embed format
-            const getEmbed = (u) => {
-                if (!u) return '';
-                if (u.includes('/embed/') || u.includes('play/embed') || u.includes('player.')) return u;
-                const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
-                if (yt) return 'https://www.youtube.com/embed/' + yt[1] + '?rel=0&playsinline=1';
-                const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
-                if (rt) return 'https://rutube.ru/play/embed/' + rt[1];
-                return u;
-            };
-
-            const embed = getEmbed(url);
-            const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
-
-            // Enter fullscreen: TG API + CSS
-            const enterFS = () => {
-                setIsFS(true);
-                document.body.style.overflow = 'hidden';
-                const tgApp = window.Telegram?.WebApp;
-                try { tgApp?.requestFullscreen?.(); } catch(e) {}
-            };
-
-            // Exit fullscreen
-            const exitFS = useCallback(() => {
-                setIsFS(false);
-                document.body.style.overflow = '';
-                const tgApp = window.Telegram?.WebApp;
-                try { tgApp?.exitFullscreen?.(); } catch(e) {}
-            }, []);
-
-            // TG fullscreen sync + back button + ESC
-            useEffect(() => {
-                if (!isFS) return;
-                const tgApp = window.Telegram?.WebApp;
-
-                const onFSChanged = () => {
-                    if (tgApp && !tgApp.isFullscreen) exitFS();
-                };
-                const onBack = () => exitFS();
-                const onKey = (e) => { if (e.key === 'Escape') exitFS(); };
-                const onPopstate = (e) => { e.preventDefault(); exitFS(); };
-
-                tgApp?.onEvent?.('fullscreenChanged', onFSChanged);
-                tgApp?.onEvent?.('fullscreenFailed', onFSChanged);
-                tgApp?.BackButton?.onClick?.(onBack);
-                document.addEventListener('keydown', onKey);
-                window.addEventListener('popstate', onPopstate);
-                window.history.pushState({f1fs: true}, '');
-
-                return () => {
-                    tgApp?.offEvent?.('fullscreenChanged', onFSChanged);
-                    tgApp?.offEvent?.('fullscreenFailed', onFSChanged);
-                    tgApp?.BackButton?.offClick?.(onBack);
-                    document.removeEventListener('keydown', onKey);
-                    window.removeEventListener('popstate', onPopstate);
-                    document.body.style.overflow = '';
-                };
-            }, [isFS, exitFS]);
-
-            // VK / unknown — card button that opens in browser
-            if (isVk || (!embed.includes('youtube') && !embed.includes('rutube') && !embed.includes('embed'))) {
+            // YouTube \u2014 iframe embed
+            const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
+            if (ytMatch) {
+                const ytId = ytMatch[1];
                 return (
-                    <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)',position:'relative'}}>
-                        <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>
-                            <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-                            </div>
-                            <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:2}}>\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043f\u0438\u0441\u044c</div>
-                                <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title || (isVk?'VK Video':'\u0412\u0438\u0434\u0435\u043e')}</div>
-                            </div>
-                            <div style={{flexShrink:0,color:'rgba(255,255,255,0.8)',fontSize:18}}>\u2197</div>
-                        </div>
+                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                        <iframe
+                            src={'https://www.youtube.com/embed/' + ytId + '?rel=0&playsinline=1'}
+                            style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            allowFullScreen
+                            title={title || 'F1 Video'}
+                        />
                     </div>
                 );
             }
 
-            // YouTube / Rutube — iframe embed with custom fullscreen
-            return (
-                <div style={{marginBottom: isFS ? 0 : 12}}>
-                    <div className={isFS ? 'f1-video-fs' : ''} style={isFS ? {} : {
-                        position:'relative', width:'100%', borderRadius:14,
-                        overflow:'hidden', background:'#000',
-                    }}>
+            // Rutube \u2014 iframe embed
+            const rtMatch = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+            if (rtMatch) {
+                const rtId = rtMatch[1];
+                return (
+                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
                         <iframe
-                            src={embed}
-                            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
-                            allowFullScreen={true}
-                            style={isFS ? {} : {
-                                width:'100%', aspectRatio:'16/9',
-                                border:'none', display:'block',
-                            }}
+                            src={'https://rutube.ru/play/embed/' + rtId}
+                            style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            allowFullScreen
+                            title={title || 'F1 Video'}
                         />
-                        {!isFS && (
-                            <div className="f1-fs-btn" onClick={enterFS}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
-                                \u041d\u0430 \u0432\u0435\u0441\u044c \u044d\u043a\u0440\u0430\u043d
-                            </div>
-                        )}
-                        {isFS && (
-                            <div className="f1-fs-exit-btn" onClick={exitFS}>
-                                \u2190 \u041d\u0430\u0437\u0430\u0434
-                            </div>
-                        )}
+                    </div>
+                );
+            }
+
+            // VK / other \u2014 card button (VK captcha blocks iframe in TG WebView)
+            const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
+            return (
+                <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)',position:'relative'}}>
+                    <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>
+                        <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:2}}>\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043f\u0438\u0441\u044c</div>
+                            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title || (isVk?'VK Video':'\u0412\u0438\u0434\u0435\u043e')}</div>
+                        </div>
+                        <div style={{flexShrink:0,color:'rgba(255,255,255,0.8)',fontSize:18}}>\u2197</div>
                     </div>
                 </div>
             );
