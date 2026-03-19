@@ -188,8 +188,8 @@
         .plyr { --plyr-color-main: #E10600; --plyr-video-background: #000; --plyr-menu-background: #1a1a1a; --plyr-menu-color: #fff; border-radius: 12px; overflow: hidden; }
         .plyr--full-ui.plyr--video .plyr__control--overlaid { background: rgba(225,6,0,0.85); }
         .plyr--full-ui.plyr--video .plyr__control--overlaid:hover { background: #E10600; }
-        .plyr--fullscreen-fallback { position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; width:100%!important; height:100%!important; z-index:999999!important; border-radius:0!important; }
-        .plyr--fullscreen-fallback video { width:100%!important; height:100%!important; max-height:none!important; object-fit:contain!important; }
+        .plyr--fullscreen-fallback { position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; z-index:999999!important; border-radius:0!important; margin:0!important; padding:0!important; background:#000!important; }
+        .plyr--fullscreen-fallback video { width:100vw!important; height:100vh!important; max-height:none!important; max-width:none!important; object-fit:contain!important; } .plyr--fullscreen-fallback .plyr__video-wrapper { width:100%!important; height:100%!important; padding:0!important; } .plyr--fullscreen-fallback .plyr__controls { position:fixed!important; bottom:0!important; left:0!important; right:0!important; z-index:1000000!important; }
     </style>
 </head>
 <body>
