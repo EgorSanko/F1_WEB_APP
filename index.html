@@ -2699,7 +2699,7 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         // ==== CUSTOM VIDEO PLAYER ====
-        const F1VideoPlayer = ({src, title, onClose, formats, poster}) => {
+        const F1VideoPlayer = ({src, title, onClose, formats, poster, streamType}) => {
             const videoRef = useRef(null);
             const hlsRef = useRef(null);
             const containerRef = useRef(null);
@@ -2722,7 +2722,7 @@
                 const video = videoRef.current;
                 if (!video || !src) return;
 
-                if (src.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                if ((streamType === 'hls' || src.includes('.m3u8')) && typeof Hls !== 'undefined' && Hls.isSupported()) {
                     const hls = new Hls({maxBufferLength: 30, maxMaxBufferLength: 60});
                     hlsRef.current = hls;
                     hls.loadSource(src);
@@ -2761,7 +2761,9 @@
                 };
                 const onPlay = () => setPlaying(true);
                 const onPause = () => setPlaying(false);
+                const onError = (e) => { console.error('Video error:', video.error); };
                 video.addEventListener('timeupdate', onTime);
+                video.addEventListener('error', onError);
                 video.addEventListener('durationchange', onDur);
                 video.addEventListener('progress', onBuf);
                 video.addEventListener('play', onPlay);
@@ -2855,8 +2857,8 @@
                     <div ref={containerRef} style={containerStyle}>
                         <div
                             style={videoWrapStyle}
-                            onClick={showControlsTemporarily}
-                            onTouchStart={showControlsTemporarily}
+                            onClick={(e) => { if (e.target === e.currentTarget || e.target.tagName === 'VIDEO') { showControlsTemporarily(); togglePlay(); } else { showControlsTemporarily(); } }}
+                            onTouchEnd={(e) => { if (e.target.tagName === 'VIDEO') { showControlsTemporarily(); } }}
                         >
                             <video
                                 ref={videoRef}
@@ -2869,7 +2871,7 @@
 
                             {/* Center play button when paused */}
                             {!playing && (
-                                <div onClick={togglePlay} style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.9)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                                <div onClick={(e)=>{e.stopPropagation();togglePlay();}} style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.9)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',zIndex:5}}>
                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
                                 </div>
                             )}
@@ -2992,7 +2994,7 @@
 
             // Custom player for resolved streams
             if (streamData) {
-                return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title || title} formats={streamData.formats} poster={streamData.thumbnail}/></div>;
+                return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title || title} formats={streamData.formats} poster={streamData.thumbnail} streamType={streamData.type}/></div>;
             }
 
             // Error or VK/other: fallback
