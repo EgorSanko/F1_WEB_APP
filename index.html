@@ -2697,13 +2697,10 @@
 
         // ==== VIDEO PLAYER (VK + YouTube) ====
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
-            const [vkResolvedUrl, setVkResolvedUrl] = useState(null);
-            const [vkLoading, setVkLoading] = useState(false);
-            const [embedFailed, setEmbedFailed] = useState(false);
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
 
-            // YouTube detection
+            // YouTube — iframe embed (works in Telegram WebView)
             const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
             if (ytMatch) {
                 const ytId = ytMatch[1];
@@ -2720,67 +2717,21 @@
                 );
             }
 
-            // VK video — resolve embed URL client-side via oEmbed
-            const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
-            useEffect(() => {
-                if (!isVk || vkResolvedUrl || vkLoading) return;
-                setVkLoading(true);
-                // Try oEmbed from client side to get proper embed URL with hash
-                const vkUrl = directUrl.includes('video-') || directUrl.includes('video_ext')
-                    ? directUrl : directUrl;
-                api.get(`/api/vk-embed?url=${encodeURIComponent(directUrl)}`)
-                    .then(data => {
-                        if (data?.embed_url) {
-                            setVkResolvedUrl(data.embed_url);
-                        } else if (embedUrl && embedUrl.includes('video_ext.php')) {
-                            setVkResolvedUrl(embedUrl);
-                        } else {
-                            setEmbedFailed(true);
-                        }
-                    })
-                    .catch(() => {
-                        if (embedUrl && embedUrl.includes('video_ext.php')) {
-                            setVkResolvedUrl(embedUrl);
-                        } else {
-                            setEmbedFailed(true);
-                        }
-                    })
-                    .finally(() => setVkLoading(false));
-            }, [isVk, directUrl]);
-
-            if (isVk && !embedFailed) {
-                if (vkLoading || !vkResolvedUrl) {
-                    return (
-                        <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#111',marginBottom:12}}>
-                            <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',color:'#666',fontSize:13}}>Загрузка плеера...</div>
-                        </div>
-                    );
-                }
-                return (
-                    <div style={{marginBottom:12}}>
-                        <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000'}}>
-                            <iframe
-                                src={vkResolvedUrl}
-                                style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}}
-                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                                allowFullScreen
-                                title={title || 'F1 Video'}
-                                onError={() => setEmbedFailed(true)}
-                            />
-                        </div>
-                        <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px',color:'var(--f1-text-muted)',textDecoration:'none',fontSize:11,marginTop:6}}>
-                            Не работает? Открыть в VK ↗
-                        </a>
-                    </div>
-                );
-            }
-
-            // Fallback: direct link button
+            // VK video — beautiful card button (iframe blocked by VK captcha in TG WebView)
             return (
-                <a href={directUrl} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'16px 20px',background:'linear-gradient(135deg,#0077FF,#0055CC)',borderRadius:12,color:'white',textDecoration:'none',fontSize:14,fontWeight:700,marginBottom:12}}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
-                    Смотреть запись
-                </a>
+                <div onClick={() => window.open(directUrl, '_blank')} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:'linear-gradient(135deg,#0077FF 0%,#0055BB 100%)',position:'relative'}}>
+                    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'50%',opacity:0.08,background:'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'white\'%3E%3Cpath d=\'M8 5v14l11-7z\'/%3E%3C/svg%3E") no-repeat center',backgroundSize:'60px'}}/>
+                    <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14,position:'relative'}}>
+                        <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:2}}>Смотреть запись</div>
+                            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title || 'VK Video'}</div>
+                        </div>
+                        <div style={{flexShrink:0,color:'rgba(255,255,255,0.8)',fontSize:18}}>↗</div>
+                    </div>
+                </div>
             );
         };
 
