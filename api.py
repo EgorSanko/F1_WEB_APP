@@ -1284,14 +1284,18 @@ async def admin_list_broadcasts(request: Request):
 
 
 async def resolve_vk_embed(video_url: str) -> str:
-    """Construct embed URL from VK or YouTube video URL, fetching hash for VK."""
+    """Construct embed URL from VK, YouTube, or Rutube video URL."""
     import re as _re
-    import httpx as _httpx
 
     # YouTube — return embed URL
     yt = _re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]+)', video_url)
     if yt:
         return f"https://www.youtube.com/embed/{yt.group(1)}?rel=0"
+
+    # Rutube — return embed URL
+    rt = _re.search(r'rutube\.ru/video/([a-f0-9]+)', video_url)
+    if rt:
+        return f"https://rutube.ru/play/embed/{rt.group(1)}"
 
     # VK video — extract oid and id
     match = _re.search(r'video(-?\d+)_(\d+)', video_url)
