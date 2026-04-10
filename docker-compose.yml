@@ -8,7 +8,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./index.html:/app/index.html:ro
-      - ./static/drivers:/app/static/drivers:ro
+      - ./static:/app/static:ro
     env_file: .env
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")"]

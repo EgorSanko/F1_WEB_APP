@@ -8,3 +8,7 @@ __pycache__/
 .DS_Store
 *.log
 test-*.html
+node_modules/
+package-lock.json
+index-old.html
+static/app.min.js.map

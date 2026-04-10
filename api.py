@@ -102,11 +102,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for driver photos
+# Mount static files
 import os
-_static_dir = os.path.join(os.path.dirname(__file__) or ".", "static", "drivers")
-os.makedirs(_static_dir, exist_ok=True)
-app.mount("/static/drivers", StaticFiles(directory=_static_dir), name="driver_photos")
+_static_base = os.path.join(os.path.dirname(__file__) or ".", "static")
+os.makedirs(os.path.join(_static_base, "drivers"), exist_ok=True)
+os.makedirs(os.path.join(_static_base, "vendor"), exist_ok=True)
+os.makedirs(os.path.join(_static_base, "fonts"), exist_ok=True)
+app.mount("/static", StaticFiles(directory=_static_base), name="static_files")
 
 
 # ============ RATE LIMITING ============
