@@ -159,6 +159,59 @@ CREATE TABLE IF NOT EXISTS broadcasts (
 
 CREATE INDEX IF NOT EXISTS idx_broadcasts_race ON broadcasts(race_round, season);
 CREATE INDEX IF NOT EXISTS idx_broadcasts_live ON broadcasts(is_live);
+
+CREATE TABLE IF NOT EXISTS live_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_key TEXT,
+    meeting_name TEXT,
+    session_name TEXT,
+    session_type TEXT,
+    circuit_short_name TEXT,
+    country_name TEXT,
+    status TEXT DEFAULT 'active',
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    signalr_data TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_live_sessions_key ON live_sessions(session_key);
+CREATE INDEX IF NOT EXISTS idx_live_sessions_status ON live_sessions(status);
+
+CREATE TABLE IF NOT EXISTS live_race_control (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    category TEXT,
+    flag TEXT,
+    message TEXT,
+    scope TEXT,
+    sector INTEGER,
+    lap_number INTEGER,
+    driver_number INTEGER,
+    ts TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES live_sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_live_rc_session ON live_race_control(session_id);
+CREATE INDEX IF NOT EXISTS idx_live_rc_category ON live_race_control(category);
+
+CREATE TABLE IF NOT EXISTS live_timing_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    driver_number INTEGER,
+    position INTEGER,
+    gap_to_leader TEXT,
+    interval TEXT,
+    last_lap_time TEXT,
+    best_lap_time TEXT,
+    num_laps INTEGER,
+    status TEXT,
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES live_sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_live_timing_session ON live_timing_snapshots(session_id);
+CREATE INDEX IF NOT EXISTS idx_live_timing_driver ON live_timing_snapshots(session_id, driver_number);
 """.format(initial_points=INITIAL_USER_POINTS)
 
 
@@ -497,6 +550,121 @@ def auto_end_stale_broadcasts(hours=4):
     execute_write(
         "UPDATE broadcasts SET is_live=0,ended_at=CURRENT_TIMESTAMP WHERE is_live=1 AND started_at<datetime('now','-'||?||' hours')",
         (str(hours),)
+    )
+
+
+# ============ LIVE SESSION OPERATIONS ============
+
+def create_live_session(meeting_name: str, session_name: str,
+                        session_type: str = None, circuit_short_name: str = None,
+                        country_name: str = None, session_key: str = None,
+                        signalr_data: str = None) -> int:
+    """Create a new live session record. Returns session id."""
+    return execute_write(
+        """INSERT INTO live_sessions
+           (session_key, meeting_name, session_name, session_type,
+            circuit_short_name, country_name, signalr_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (session_key, meeting_name, session_name, session_type,
+         circuit_short_name, country_name, signalr_data)
+    )
+
+
+def get_active_live_session() -> Optional[Dict[str, Any]]:
+    """Get the currently active live session."""
+    return execute_one(
+        "SELECT * FROM live_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1"
+    )
+
+
+def end_live_session(session_id: int):
+    """Mark a live session as ended."""
+    execute_write(
+        "UPDATE live_sessions SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (session_id,)
+    )
+
+
+def end_all_live_sessions():
+    """End all active sessions (used on reconnect with new SessionInfo)."""
+    execute_write(
+        "UPDATE live_sessions SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE status = 'active'"
+    )
+
+
+def save_race_control_message(session_id: int, category: str = None,
+                               flag: str = None, message: str = None,
+                               scope: str = None, sector: int = None,
+                               lap_number: int = None, driver_number: int = None,
+                               ts: str = None):
+    """Save a race control message."""
+    execute_write(
+        """INSERT INTO live_race_control
+           (session_id, category, flag, message, scope, sector, lap_number, driver_number, ts)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (session_id, category, flag, message, scope, sector, lap_number, driver_number, ts)
+    )
+
+
+def get_race_control_messages(session_id: int, category: str = None) -> List[Dict[str, Any]]:
+    """Get race control messages for a session, optionally filtered by category."""
+    if category:
+        return execute(
+            "SELECT * FROM live_race_control WHERE session_id = ? AND category = ? ORDER BY ts ASC",
+            (session_id, category)
+        )
+    return execute(
+        "SELECT * FROM live_race_control WHERE session_id = ? ORDER BY ts ASC",
+        (session_id,)
+    )
+
+
+def has_safety_car(session_id: int) -> bool:
+    """Check if a session had a safety car or VSC deployment."""
+    row = execute_one(
+        """SELECT COUNT(*) as cnt FROM live_race_control
+           WHERE session_id = ? AND category IN ('SafetyCar', 'VirtualSafetyCar')""",
+        (session_id,)
+    )
+    return (row["cnt"] if row else 0) > 0
+
+
+def save_timing_snapshot(session_id: int, driver_number: int, position: int = None,
+                         gap_to_leader: str = None, interval: str = None,
+                         last_lap_time: str = None, best_lap_time: str = None,
+                         num_laps: int = None, status: str = None):
+    """Save a timing snapshot for a driver."""
+    execute_write(
+        """INSERT INTO live_timing_snapshots
+           (session_id, driver_number, position, gap_to_leader, interval,
+            last_lap_time, best_lap_time, num_laps, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (session_id, driver_number, position, gap_to_leader, interval,
+         last_lap_time, best_lap_time, num_laps, status)
+    )
+
+
+def get_latest_timing(session_id: int) -> List[Dict[str, Any]]:
+    """Get the latest timing snapshot for each driver in a session."""
+    return execute(
+        """SELECT t.* FROM live_timing_snapshots t
+           INNER JOIN (
+               SELECT driver_number, MAX(id) as max_id
+               FROM live_timing_snapshots
+               WHERE session_id = ?
+               GROUP BY driver_number
+           ) latest ON t.id = latest.max_id
+           ORDER BY t.position ASC""",
+        (session_id,)
+    )
+
+
+def get_latest_session_for_round(race_round: int, season: int) -> Optional[Dict[str, Any]]:
+    """Find the most recent live session matching a race round/season (by meeting name heuristic)."""
+    return execute_one(
+        """SELECT * FROM live_sessions
+           WHERE status = 'ended' AND session_type = 'Race'
+           ORDER BY ended_at DESC LIMIT 1"""
     )
 
 

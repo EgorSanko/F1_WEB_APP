@@ -130,15 +130,31 @@ def cache_stats() -> Dict[str, Any]:
 _demo_override_key: Optional[str] = None
 
 
-async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
+def _signalr_session_active() -> bool:
+    """True iff the f1_live SignalR client is connected and has SessionInfo."""
+    try:
+        import f1_live  # local import to avoid circular dep at startup
+        c = f1_live.get_client()
+        return bool(c and c.is_session_active())
+    except Exception:
+        return False
+
+
+async def get_fallback_session_key() -> Tuple[Optional[str], bool, Optional[Dict]]:
     """
     Determine which session_key to use for live endpoints.
     Returns (session_key, is_demo, demo_session_info).
-    - Live session active → ("latest", False, None)
-    - Manual override set → (override_key, True, info)
-    - No live session → (last_session_key, True, info)
+    - SignalR upstream active       → ("latest", False, None)
+    - Live session per OpenF1       → ("latest", False, None)
+    - Manual demo override set      → (override_key, True, info)
+    - None of the above (offline)   → (None, False, None)   ← NEW: no fake Suzuka fallback
     """
     global _demo_override_key
+
+    # 0) SignalR upstream has a named SessionInfo → live!
+    if _signalr_session_active():
+        cache_set("_fallback_resolved", {"key": "latest", "is_demo": False})
+        return "latest", False, None
 
     # 1) Manual override via /api/demo/set
     if _demo_override_key:
@@ -176,59 +192,35 @@ async def get_fallback_session_key() -> Tuple[str, bool, Optional[Dict]]:
     if cached:
         return cached["key"], cached["is_demo"], cached.get("info")
 
-    # 3) Check if latest session is actually live
+    # 3) Check if OpenF1 "latest" is actually live right now
     sessions = await fetch_openf1("sessions", {"session_key": "latest"})
-    if not sessions:
-        last_rnd = max(SEASON_2025_RESULTS.keys())
-        sk = str(SEASON_2025_RESULTS[last_rnd]["session_key"])
-        info = {"session_key": int(sk), "meeting_name": SEASON_2025_RESULTS[last_rnd]["name"],
-                "session_name": "Race", "date_start": SEASON_2025_RESULTS[last_rnd]["date"]}
-        cache_set("_fallback_resolved", {"key": sk, "is_demo": True, "info": info})
-        return sk, True, info
+    if sessions:
+        session = sessions[-1] if isinstance(sessions, list) and sessions else sessions
+        if isinstance(session, list):
+            session = session[0] if session else {}
 
-    session = sessions[-1] if isinstance(sessions, list) and sessions else sessions
-    if isinstance(session, list):
-        session = session[0] if session else {}
+        now = datetime.utcnow()
+        is_live = False
+        date_start = session.get("date_start", "")
+        date_end = session.get("date_end", "")
+        if date_start and date_end:
+            try:
+                start = datetime.fromisoformat(date_start.replace("Z", "+00:00").replace("+00:00", ""))
+                end = datetime.fromisoformat(date_end.replace("Z", "+00:00").replace("+00:00", ""))
+                is_live = start <= now <= (end + timedelta(minutes=30))
+            except (ValueError, TypeError):
+                pass
 
-    now = datetime.utcnow()
-    is_live = False
-    date_start = session.get("date_start", "")
-    date_end = session.get("date_end", "")
-    if date_start and date_end:
-        try:
-            start = datetime.fromisoformat(date_start.replace("Z", "+00:00").replace("+00:00", ""))
-            end = datetime.fromisoformat(date_end.replace("Z", "+00:00").replace("+00:00", ""))
-            is_live = start <= now <= (end + timedelta(minutes=30))
-        except (ValueError, TypeError):
-            pass
+        if is_live:
+            cache_set("_fallback_resolved", {"key": "latest", "is_demo": False})
+            return "latest", False, None
 
-    if is_live:
-        cache_set("_fallback_resolved", {"key": "latest", "is_demo": False})
-        return "latest", False, None
-
-    # Not live — check if this is a proper race/quali session (not pre-season testing)
-    session_name = session.get("session_name", "")
-    is_testing = "Day" in session_name or "Test" in session_name.lower()
-    sk = session.get("session_key")
-    if sk and not is_testing:
-        info = {
-            "session_key": sk,
-            "session_name": session_name,
-            "session_type": session.get("session_type", ""),
-            "meeting_name": session.get("meeting_name", ""),
-            "circuit_short_name": session.get("circuit_short_name", ""),
-            "date_start": date_start,
-            "date_end": date_end,
-        }
-        cache_set("_fallback_resolved", {"key": str(sk), "is_demo": True, "info": info})
-        return str(sk), True, info
-
-    # Absolute fallback
-    last_rnd = max(SEASON_2025_RESULTS.keys())
-    sk = str(SEASON_2025_RESULTS[last_rnd]["session_key"])
-    info = {"session_key": int(sk), "meeting_name": SEASON_2025_RESULTS[last_rnd]["name"], "session_name": "Race"}
-    cache_set("_fallback_resolved", {"key": sk, "is_demo": True, "info": info})
-    return sk, True, info
+    # 4) Nothing live, no manual override → OFFLINE.
+    # Previously we returned the last race's session_key so endpoints could
+    # fake a "Suzuka demo" screen. That confused users (looked like a real
+    # session). Now we return None; callers surface {"active": false}.
+    cache_set("_fallback_resolved", {"key": None, "is_demo": False, "info": None})
+    return None, False, None
 
 
 def set_demo_session(session_key: Optional[str]):
@@ -759,7 +751,8 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
 
         # Determine finish status
         status_raw = r.get("status", "")
-        is_dnf = status_raw not in ["Finished", "+1 Lap", "+2 Laps", "+3 Laps"]
+        # Finished if status is "Finished", contains "Lap" (+1 Lap, Lapped), or has time
+        is_dnf = not (status_raw == "Finished" or "Lap" in status_raw or (r.get("Time", {}).get("time") and status_raw not in ["Retired", "Did not start", "Did not finish", "Disqualified", "Excluded"]))
 
         entry = enrich_driver(driver_num, {
             "position": int(r["position"]),
@@ -1031,10 +1024,72 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
 
 # ============ LIVE DATA (OpenF1) ============
 
+def _empty_live_session_response() -> Dict[str, Any]:
+    """Consistent shape for 'no session' replies across /api/live/*."""
+    return {
+        "active": False,
+        "is_live": False,
+        "is_demo": False,
+        "offline": True,
+        "session_key": None,
+        "session_name": "",
+        "session_type": "",
+        "meeting_name": "",
+        "meeting_key": None,
+        "date_start": "",
+        "date_end": "",
+        "circuit_short_name": "",
+        "country_name": "",
+        "year": None,
+        "message": "Нет активной сессии",
+    }
+
+
+def _signalr_live_session() -> Optional[Dict[str, Any]]:
+    """Build a /api/live/session response from the SignalR client state, or None."""
+    try:
+        import f1_live
+        c = f1_live.get_client()
+        if not c or not c.is_session_active():
+            return None
+        si = c.topic("SessionInfo") or {}
+        meeting = si.get("Meeting") or {}
+        country = meeting.get("Country") or {}
+        circuit = meeting.get("Circuit") or {}
+        return {
+            "active": True,
+            "is_live": True,
+            "is_demo": False,
+            "offline": False,
+            "source": "signalr",
+            "session_key": si.get("Key"),
+            "session_name": si.get("Name") or si.get("Type") or "",
+            "session_type": si.get("Type") or "",
+            "meeting_name": meeting.get("Name") or meeting.get("OfficialName") or "",
+            "meeting_key": meeting.get("Key"),
+            "date_start": si.get("StartDate") or "",
+            "date_end": si.get("EndDate") or "",
+            "circuit_short_name": circuit.get("ShortName") or "",
+            "country_name": country.get("Name") or "",
+            "year": si.get("Year"),
+        }
+    except Exception as e:
+        logger.debug("signalr session build failed: %s", e)
+        return None
+
+
 async def get_live_session(_session_key=None) -> Dict[str, Any]:
     """Check if there's a live session and get its info."""
+    # 0) Prefer the SignalR upstream when a real session is on
+    sig = _signalr_live_session()
+    if sig is not None:
+        return sig
+
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        # New: honest "offline" response instead of Suzuka demo fake
+        if _session_key is None:
+            return _empty_live_session_response()
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1089,6 +1144,8 @@ async def get_live_positions(_session_key=None) -> Dict[str, Any]:
     """Get current positions with tyres and pit stop info — merged from 3 endpoints."""
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1176,6 +1233,8 @@ async def get_live_timing(_session_key=None) -> Dict[str, Any]:
     """Get timing data: laps, sectors, intervals — merged and enriched."""
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1284,10 +1343,49 @@ async def get_live_timing(_session_key=None) -> Dict[str, Any]:
     return response
 
 
+def _signalr_weather() -> Optional[Dict[str, Any]]:
+    try:
+        import f1_live
+        c = f1_live.get_client()
+        if not c or not c.is_session_active():
+            return None
+        w = c.topic("WeatherData")
+        if not isinstance(w, dict):
+            return None
+        def _f(v):
+            try: return float(v)
+            except (TypeError, ValueError): return None
+        rain = _f(w.get("Rainfall"))
+        return {
+            "source": "signalr",
+            "active": True,
+            "is_live": True,
+            "is_demo": False,
+            "weather": {
+                "air_temperature": _f(w.get("AirTemp")),
+                "track_temperature": _f(w.get("TrackTemp")),
+                "humidity": _f(w.get("Humidity")),
+                "pressure": _f(w.get("Pressure")),
+                "rainfall": rain or 0,
+                "is_raining": bool(rain),
+                "wind_speed": _f(w.get("WindSpeed")),
+                "wind_direction": _f(w.get("WindDirection")),
+            },
+        }
+    except Exception as e:
+        logger.debug("signalr weather build failed: %s", e)
+        return None
+
+
 async def get_live_weather(_session_key=None) -> Dict[str, Any]:
     """Get current track weather."""
+    sig = _signalr_weather()
+    if sig is not None:
+        return sig
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "weather": None, "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1321,10 +1419,58 @@ async def get_live_weather(_session_key=None) -> Dict[str, Any]:
     return response
 
 
+def _signalr_race_control() -> Optional[Dict[str, Any]]:
+    try:
+        import f1_live
+        c = f1_live.get_client()
+        if not c or not c.is_session_active():
+            return None
+        rc = c.topic("RaceControlMessages")
+        if not isinstance(rc, dict):
+            return None
+        msgs_raw = rc.get("Messages")
+        # F1 sometimes sends Messages as dict keyed by numeric string, sometimes as list
+        items = []
+        if isinstance(msgs_raw, dict):
+            items = [msgs_raw[k] for k in sorted(msgs_raw.keys(), key=lambda x: int(x) if str(x).isdigit() else 0)]
+        elif isinstance(msgs_raw, list):
+            items = msgs_raw
+        messages = []
+        for m in items[-25:]:
+            if not isinstance(m, dict):
+                continue
+            en_msg = m.get("Message") or ""
+            messages.append({
+                "date": m.get("Utc") or "",
+                "category": m.get("Category") or "",
+                "flag": m.get("Flag") or "",
+                "message": en_msg,
+                "message_ru": translate_race_control(en_msg),
+                "scope": m.get("Scope") or "",
+                "driver_number": m.get("RacingNumber"),
+                "lap_number": m.get("Lap"),
+            })
+        return {
+            "source": "signalr",
+            "active": True,
+            "is_live": True,
+            "is_demo": False,
+            "messages": messages,
+        }
+    except Exception as e:
+        logger.debug("signalr race-control build failed: %s", e)
+        return None
+
+
 async def get_live_race_control(_session_key=None) -> Dict[str, Any]:
     """Get race control messages (flags, penalties, etc.)."""
+    sig = _signalr_race_control()
+    if sig is not None:
+        return sig
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "messages": [], "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1363,6 +1509,8 @@ async def get_live_radio(_session_key=None) -> Dict[str, Any]:
     """Get latest team radio messages."""
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1396,6 +1544,8 @@ async def get_live_pit_stops(_session_key=None) -> Dict[str, Any]:
     """Get pit stops from the current session."""
     if _session_key is None:
         _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+        if _session_key is None:
+            return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
     else:
         _is_demo = (_session_key != "latest")
         _demo_info = None
@@ -1476,7 +1626,7 @@ async def get_driver_profile(driver_number: int, season: int = None) -> Dict[str
                 if pos == 1: wins += 1
                 if pos <= 3: podiums += 1
                 if pos < best_finish: best_finish = pos
-                if r.get("status", "") not in ["Finished", "+1 Lap", "+2 Laps", "+3 Laps"]:
+                if not (r.get("status", "") == "Finished" or "Lap" in r.get("status", "")):
                     dnfs += 1
 
                 season_results.append({
@@ -1605,6 +1755,8 @@ async def get_live_dashboard() -> Dict[str, Any]:
     """Get all live data in a single parallel fetch, with cross-enrichment."""
     # Resolve session key once, pass to all sub-functions
     _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    if _session_key is None:
+        return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
 
     session, positions, timing, weather, rc = await asyncio.gather(
         get_live_session(_session_key),
@@ -2201,6 +2353,8 @@ async def get_live_track_map() -> Dict[str, Any]:
     Uses lightweight /position API instead of heavy /location.
     Cars are distributed along track outline based on race position."""
     _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    if _session_key is None:
+        return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
 
     cache_key = f"live_track_map:{_session_key}"
     cached = cache_get(cache_key, ttl_override=3600 if _is_demo else 5)
@@ -3077,6 +3231,8 @@ async def get_lap_time_series(session_key: str, driver_numbers: list = None) -> 
 async def get_live_car_data(driver_number: int) -> Dict[str, Any]:
     """Get latest car telemetry for a single driver — speed, throttle, brake, gear, DRS, RPM."""
     _session_key, _is_demo, _demo_info = await get_fallback_session_key()
+    if _session_key is None:
+        return {"active": False, "offline": True, "is_demo": False, "is_live": False, "message": "Нет активной сессии"}
 
     cache_key = f"car_data:{_session_key}:{driver_number}"
     cached = cache_get(cache_key, ttl_override=2)

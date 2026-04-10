@@ -42,13 +42,38 @@ logger = logging.getLogger("f1hub")
 
 
 # ============ LIFESPAN ============
+
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio as _asyncio
+    import f1_live
+
     db.init_db()
     logger.info("F1 Hub API started (v2 async)")
-    yield
-    await f1_data.close_client()
-    logger.info("F1 Hub API shutting down")
+
+    # Single F1 live-timing upstream (SignalR over WS, ported from f1-dash).
+    # Runs forever, reconnects on its own, handles CloudFront-403
+    # "no session" state quietly between race weekends.
+    live_client = f1_live.F1LiveClient()
+    f1_live.set_client(live_client)
+    app.state.f1_live = live_client
+    app.state.f1_live_task = _asyncio.create_task(live_client.run_forever())
+    logger.info("F1LiveClient background task started")
+
+    try:
+        yield
+    finally:
+        logger.info("F1 Hub API shutting down")
+        await live_client.shutdown()
+        app.state.f1_live_task.cancel()
+        try:
+            await app.state.f1_live_task
+        except (_asyncio.CancelledError, Exception):
+            pass
+        f1_live.set_client(None)
+        await f1_data.close_client()
 
 
 # ============ APP ============
@@ -170,7 +195,7 @@ async def health():
 
 @app.get("/")
 async def serve_index():
-    return FileResponse("index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return FileResponse("index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
 
 
 @app.get("/{filename}.html")
@@ -178,7 +203,7 @@ async def serve_html(filename: str):
     import os
     path = f"{filename}.html"
     if os.path.exists(path):
-        return FileResponse(path)
+        return FileResponse(path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(status_code=404)
 
 
@@ -195,12 +220,11 @@ async def user_me(request: Request):
         photo_url=tg_user.get("photo_url"),
     )
 
-    # Fetch avatar from Bot API if not available from initData
-    if not user.get("photo_url"):
-        avatar_url = await fetch_telegram_avatar(tg_user["id"])
-        if avatar_url:
-            user["photo_url"] = avatar_url
-            db.execute_write("UPDATE users SET photo_url = ? WHERE user_id = ?", (avatar_url, tg_user["id"]))
+    # Always update photo_url from initData (TG sends fresh avatar URL each session)
+    tg_photo = tg_user.get("photo_url")
+    if tg_photo and tg_photo != user.get("photo_url"):
+        user["photo_url"] = tg_photo
+        db.execute_write("UPDATE users SET photo_url = ? WHERE user_id = ?", (tg_photo, tg_user["id"]))
 
     rank = db.get_user_rank(user["user_id"])
     achievements = db.get_user_achievements(user["user_id"])
@@ -302,7 +326,26 @@ async def get_live_dashboard():
     return await f1_data.get_live_dashboard()
 
 
-# ============ LIVE DATA (OpenF1) ============
+# ============ LIVE DATA ============
+# Primary source: F1 SignalR upstream via f1_live.F1LiveClient.
+# Fallback:       OpenF1 archive (used when the SignalR stream is offline,
+#                 i.e. between race weekends, AND caller asked for a specific
+#                 archived session via /api/demo/set).
+# Between sessions with no demo override, endpoints return
+# {"active": false, ...} so the frontend can show an honest "Нет сессии"
+# instead of the old fake Suzuka demo.
+
+@app.get("/api/live/status")
+async def live_status():
+    """Debug endpoint: snapshot of the SignalR client (connected, topics, errors)."""
+    import f1_live
+    c = f1_live.get_client()
+    if c is None:
+        return {"enabled": False}
+    snap = c.snapshot()
+    snap["enabled"] = True
+    return snap
+
 
 @app.get("/api/live/session")
 async def live_session():
@@ -327,6 +370,31 @@ async def live_weather():
 @app.get("/api/live/race-control")
 async def live_race_control():
     return await f1_data.get_live_race_control()
+
+
+@app.get("/api/live/track-status")
+async def live_track_status():
+    """Track flag state (green, yellow, VSC, SC, red) from SignalR."""
+    import f1_live
+    c = f1_live.get_client()
+    if not c or not c.is_session_active():
+        return {"active": False, "offline": True, "status": None, "message": "Нет активной сессии"}
+    ts = c.topic("TrackStatus") or {}
+    # Status codes per F1 SignalR: 1=AllClear, 2=Yellow, 3=?, 4=SC, 5=Red, 6=VSC, 7=VSCEnding
+    code = str(ts.get("Status") or "")
+    message = ts.get("Message") or ""
+    label_map = {
+        "1": "Track clear", "2": "Yellow flag", "4": "Safety Car",
+        "5": "Red flag", "6": "Virtual Safety Car", "7": "VSC ending",
+    }
+    return {
+        "active": True,
+        "is_live": True,
+        "source": "signalr",
+        "status_code": code,
+        "status": label_map.get(code, message or "Unknown"),
+        "message": message,
+    }
 
 
 @app.get("/api/live/radio")
@@ -414,7 +482,7 @@ async def get_teams_list(season: int = CURRENT_SEASON):
 
 class PredictionRequest(BaseModel):
     race_round: int
-    season: int = 2025
+    season: int = 2026
     prediction_type: str
     prediction_value: Any
     points_bet: int = 0
@@ -428,7 +496,7 @@ async def predictions_available(request: Request):
     if "round" not in next_race:
         return {"available": False, "message": "No upcoming race"}
 
-    existing = db.get_user_predictions(tg_user["id"], next_race["round"], 2025)
+    existing = db.get_user_predictions(tg_user["id"], next_race["round"], CURRENT_SEASON)
     existing_types = {p["prediction_type"] for p in existing}
 
     types = [
@@ -926,7 +994,7 @@ async def get_season_results(season: int):
 
 
 @app.get("/api/race/{round_num}/tyres")
-async def get_race_tyres(round_num: int, season: int = 2025):
+async def get_race_tyres(round_num: int, season: int = 2026):
     """Get tyre strategy data for a specific race round."""
     if season != 2025:
         raise HTTPException(status_code=404, detail=f"No tyre data for season {season}")
@@ -1556,7 +1624,7 @@ async def proxy_stream(request: Request, url: str):
 # ============ ADMIN ============
 
 @app.post("/api/admin/settle/{race_round}")
-async def admin_settle(race_round: int, request: Request):
+async def admin_settle(race_round: int, request: Request, season: int = 0):
     """Settle all predictions for a race round."""
     tg_user = get_current_user(request)
     if tg_user["id"] not in ADMIN_IDS:
@@ -1582,7 +1650,11 @@ async def admin_settle(race_round: int, request: Request):
         for msg in rc_data.get("messages", [])
     )
 
-    predictions = db.get_pending_predictions(race_round, 2025)
+    pred_season = season if season > 0 else CURRENT_SEASON
+    # Also try 2025 season for old predictions
+    predictions = db.get_pending_predictions(race_round, pred_season)
+    if not predictions and pred_season != 2025:
+        predictions = db.get_pending_predictions(race_round, 2025)
     settled = 0
 
     for pred in predictions:

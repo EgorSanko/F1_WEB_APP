@@ -188,8 +188,8 @@
         .plyr { --plyr-color-main: #E10600; --plyr-video-background: #000; --plyr-menu-background: #1a1a1a; --plyr-menu-color: #fff; border-radius: 12px; overflow: hidden; }
         .plyr--full-ui.plyr--video .plyr__control--overlaid { background: rgba(225,6,0,0.85); }
         .plyr--full-ui.plyr--video .plyr__control--overlaid:hover { background: #E10600; }
-        .plyr--fullscreen-fallback { position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; z-index:999999!important; border-radius:0!important; margin:0!important; padding:0!important; background:#000!important; }
-        .plyr--fullscreen-fallback video { width:100vw!important; height:100vh!important; max-height:none!important; max-width:none!important; object-fit:contain!important; } .plyr--fullscreen-fallback .plyr__video-wrapper { width:100%!important; height:100%!important; padding:0!important; } .plyr--fullscreen-fallback .plyr__controls { position:fixed!important; bottom:0!important; left:0!important; right:0!important; z-index:1000000!important; }
+        .plyr--fullscreen-fallback, body > .plyr--fullscreen-fallback { position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; width:100vw!important; height:100vh!important; z-index:2147483647!important; border-radius:0!important; margin:0!important; padding:0!important; background:#000!important; }
+        .plyr--fullscreen-fallback video { width:100vw!important; height:100vh!important; max-height:none!important; max-width:none!important; object-fit:contain!important; } .plyr--fullscreen-fallback .plyr__video-wrapper { width:100%!important; height:100%!important; padding:0!important; } .plyr--fullscreen-fallback .plyr__controls { position:fixed!important; bottom:0!important; left:0!important; right:0!important; z-index:2147483647!important; }
     </style>
 </head>
 <body>
@@ -201,25 +201,6 @@
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.expand(); tg.setHeaderColor('#0F0F15'); tg.setBackgroundColor('#0F0F15'); }
 
-        // Sync browser fullscreen with TG app
-        (() => {
-            const tgApp = window.Telegram?.WebApp;
-            if (!tgApp) return;
-            document.addEventListener('fullscreenchange', () => {
-                if (document.fullscreenElement) {
-                    try { tgApp.requestFullscreen?.(); } catch(e) {}
-                } else {
-                    try { tgApp.exitFullscreen?.(); } catch(e) {}
-                }
-            });
-            document.addEventListener('webkitfullscreenchange', () => {
-                if (document.webkitFullscreenElement) {
-                    try { tgApp.requestFullscreen?.(); } catch(e) {}
-                } else {
-                    try { tgApp.exitFullscreen?.(); } catch(e) {}
-                }
-            });
-        })();
 
 
         const initData = tg?.initData || '';
@@ -1267,7 +1248,7 @@
                         const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
                         const raceTime = toMSK(race.time);
                         const winner = race.winner;
-                        const shouldHide = isSpoilerActive && lastCompletedRound && race.round === lastCompletedRound.round;
+                        const shouldHide = isSpoilerActive && isPast;
 
                         return (
                             <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
@@ -1288,10 +1269,7 @@
                                         <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit || race.circuit_name} · {dateStr}{raceTime ? ` · ${raceTime}` : ''}</div>
                                     </div>
                                     {shouldHide ? (
-                                        <div style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:'rgba(225,6,0,0.1)',border:'1px solid rgba(225,6,0,0.2)',borderRadius:8,flexShrink:0}}>
-                                            <span style={{fontSize:12}}>🔒</span>
-                                            <span style={{fontSize:10,color:'var(--f1-red)',fontWeight:600}}>Скрыто</span>
-                                        </div>
+                                        null
                                     ) : (<>
                                         {isPast && winner && (
                                             <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
@@ -1323,7 +1301,7 @@
         };
 
         // ==== STANDINGS PAGE ====
-        const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh, spoilerFree}) => {
+        const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh, spoilerFree, onBack}) => {
             const [tab, setTab] = useState('drivers');
             const [spoilerDismissed, setSpoilerDismissed] = useState(() => localStorage.getItem('f1hub_spoiler_standings_skip') === 'true');
             const showSpoilerWarning = spoilerFree && !spoilerDismissed;
@@ -1442,7 +1420,7 @@
 
             return (
                 <div className="page-container fade-in flex-layout" style={{display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:0}}>
-                    {showSpoilerWarning && <SpoilerWarningOverlay onDismiss={()=>setSpoilerDismissed(true)} onBack={()=>history.back()}/>}
+                    {showSpoilerWarning && <SpoilerWarningOverlay onDismiss={()=>setSpoilerDismissed(true)} onBack={()=>onBack?onBack():null}/>}
                     {/* Sticky header + tabs */}
                     <div style={{flexShrink:0,padding:'12px 16px 0',background:'var(--f1-dark)'}}>
                         {ptr.indicatorEl}
@@ -1777,23 +1755,38 @@
                                 {pred.already_predicted || selected[pred.type] ? (
                                     <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(57,181,74,0.1)',color:'#39B54A',fontSize:13,fontWeight:600}}>✓ Прогноз сделан</div>
                                 ) : pred.type==='winner'||pred.type==='fastest_lap' ? (
-                                    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
                                         {available.drivers?.slice(0,20).map(d=>(
-                                            <button key={d.driver_number} onClick={()=>handlePredict(pred.type,d.driver_number)} disabled={submitting}
-                                                style={{background:`${d.team_color}44`,border:`1px solid ${d.team_color}66`,borderRadius:8,padding:'6px 10px',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:submitting?0.5:1,transition:'transform 0.1s'}}>{d.code}</button>
+                                            <div key={d.driver_number} onClick={()=>{if(!submitting)handlePredict(pred.type,d.driver_number)}}
+                                                style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:'var(--f1-gray)',border:'2px solid '+d.team_color+'66',opacity:submitting?0.5:1,transition:'transform 0.15s'}}>
+                                                <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+                                                    {d.photo_url && <img src={d.photo_url} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
+                                                </div>
+                                                <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
+                                                    <div style={{fontSize:11,fontWeight:800,color:d.team_color}}>{d.code}</div>
+                                                    <div style={{fontSize:8,color:'var(--f1-text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.team?.split(' ')[0]||''}</div>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
                                 ) : pred.type==='podium' ? (
                                     <div>
                                         <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:6}}>Выбрано: {podiumPicks.length}/3 {podiumPicks.length===3&&<span style={{color:'#39B54A',marginLeft:8}}>Готово!</span>}</div>
-                                        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                                        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
                                             {available.drivers?.slice(0,20).map(d=>{
                                                 const picked=podiumPicks.includes(d.driver_number), idx=podiumPicks.indexOf(d.driver_number);
                                                 return (
-                                                    <button key={d.driver_number} onClick={()=>{if(picked)setPodiumPicks(p=>p.filter(n=>n!==d.driver_number));else if(podiumPicks.length<3)setPodiumPicks(p=>[...p,d.driver_number]);}} disabled={submitting}
-                                                        style={{background:picked?d.team_color:`${d.team_color}33`,border:`2px solid ${picked?d.team_color:d.team_color+'44'}`,borderRadius:8,padding:'6px 10px',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1}}>
-                                                        {picked&&<span style={{marginRight:4}}>{idx+1}.</span>}{d.code}
-                                                    </button>
+                                                    <div key={d.driver_number} onClick={()=>{if(submitting)return;if(picked)setPodiumPicks(p=>p.filter(n=>n!==d.driver_number));else if(podiumPicks.length<3)setPodiumPicks(p=>[...p,d.driver_number]);}}
+                                                        style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:picked?d.team_color+'33':'var(--f1-gray)',border:'2px solid '+(picked?d.team_color:d.team_color+'44'),opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1,transition:'transform 0.15s',position:'relative'}}>
+                                                        {picked && <div style={{position:'absolute',top:4,right:4,width:18,height:18,borderRadius:'50%',background:d.team_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',zIndex:2}}>{idx+1}</div>}
+                                                        <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+                                                            {d.photo_url && <img src={d.photo_url} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
+                                                        </div>
+                                                        <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
+                                                            <div style={{fontSize:11,fontWeight:800,color:picked?d.team_color:'var(--f1-text)'}}>{d.code}</div>
+                                                            <div style={{fontSize:8,color:'var(--f1-text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.team?.split(' ')[0]||''}</div>
+                                                        </div>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -1817,12 +1810,21 @@
                     {myPredictions.length>0 && (
                         <div style={{marginTop:20}}>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Мои прогнозы</div>
-                            {myPredictions.slice(0,10).map((p,i)=>(
-                                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--f1-border)',fontSize:13}}>
-                                    <div><span style={{fontWeight:600}}>R{p.race_round}</span><span style={{color:'var(--f1-text-muted)',marginLeft:8}}>{p.prediction_type}</span></div>
-                                    <div style={{fontWeight:700,color:p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{p.status==='pending'?'⏳':p.status==='correct'?`✓ +${p.points_won}`:p.status==='partial'?`~ +${p.points_won}`:'✗'}</div>
+                            {myPredictions.slice(0,15).map((p,i)=>{
+                                const typeLabels = {'winner':'Победитель','podium':'Подиум','fastest_lap':'Быстр. круг','dnf_count':'Сходы','safety_car':'Safety Car'};
+                                const statusColor = p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)';
+                                const statusBg = p.status==='correct'?'rgba(57,181,74,0.1)':p.status==='partial'?'rgba(255,215,0,0.1)':p.status==='incorrect'?'rgba(225,6,0,0.1)':'rgba(255,255,255,0.03)';
+                                return (
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',marginBottom:6,borderRadius:10,background:statusBg}}>
+                                    <div style={{width:32,height:32,borderRadius:8,background:'rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,color:statusColor,flexShrink:0}}>R{p.race_round}</div>
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:13,fontWeight:700}}>{typeLabels[p.prediction_type]||p.prediction_type}</div>
+                                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{typeof p.prediction_value==='object'?JSON.stringify(p.prediction_value):String(p.prediction_value)}</div>
+                                    </div>
+                                    <div style={{fontWeight:800,fontSize:13,color:statusColor,flexShrink:0}}>{p.status==='pending'?'\u23f3':p.status==='correct'?'+'+p.points_won:p.status==='partial'?'+'+p.points_won:'\u2717'}</div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -2730,6 +2732,64 @@
             );
         };
 
+        // ==== IFRAME FULLSCREEN PLAYER (mobile only, uses portal to body) ====
+        const IframeFullscreenPlayer = ({src, title}) => {
+            const [isFS, setIsFS] = useState(false);
+            const tgApp = window.Telegram?.WebApp;
+            const portalRef = useRef(null);
+
+            // Create portal container once
+            if (!portalRef.current) {
+                portalRef.current = document.createElement('div');
+            }
+
+            const exitFS = useCallback(() => {
+                setIsFS(false);
+                document.body.style.overflow = '';
+                try { tgApp?.exitFullscreen?.(); } catch(e) {}
+            }, []);
+
+            useEffect(() => {
+                if (!isFS) return;
+                // Mount portal div directly on body
+                document.body.appendChild(portalRef.current);
+                document.body.style.overflow = 'hidden';
+                try { tgApp?.requestFullscreen?.(); } catch(e) {}
+
+                const onKey = (e) => { if (e.key === 'Escape') exitFS(); };
+                document.addEventListener('keydown', onKey);
+                tgApp?.BackButton?.onClick?.(exitFS);
+
+                return () => {
+                    document.removeEventListener('keydown', onKey);
+                    tgApp?.BackButton?.offClick?.(exitFS);
+                    document.body.style.overflow = '';
+                    if (portalRef.current.parentNode) portalRef.current.parentNode.removeChild(portalRef.current);
+                };
+            }, [isFS, exitFS]);
+
+            const fsOverlay = isFS ? ReactDOM.createPortal(
+                <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,width:'100vw',height:'100vh',zIndex:2147483647,background:'#000'}}>
+                    <iframe src={src} style={{width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
+                    <div onClick={exitFS} style={{position:'fixed',top:'max(12px, env(safe-area-inset-top, 12px))',left:12,padding:'8px 16px',borderRadius:12,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',fontSize:14,fontWeight:700,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',zIndex:2147483647}}>{'← Назад'}</div>
+                </div>,
+                portalRef.current
+            ) : null;
+
+            return (
+                <>
+                    {fsOverlay}
+                    {!isFS && <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                        <iframe src={src} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; encrypted-media; picture-in-picture" title={title||'Video'}/>
+                        <div onClick={() => setIsFS(true)} style={{position:'absolute',bottom:12,right:12,padding:'6px 12px',borderRadius:8,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',fontSize:12,fontWeight:600,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',display:'flex',alignItems:'center',gap:4,zIndex:10}}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+                            {'На весь экран'}
+                        </div>
+                    </div>}
+                </>
+            );
+        };
+
         // ==== VIDEO PLAYER ====
         const F1VideoPlayer = ({src, title, poster, streamType}) => {
             const videoRef = useRef(null);
@@ -2750,9 +2810,43 @@
                     i18n: { speed:'\u0421\u043a\u043e\u0440\u043e\u0441\u0442\u044c', quality:'\u041a\u0430\u0447\u0435\u0441\u0442\u0432\u043e', normal:'\u041e\u0431\u044b\u0447\u043d\u0430\u044f' },
                 };
 
+                const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                 const hookFS = (p) => {
-                    p.on('enterfullscreen', () => { try { tgApp?.requestFullscreen?.(); } catch(e) {} });
-                    p.on('exitfullscreen', () => { try { tgApp?.exitFullscreen?.(); } catch(e) {} });
+                    const plyrEl = p.elements.container;
+                    let origParent = null, origNext = null;
+
+                    if (isMobile) {
+                        // Mobile: auto-fullscreen on play + move to body (CSS fallback)
+                        p.on('play', () => {
+                            if (!p.fullscreen.active) {
+                                p.fullscreen.enter();
+                            }
+                        });
+
+                        p.on('enterfullscreen', () => {
+                            origParent = plyrEl.parentNode;
+                            origNext = plyrEl.nextSibling;
+                            document.body.appendChild(plyrEl);
+                            document.body.style.overflow = 'hidden';
+                            try { tgApp?.requestFullscreen?.(); } catch(e) {}
+                        });
+
+                        p.on('exitfullscreen', () => {
+                            if (origParent) {
+                                origParent.insertBefore(plyrEl, origNext);
+                            }
+                            document.body.style.overflow = '';
+                            try { tgApp?.exitFullscreen?.(); } catch(e) {}
+                        });
+                    } else {
+                        // Desktop: native fullscreen via Plyr (no auto-fullscreen)
+                        p.on('enterfullscreen', () => {
+                            try { tgApp?.requestFullscreen?.(); } catch(e) {}
+                        });
+                        p.on('exitfullscreen', () => {
+                            try { tgApp?.exitFullscreen?.(); } catch(e) {}
+                        });
+                    }
                 };
 
                 if (streamType === 'hls' && typeof Hls !== 'undefined' && Hls.isSupported()) {
@@ -2794,12 +2888,28 @@
         const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
             const url = embedUrl || videoUrl || '';
             const directUrl = videoUrl || embedUrl || '';
-            const [streamData, setStreamData] = useState(null);
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState(false);
+            const isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
             const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
             const rtMatch = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+
+            // YouTube: mobile = our CSS overlay, desktop = native iframe
+            if (ytMatch) {
+                if (isMob) {
+                    const ytSrc = 'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1&fs=0';
+                    return <IframeFullscreenPlayer src={ytSrc} title={title}/>;
+                }
+                return (
+                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                        <iframe src={'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1'} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
+                    </div>
+                );
+            }
+
+            // Rutube: Plyr + HLS.js via API
+            const [streamData, setStreamData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(false);
 
             useEffect(() => {
                 if (streamData || loading || error) return;
@@ -2807,11 +2917,6 @@
                     setLoading(true);
                     api.get('/api/rutube-stream/' + rtMatch[1])
                         .then(d => { if (d?.hls_url) setStreamData({type:'hls', src:d.hls_url, title:d.title||title, thumbnail:d.thumbnail}); else setError(true); })
-                        .catch(() => setError(true)).finally(() => setLoading(false));
-                } else if (ytMatch) {
-                    setLoading(true);
-                    api.get('/api/youtube-stream/' + ytMatch[1])
-                        .then(d => { if (d?.best_url) setStreamData({type:'mp4', src:d.best_url, title:d.title||title, thumbnail:d.thumbnail}); else setError(true); })
                         .catch(() => setError(true)).finally(() => setLoading(false));
                 }
             }, [url]);
@@ -2831,13 +2936,10 @@
                 return <div style={{marginBottom:12}}><F1VideoPlayer src={streamData.src} title={streamData.title||title} poster={streamData.thumbnail} streamType={streamData.type}/></div>;
             }
 
-            // Error fallback: YouTube iframe, Rutube link
-            if (error && ytMatch) {
-                return (
-                    <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
-                        <iframe src={'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1'} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen title={title||'Video'}/>
-                    </div>
-                );
+            // Error fallback: Rutube iframe
+            if (error && rtMatch) {
+                const rtSrc = 'https://rutube.ru/play/embed/' + rtMatch[1];
+                return <IframeFullscreenPlayer src={rtSrc} title={title} isMobile={isMob}/>;
             }
             if (error && rtMatch) {
                 return <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}><div style={{fontSize:14,fontWeight:700,color:'white'}}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043d\u0430 Rutube \u2197</div></div>;
@@ -2938,6 +3040,7 @@
             const [broadcasts, setBroadcasts] = useState([]);
             const [form, setForm] = useState({race_round:'',session_type:'race',video_url:'',title:'',is_live:false});
             const [saving, setSaving] = useState(false);
+            const [expandedRound, setExpandedRound] = useState(null);
             const [schedule, setSchedule] = useState([]);
 
             useEffect(() => {
@@ -2999,20 +3102,67 @@
                         </button>
                     </div>
 
-                    {/* List */}
-                    {broadcasts.length === 0 ? (
-                        <div style={{textAlign:'center',padding:12,color:'var(--f1-text-muted)',fontSize:13}}>Нет трансляций</div>
-                    ) : broadcasts.map(b=>(
-                        <div key={b.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid var(--f1-border)'}}>
-                            {b.is_live && <div style={{width:6,height:6,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>}
-                            <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>R{b.race_round} · {sessionLabels[b.session_type]||b.session_type}</div>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{b.title || 'Без названия'}</div>
-                            </div>
-                            {b.is_live && <button onClick={()=>handleEnd(b.id)} style={{padding:'4px 10px',borderRadius:6,border:'none',fontFamily:'inherit',fontSize:11,fontWeight:700,cursor:'pointer',background:'rgba(255,128,0,0.2)',color:'#FF8000'}}>Завершить</button>}
-                            <button onClick={()=>handleDelete(b.id)} style={{padding:'4px 8px',borderRadius:6,border:'none',fontFamily:'inherit',fontSize:11,cursor:'pointer',background:'rgba(255,0,0,0.1)',color:'var(--f1-red)'}}>✕</button>
-                        </div>
-                    ))}
+                    {/* List grouped by GP */}
+                    {(() => {
+                        if (broadcasts.length === 0) return <div style={{textAlign:'center',padding:12,color:'var(--f1-text-muted)',fontSize:13}}>Нет трансляций</div>;
+                        const grouped = {};
+                        broadcasts.forEach(b => {
+                            if (!grouped[b.race_round]) grouped[b.race_round] = [];
+                            grouped[b.race_round].push(b);
+                        });
+                        const rounds = Object.keys(grouped).map(Number).sort((a,b) => b - a);
+                        const sessionOrder = ['race','qualifying','sprint','sprint_qualifying','review'];
+                        return rounds.map(round => {
+                            const items = grouped[round];
+                            const raceName = schedule.find(r => r.round === round)?.name || ('\u0420\u0430\u0443\u043d\u0434 ' + round);
+                            const hasLive = items.some(b => b.is_live);
+                            const filledSessions = items.map(b => b.session_type);
+                            return (
+                                <div key={round} style={{marginBottom:10,background:'rgba(255,255,255,0.03)',borderRadius:10,border:'1px solid var(--f1-border)',overflow:'hidden'}}>
+                                    <div onClick={() => setExpandedRound(r => r === round ? null : round)} style={{padding:'10px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+                                        {hasLive && <div style={{width:6,height:6,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite',flexShrink:0}}/>}
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{fontSize:13,fontWeight:700}}>R{round} · {raceName}</div>
+                                        </div>
+                                        <div style={{display:'flex',gap:3,flexShrink:0}}>
+                                            {sessionOrder.map(s => {
+                                                const has = filledSessions.includes(s);
+                                                const live = items.find(b => b.session_type === s && b.is_live);
+                                                return <div key={s} style={{width:8,height:8,borderRadius:'50%',background:live?'var(--f1-red)':has?'#00C853':'rgba(255,255,255,0.12)'}} title={sessionLabels[s]}/>;
+                                            })}
+                                        </div>
+                                        <span style={{fontSize:10,color:'var(--f1-text-muted)',flexShrink:0}}>{items.length}/{sessionOrder.length}</span>
+                                        <span style={{fontSize:11,color:'var(--f1-text-muted)',flexShrink:0}}>{expandedRound===round?'\u25b2':'\u25bc'}</span>
+                                    </div>
+                                    {expandedRound === round && (
+                                        <div style={{padding:'0 12px 10px',borderTop:'1px solid var(--f1-border)'}}>
+                                            {sessionOrder.map(sType => {
+                                                const b = items.find(x => x.session_type === sType);
+                                                if (!b) return (
+                                                    <div key={sType} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',opacity:0.4}}>
+                                                        <div style={{width:6,height:6,borderRadius:'50%',background:'rgba(255,255,255,0.15)'}}/>
+                                                        <span style={{fontSize:12,color:'var(--f1-text-muted)'}}>{sessionLabels[sType]}</span>
+                                                        <span style={{fontSize:10,color:'var(--f1-text-muted)',marginLeft:'auto'}}>{'\u2014'}</span>
+                                                    </div>
+                                                );
+                                                return (
+                                                    <div key={sType} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
+                                                        <div style={{width:6,height:6,borderRadius:'50%',background:b.is_live?'var(--f1-red)':'#00C853',flexShrink:0}}/>
+                                                        <div style={{flex:1,minWidth:0}}>
+                                                            <div style={{fontSize:12,fontWeight:600}}>{sessionLabels[sType]}{b.is_live ? ' \xb7 LIVE' : ''}</div>
+                                                            <div style={{fontSize:10,color:'var(--f1-text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.title || (b.video_url ? b.video_url.substring(0,40)+'...' : '')}</div>
+                                                        </div>
+                                                        {b.is_live && <button onClick={()=>handleEnd(b.id)} style={{padding:'3px 8px',borderRadius:5,border:'none',fontFamily:'inherit',fontSize:10,fontWeight:700,cursor:'pointer',background:'rgba(255,128,0,0.2)',color:'#FF8000'}}>{'\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c'}</button>}
+                                                        <button onClick={()=>handleDelete(b.id)} style={{padding:'3px 6px',borderRadius:5,border:'none',fontFamily:'inherit',fontSize:10,cursor:'pointer',background:'rgba(255,0,0,0.1)',color:'var(--f1-red)'}}>{'\u2715'}</button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        });
+                    })()}
                 </div>
             );
         };
@@ -3129,9 +3279,12 @@
 
             if (!race) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка гран-при..."/></div>;
 
-            // Determine if this race should be spoiler-hidden (any past race when spoilerFree)
+            // Determine if this race should be spoiler-hidden (ONLY the last completed GP)
             const now = new Date();
+            const lastCompletedRound = allRaces ? [...allRaces].filter(r => r.date && new Date(r.date) < now).pop()?.round : null;
+            const isLastCompleted = lastCompletedRound && race.round === lastCompletedRound;
             const isSpoilerHidden = spoilerFree && !revealed && isPastRace;
+            console.log("ANTISPOILER DEBUG:", {spoilerFree, revealed, isPastRace, isSpoilerHidden: spoilerFree && !revealed && isPastRace, raceDate: race?.date, raceName: race?.name});
 
             const flag = circuitFlags[race.circuit_id] || '🏁';
             const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
@@ -3159,7 +3312,7 @@
                         </div>
                     </div>
 
-                    {isSpoilerHidden && (race.podium || race.top_10 || raceResults) && (
+                    {isSpoilerHidden && isPastRace && (
                         <div className="card" style={{padding:'28px 20px',textAlign:'center',marginBottom:16}}>
                             <div style={{fontSize:40,marginBottom:10}}>🙈</div>
                             <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>Антиспойлер включён</div>
@@ -3232,7 +3385,7 @@
                         </div>
                     )}
 
-                    {raceTab === 'race' && (<>
+                    {raceTab === 'race' && !isSpoilerHidden && (<>
                     {/* Podium */}
                     {race.podium?.length >= 3 && (
                         <div className="card" style={{padding:'16px 12px', marginBottom:16, position:'relative', overflow:'hidden'}}>
@@ -3340,9 +3493,9 @@
                                         </div>
                                         <div style={{textAlign:'right'}}>
                                             {d.is_dnf ? (
-                                                <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700}}>DNF</div>
+                                                <div><div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700}}>{d.status==='Did not start'?'DNS':'DNF'}</div>{d.status&&d.status!=='Retired'&&d.status!=='Did not start'&&<div style={{fontSize:9,color:'var(--f1-text-muted)'}}>{d.status}</div>}</div>
                                             ) : (<>
-                                                {d.time && <div style={{fontSize:11,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.time}</div>}
+                                                {d.time ? <div style={{fontSize:11,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.time}</div> : d.status && d.status!=='Finished' ? <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600}}>{d.status}</div> : null}
                                                 {d.points > 0 && <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.points} очк.</div>}
                                             </>)}
                                         </div>
@@ -3352,31 +3505,7 @@
                         </div>
                     )}
 
-                    {/* Position change chart */}
-                    {isPastRace && !isSpoilerHidden && raceTab === 'race' && posChart && (
-                        <div className="card" style={{padding:0,marginBottom:16,overflow:'hidden'}}>
-                            <div style={{padding:'14px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                    <div style={{width:3,height:16,borderRadius:2,background:'var(--f1-red)'}}/>
-                                    <span style={{fontSize:13,fontWeight:700,color:'var(--f1-text)',letterSpacing:0.3}}>Смена позиций</span>
-                                </div>
-                                <span style={{fontSize:10,color:'var(--f1-text-muted)'}}>{posChart.total_laps} кругов</span>
-                            </div>
-                            <div style={{padding:'0 8px 8px'}}>
-                                <div style={{height:280,position:'relative',background:'rgba(0,0,0,0.15)',borderRadius:10,padding:'8px 4px 4px'}}>
-                                    <canvas ref={posChartRef}/>
-                                </div>
-                            </div>
-                            <div style={{padding:'6px 16px 14px',display:'flex',flexWrap:'wrap',gap:'4px 10px'}}>
-                                {posChart.drivers.map(d => (
-                                    <div key={d.code} style={{display:'flex',alignItems:'center',gap:4,fontSize:10,padding:'2px 0'}}>
-                                        <div style={{width:12,height:3,borderRadius:2,background:d.team_color,opacity:0.9}}/>
-                                        <span style={{color:'var(--f1-text-muted)',fontWeight:500}}>{d.code}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+
 
                     {/* Qualifying Results */}
                     {raceTab === 'qualifying' && !isSpoilerHidden && qualiData?.results?.length > 0 && (
@@ -3435,7 +3564,7 @@
                         </div>
                     )}
 
-                    {raceTab === 'race' && (<>
+                    {raceTab === 'race' && !isSpoilerHidden && (<>
                     {/* Tyre Strategy */}
                     {tyreLoading && (
                         <div style={{padding:'20px 12px', marginBottom:16, textAlign:'center'}}>
@@ -4227,7 +4356,7 @@
                     case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
                     case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree}/>;
                     case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
-                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
+                    case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onBack={()=>setTab('home')} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
                     case 'predict': return <PredictionsPage user={user}/>;
                     case 'profile': return <ProfilePage user={user}/>;
                     case 'analytics': return <AnalyticsPage/>;
