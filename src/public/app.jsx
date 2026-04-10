@@ -131,7 +131,7 @@ const Sidebar = ({ active, onChange, collapsed, onToggle }) => {
           </button>
         ))}
       </nav>
-      <button onClick={onToggle} className="px-4 py-4 border-t border-f1-border text-f1-muted hover:text-white transition-colors">
+      <button onClick={onToggle} aria-label="Свернуть меню" className="px-4 py-4 border-t border-f1-border text-f1-muted hover:text-white transition-colors">
         <svg className={`w-5 h-5 mx-auto transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
       </button>
     </aside>
@@ -141,7 +141,7 @@ const Sidebar = ({ active, onChange, collapsed, onToggle }) => {
 // ==== TOP BAR ====
 const TopBar = ({ user, onLogin, onMenuToggle }) => (
   <header className="sticky top-0 z-30 h-14 bg-f1-bg/80 backdrop-blur-xl border-b border-f1-border flex items-center justify-between px-6">
-    <button onClick={onMenuToggle} className="lg:hidden text-f1-muted hover:text-white mr-4">
+    <button onClick={onMenuToggle} aria-label="Меню" className="lg:hidden text-f1-muted hover:text-white mr-4">
       <IconMenu/>
     </button>
     <div className="flex-1"/>
