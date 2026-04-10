@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-f1-bg: #09090b;
+  --color-f1-surface: #111118;
+  --color-f1-card: #16161e;
+  --color-f1-card-hover: #1e1e2a;
+  --color-f1-border: rgba(255,255,255,0.06);
+  --color-f1-border-light: rgba(255,255,255,0.1);
+  --color-f1-red: #E10600;
+  --color-f1-red-dark: #B00500;
+  --color-f1-muted: #6b6b80;
+  --color-f1-secondary: #9a9aaf;
+
+  --color-team-redbull: #3671C6;
+  --color-team-ferrari: #E8002D;
+  --color-team-mercedes: #27F4D2;
+  --color-team-mclaren: #FF8000;
+  --color-team-aston: #229971;
+  --color-team-alpine: #0093CC;
+  --color-team-williams: #64C4FF;
+  --color-team-rb: #6692FF;
+  --color-team-sauber: #52E252;
+  --color-team-haas: #B6BABD;
+
+  --font-family-f1: 'Titillium Web', system-ui, sans-serif;
+
+  --animate-fade-in: fadeIn 0.4s ease-out;
+  --animate-fade-up: fadeUp 0.5s ease-out;
+  --animate-pulse-red: pulseRed 2s infinite;
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+
+  @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes fadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes pulseRed { 0%,100% { box-shadow: 0 0 0 0 rgba(225,6,0,0.4); } 50% { box-shadow: 0 0 0 8px rgba(225,6,0,0); } }
+  @keyframes glow { 0% { box-shadow: 0 0 20px rgba(225,6,0,0.1); } 100% { box-shadow: 0 0 30px rgba(225,6,0,0.25); } }
+}
+
+@layer base {
+  html, body, #root { height: 100dvh; overflow: hidden; }
+  body { background: var(--color-f1-bg); color: #fff; font-family: var(--font-family-f1); -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+}
+
+@utility glass-card {
+  background: color-mix(in srgb, var(--color-f1-card) 80%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-f1-border);
+  border-radius: 1rem;
+}
+
+@utility glass-card-hover {
+  background: color-mix(in srgb, var(--color-f1-card) 80%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-f1-border);
+  border-radius: 1rem;
+  transition: all 0.2s;
+  &:hover {
+    background: var(--color-f1-card-hover);
+    border-color: var(--color-f1-border-light);
+    box-shadow: 0 10px 40px rgba(225,6,0,0.05);
+  }
+}
+
+@utility sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  color: var(--color-f1-muted);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  &:hover { background: rgba(255,255,255,0.05); color: #fff; }
+}
+
+@utility sidebar-link-active {
+  background: rgba(225,6,0,0.1);
+  color: var(--color-f1-red);
+  border-left: 2px solid var(--color-f1-red);
+}
+
+@utility section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-f1-muted);
+  margin-bottom: 1rem;
+}
+
+@utility data-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+@utility pos-1 { background: #FFD700; color: #000; }
+@utility pos-2 { background: #C0C0C0; color: #000; }
+@utility pos-3 { background: #CD7F32; color: #fff; }
