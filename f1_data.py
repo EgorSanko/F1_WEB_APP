@@ -105,6 +105,24 @@ def cache_set(key: str, data: Any):
     _cache[key] = {"data": data, "time": time.time()}
 
 
+# Negative cache: remember 404s to avoid hammering upstream on non-existent resources
+_negative_cache: Dict[str, float] = {}
+NEGATIVE_CACHE_TTL = 600  # 10 minutes
+
+
+def negative_cache_check(key: str) -> bool:
+    """Return True if this key is in the negative cache (known 404)."""
+    ts = _negative_cache.get(key)
+    if ts and time.time() - ts < NEGATIVE_CACHE_TTL:
+        return True
+    return False
+
+
+def negative_cache_set(key: str):
+    """Mark a key as 404 (negative cache)."""
+    _negative_cache[key] = time.time()
+
+
 def cache_clear(prefix: str = None):
     """Clear cache entries."""
     global _cache
@@ -730,6 +748,11 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
     if cached:
         return cached
 
+    # Negative cache: don't hammer upstream for known-missing races
+    neg_key = f"neg:race_results:{s}:{round_num}"
+    if negative_cache_check(neg_key):
+        return {"error": "Race results not found", "round": round_num}
+
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/results")
     if not data:
@@ -737,6 +760,7 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
 
     races = data.get("RaceTable", {}).get("Races", [])
     if not races:
+        negative_cache_set(neg_key)
         return {"error": "Race results not found", "round": round_num}
 
     race = races[0]
@@ -834,6 +858,10 @@ async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str
     if cached:
         return cached
 
+    neg_key = f"neg:qualifying:{s}:{round_num}"
+    if negative_cache_check(neg_key):
+        return {"error": "Qualifying results not found", "round": round_num}
+
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/qualifying")
     if not data:
@@ -841,6 +869,7 @@ async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str
 
     races = data.get("RaceTable", {}).get("Races", [])
     if not races:
+        negative_cache_set(neg_key)
         return {"error": "Qualifying results not found", "round": round_num}
 
     race = races[0]

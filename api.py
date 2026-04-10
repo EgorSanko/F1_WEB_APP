@@ -54,13 +54,29 @@ async def lifespan(app: FastAPI):
     logger.info("F1 Hub API started (v2 async)")
 
     # Single F1 live-timing upstream (SignalR over WS, ported from f1-dash).
-    # Runs forever, reconnects on its own, handles CloudFront-403
-    # "no session" state quietly between race weekends.
     live_client = f1_live.F1LiveClient()
     f1_live.set_client(live_client)
     app.state.f1_live = live_client
     app.state.f1_live_task = _asyncio.create_task(live_client.run_forever())
     logger.info("F1LiveClient background task started")
+
+    # Cache prewarmer — prime heavy endpoints so first user doesn't wait 3.6s
+    async def _prewarm():
+        await _asyncio.sleep(1)
+        try:
+            await f1_data.get_home_data(season=CURRENT_SEASON)
+            logger.info("Cache prewarmed: /api/home")
+        except Exception as e:
+            logger.warning("Prewarm /api/home failed: %s", e)
+        try:
+            await f1_data.get_schedule(season=CURRENT_SEASON)
+            logger.info("Cache prewarmed: /api/schedule")
+        except Exception as e:
+            logger.warning("Prewarm /api/schedule failed: %s", e)
+        # Note: /api/news is parsed inline (championat.com), not in f1_data.
+        # It's fast enough and not worth pre-warming.
+
+    app.state.prewarm_task = _asyncio.create_task(_prewarm())
 
     try:
         yield
@@ -93,10 +109,141 @@ os.makedirs(_static_dir, exist_ok=True)
 app.mount("/static/drivers", StaticFiles(directory=_static_dir), name="driver_photos")
 
 
+# ============ RATE LIMITING ============
+from collections import defaultdict
+
+_rate_buckets: Dict[str, list] = defaultdict(list)
+RATE_LIMIT = 60          # requests per window
+RATE_WINDOW = 60          # seconds
+RATE_LIMIT_AUTH = 120     # higher limit for authenticated users
+
+
+def _check_rate_limit(ip: str, authenticated: bool = False) -> bool:
+    """Return True if request is allowed, False if rate-limited."""
+    now = time.time()
+    bucket = _rate_buckets[ip]
+    # Prune old entries
+    cutoff = now - RATE_WINDOW
+    _rate_buckets[ip] = bucket = [t for t in bucket if t > cutoff]
+    limit = RATE_LIMIT_AUTH if authenticated else RATE_LIMIT
+    if len(bucket) >= limit:
+        return False
+    bucket.append(now)
+    return True
+
+
+# ============ REQUEST LOGGING MIDDLEWARE ============
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RequestLogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        # Rate limiting (skip health + static)
+        path = request.url.path
+        if path.startswith("/api/") and path != "/api/health":
+            ip = request.client.host if request.client else "unknown"
+            has_auth = bool(request.headers.get("X-Telegram-Init-Data") or
+                           request.headers.get("Authorization", "").startswith("TgLogin "))
+            if not _check_rate_limit(ip, authenticated=has_auth):
+                from starlette.responses import JSONResponse
+                return JSONResponse(
+                    {"detail": "Too many requests"}, status_code=429,
+                    headers={"Retry-After": str(RATE_WINDOW)}
+                )
+
+        response = await call_next(request)
+        ms = (time.time() - start) * 1000
+
+        # Structured log for API requests (skip static/health)
+        if path.startswith("/api/") and path != "/api/health":
+            auth_type = "none"
+            if request.headers.get("X-Telegram-Init-Data"):
+                auth_type = "webapp"
+            elif request.headers.get("Authorization", "").startswith("TgLogin "):
+                auth_type = "widget"
+            logger.info(
+                '{"endpoint":"%s","method":"%s","status":%d,"ms":%.1f,"auth":"%s"}',
+                path, request.method, response.status_code, ms, auth_type,
+            )
+        return response
+
+app.add_middleware(RequestLogMiddleware)
+
+
 # ============ TELEGRAM AUTH ============
+# Unified: accepts both WebApp initData AND Login Widget query string.
+# WebApp initData: HMAC key = SHA256("WebAppData", BOT_TOKEN), has "user" JSON field
+# Login Widget:    HMAC key = SHA256(BOT_TOKEN), has top-level id/first_name/username
+
+AUTH_MAX_AGE = 30 * 86400  # 30 days (RM lesson: 24h silently logged out profiles)
+
+
+def _validate_webapp_initdata(parsed: Dict[str, str]) -> Dict[str, Any]:
+    """Validate WebApp initData (has 'user' field with JSON)."""
+    received_hash = parsed.pop("hash", "")
+    if not received_hash:
+        raise HTTPException(status_code=401, detail="No hash")
+
+    data_check_string = "\n".join(
+        f"{k}={parsed[k]}" for k in sorted(parsed.keys())
+    )
+    secret_key = hmac.new(
+        b"WebAppData", TELEGRAM_TOKEN.encode(), hashlib.sha256
+    ).digest()
+    expected_hash = hmac.new(
+        secret_key, data_check_string.encode(), hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(received_hash, expected_hash):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    auth_date = int(parsed.get("auth_date", 0))
+    if time.time() - auth_date > AUTH_MAX_AGE:
+        raise HTTPException(status_code=401, detail="Auth expired")
+
+    user_data = json.loads(parsed.get("user", "{}"))
+    if not user_data.get("id"):
+        raise HTTPException(status_code=401, detail="No user")
+    return user_data
+
+
+def _validate_login_widget(parsed: Dict[str, str]) -> Dict[str, Any]:
+    """Validate Telegram Login Widget auth data (top-level id/first_name/hash)."""
+    received_hash = parsed.pop("hash", "")
+    if not received_hash:
+        raise HTTPException(status_code=401, detail="No hash")
+
+    data_check_string = "\n".join(
+        f"{k}={parsed[k]}" for k in sorted(parsed.keys())
+    )
+    secret_key = hashlib.sha256(TELEGRAM_TOKEN.encode()).digest()
+    expected_hash = hmac.new(
+        secret_key, data_check_string.encode(), hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(received_hash, expected_hash):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    auth_date = int(parsed.get("auth_date", 0))
+    if time.time() - auth_date > AUTH_MAX_AGE:
+        raise HTTPException(status_code=401, detail="Auth expired")
+
+    uid = parsed.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="No user id")
+
+    return {
+        "id": int(uid),
+        "first_name": parsed.get("first_name", ""),
+        "last_name": parsed.get("last_name", ""),
+        "username": parsed.get("username", ""),
+        "photo_url": parsed.get("photo_url", ""),
+    }
+
 
 def validate_telegram_data(init_data: str) -> Dict[str, Any]:
-    """Validate Telegram WebApp initData — HMAC-SHA256 verification."""
+    """Validate Telegram auth — auto-detects WebApp initData vs Login Widget."""
     if not init_data:
         if DEBUG:
             return {"id": 999999, "first_name": "Test", "username": "testuser"}
@@ -109,33 +256,13 @@ def validate_telegram_data(init_data: str) -> Dict[str, Any]:
                 key, value = part.split("=", 1)
                 parsed[key] = unquote(value)
 
-        received_hash = parsed.pop("hash", "")
-        if not received_hash:
-            raise HTTPException(status_code=401, detail="No hash")
-
-        data_check_string = "\n".join(
-            f"{k}={parsed[k]}" for k in sorted(parsed.keys())
-        )
-
-        secret_key = hmac.new(
-            b"WebAppData", TELEGRAM_TOKEN.encode(), hashlib.sha256
-        ).digest()
-        expected_hash = hmac.new(
-            secret_key, data_check_string.encode(), hashlib.sha256
-        ).hexdigest()
-
-        if not hmac.compare_digest(received_hash, expected_hash):
-            raise HTTPException(status_code=401, detail="Invalid signature")
-
-        auth_date = int(parsed.get("auth_date", 0))
-        if time.time() - auth_date > 86400:  # 24 hours
-            raise HTTPException(status_code=401, detail="Auth expired")
-
-        user_data = json.loads(parsed.get("user", "{}"))
-        if not user_data.get("id"):
-            raise HTTPException(status_code=401, detail="No user")
-
-        return user_data
+        # Auto-detect: WebApp initData has "user" field, Login Widget has "id"
+        if "user" in parsed:
+            return _validate_webapp_initdata(parsed)
+        elif "id" in parsed:
+            return _validate_login_widget(parsed)
+        else:
+            raise HTTPException(status_code=401, detail="Unknown auth format")
 
     except HTTPException:
         raise
@@ -145,7 +272,15 @@ def validate_telegram_data(init_data: str) -> Dict[str, Any]:
 
 
 def get_current_user(request: Request) -> Dict[str, Any]:
+    """Extract and validate Telegram auth from request.
+    Checks X-Telegram-Init-Data header first (WebApp), then Authorization header (Login Widget).
+    """
     init_data = request.headers.get("X-Telegram-Init-Data", "")
+    if not init_data:
+        # Login Widget: frontend sends auth as Authorization: TgLogin <query_string>
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("TgLogin "):
+            init_data = auth_header[8:]
     return validate_telegram_data(init_data)
 
 
@@ -324,6 +459,41 @@ async def get_home(season: int = CURRENT_SEASON):
 async def get_live_dashboard():
     """Combined endpoint: session + positions + timing + weather + race control."""
     return await f1_data.get_live_dashboard()
+
+
+@app.get("/api/f1/bundle")
+async def f1_bundle(request: Request, season: int = CURRENT_SEASON):
+    """Combined bundle for anonymous page load: home + schedule + standings.
+    Supports ETag/304 to avoid re-downloading unchanged data."""
+    import asyncio as _aio
+
+    home, schedule, drivers_st, constructors_st = await _aio.gather(
+        f1_data.get_home_data(season=season),
+        f1_data.get_schedule(season=season),
+        f1_data.get_driver_standings(season=season),
+        f1_data.get_constructor_standings(season=season),
+    )
+    bundle = {
+        "home": home,
+        "schedule": schedule,
+        "standings": {"drivers": drivers_st, "constructors": constructors_st},
+        "season": season,
+    }
+
+    # ETag based on content hash
+    content = json.dumps(bundle, sort_keys=True, default=str)
+    etag = hashlib.md5(content.encode()).hexdigest()
+
+    if_none_match = request.headers.get("if-none-match", "").strip('"')
+    if if_none_match == etag:
+        from starlette.responses import Response
+        return Response(status_code=304, headers={"ETag": f'"{etag}"'})
+
+    from starlette.responses import JSONResponse
+    return JSONResponse(
+        content=bundle,
+        headers={"ETag": f'"{etag}"', "Cache-Control": "public, max-age=60"},
+    )
 
 
 # ============ LIVE DATA ============
