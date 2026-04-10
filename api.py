@@ -331,8 +331,13 @@ async def health():
 # ============ STATIC ============
 
 @app.get("/")
-async def serve_index():
-    return FileResponse("index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
+async def serve_index(request: Request):
+    """Serve webapp.html for TG WebApp (f1.lead-seek.ru), public.html for public site (f1hub.lead-seek.ru)."""
+    host = request.headers.get("host", "")
+    no_cache = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    if "f1hub" in host:
+        return FileResponse("public.html", headers=no_cache)
+    return FileResponse("webapp.html", headers=no_cache)
 
 
 @app.get("/{filename}.html")
@@ -375,6 +380,25 @@ async def user_me(request: Request):
     }
 
 
+@app.post("/api/auth/widget")
+async def auth_widget(request: Request):
+    """Validate Login Widget auth data from public site.
+    Body: { "auth_data": "id=...&first_name=...&hash=..." }
+    Returns user info if valid.
+    """
+    body = await request.json()
+    auth_data = body.get("auth_data", "")
+    if not auth_data:
+        raise HTTPException(status_code=400, detail="Missing auth_data")
+    tg_user = validate_telegram_data(auth_data)
+    user = db.get_or_create_user(
+        user_id=tg_user["id"],
+        username=tg_user.get("username"),
+        first_name=tg_user.get("first_name"),
+        last_name=tg_user.get("last_name"),
+        photo_url=tg_user.get("photo_url"),
+    )
+    return {"ok": True, "user": user}
 
 
 class BroadcastRequest(BaseModel):

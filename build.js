@@ -4,9 +4,8 @@ const fs = require('fs');
 async function build() {
     const start = Date.now();
 
-    const result = await esbuild.build({
+    const commonOpts = {
         entryPoints: ['src/app.jsx'],
-        outfile: 'static/app.min.js',
         bundle: false,
         minify: true,
         sourcemap: true,
@@ -16,14 +15,26 @@ async function build() {
         target: ['es2020'],
         charset: 'utf8',
         legalComments: 'none',
+    };
+
+    // Build 1: WebApp (Telegram Mini App)
+    await esbuild.build({
+        ...commonOpts,
+        outfile: 'static/webapp.min.js',
+        define: { '__IS_WEBAPP__': 'true' },
     });
 
-    const jsSize = fs.statSync('static/app.min.js').size;
+    // Build 2: Public site
+    await esbuild.build({
+        ...commonOpts,
+        outfile: 'static/public.min.js',
+        define: { '__IS_WEBAPP__': 'false' },
+    });
+
+    const waSize = fs.statSync('static/webapp.min.js').size;
+    const pubSize = fs.statSync('static/public.min.js').size;
     const elapsed = Date.now() - start;
-    const kb = (jsSize / 1024).toFixed(1);
-    console.log('Built static/app.min.js (' + kb + ' KB) in ' + elapsed + 'ms');
-    if (result.errors.length) console.error('Errors:', result.errors);
-    if (result.warnings.length > 0) console.warn('Warnings:', result.warnings.length);
+    console.log('Built webapp.min.js (' + (waSize / 1024).toFixed(1) + ' KB) + public.min.js (' + (pubSize / 1024).toFixed(1) + ' KB) in ' + elapsed + 'ms');
 }
 
 build().catch(function(e) { console.error(e); process.exit(1); });

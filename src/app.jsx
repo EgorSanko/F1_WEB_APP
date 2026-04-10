@@ -1,32 +1,56 @@
 // React hooks from global React (loaded as vendor lib)
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-const tg = window.Telegram?.WebApp;
-if (tg) { tg.expand(); tg.setHeaderColor('#0F0F15'); tg.setBackgroundColor('#0F0F15'); }
+// IS_WEBAPP is replaced at build time by esbuild define
+const IS_WEBAPP = typeof __IS_WEBAPP__ !== 'undefined' ? __IS_WEBAPP__ : true;
 
+const tg = IS_WEBAPP ? window.Telegram?.WebApp : null;
+if (tg) {
+    if (parseFloat(tg.version) >= 6.1) {
+        tg.expand();
+        tg.setHeaderColor('#0F0F15');
+        tg.setBackgroundColor('#0F0F15');
+    } else {
+        tg.expand();
+    }
+}
 
+const initData = IS_WEBAPP ? (tg?.initData || '') : '';
 
-const initData = tg?.initData || '';
+// ==== AUTH HELPERS ====
+const _getAuthHeaders = () => {
+    if (IS_WEBAPP) return { 'X-Telegram-Init-Data': initData };
+    const token = localStorage.getItem('f1hub_auth_token');
+    return token ? { 'Authorization': 'TgLogin ' + token } : {};
+};
 
 // ==== API CLIENT ====
 const api = {
     get: async (url) => {
         try {
-            const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': initData } });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetch(url, { headers: _getAuthHeaders() });
+            if (!IS_WEBAPP && res.status === 401) {
+                window.dispatchEvent(new CustomEvent('f1:auth-expired'));
+                return null;
+            }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             return await res.json();
-        } catch (err) { console.error(`API GET ${url}:`, err); return null; }
+        } catch (err) { console.error('API GET ' + url + ':', err); return null; }
     },
     post: async (url, body) => {
         try {
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+                headers: { 'Content-Type': 'application/json', ..._getAuthHeaders() },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!IS_WEBAPP && res.status === 401) {
+                window.dispatchEvent(new CustomEvent('f1:auth-expired'));
+                return null;
+            }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             return await res.json();
-        } catch (err) { console.error(`API POST ${url}:`, err); return null; }
+        } catch (err) { console.error('API POST ' + url + ':', err); return null; }
     }
 };
 
@@ -4060,12 +4084,51 @@ const GamesPage = ({onChange}) => {
     );
 };
 
+// ==== PUBLIC LOGIN (Login Widget) ====
+const PublicLoginPage = ({ onLogin }) => {
+    const containerRef = useRef(null);
+    useEffect(() => {
+        if (!containerRef.current) return;
+        // Telegram Login Widget callback
+        window.__onTelegramAuth = (tgUser) => {
+            // Build query string from widget data
+            const params = new URLSearchParams();
+            Object.keys(tgUser).forEach(k => params.set(k, tgUser[k]));
+            const qs = params.toString();
+            localStorage.setItem('f1hub_auth_token', qs);
+            onLogin(tgUser);
+        };
+        const script = document.createElement('script');
+        script.src = 'https://telegram.org/js/telegram-widget.js?22';
+        script.setAttribute('data-telegram-login', 'F1_egor_bot');
+        script.setAttribute('data-size', 'large');
+        script.setAttribute('data-radius', '12');
+        script.setAttribute('data-onauth', '__onTelegramAuth(user)');
+        script.setAttribute('data-request-access', 'write');
+        script.async = true;
+        containerRef.current.appendChild(script);
+    }, []);
+    return (
+        <div style={{height:'100dvh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,padding:32}}>
+            <div style={{fontSize:28,fontWeight:900}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></div>
+            <div style={{fontSize:14,color:'var(--f1-text-secondary)',textAlign:'center',maxWidth:300,lineHeight:1.5}}>
+                Войдите через Telegram, чтобы получить доступ к прогнозам, играм и персональной статистике
+            </div>
+            <div ref={containerRef}></div>
+            <button onClick={() => onLogin(null)} className="btn-primary" style={{marginTop:8,background:'transparent',border:'1px solid var(--f1-border)',fontSize:13,padding:'10px 20px'}}>
+                Продолжить без входа
+            </button>
+        </div>
+    );
+};
+
 // ==== MAIN APP ====
 const App = () => {
     const [tab, setTab] = useState('home');
     const [currentSeason, setCurrentSeason] = useState(2026);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
+    const [showLogin, setShowLogin] = useState(false);
     const [nextRace, setNextRace] = useState(null);
     const [lastRace, setLastRace] = useState(null);
     const [schedule, setSchedule] = useState(null);
@@ -4088,15 +4151,40 @@ const App = () => {
 
     useEffect(() => {
         (async () => {
-            const [u, s] = await Promise.all([api.get('/api/user/me'), api.get('/api/live/session')]);
-            setUser(u); setSession(s); setLoading(false);
-            // Check admin status
-            if (u?.user_id) {
-                api.get('/api/user/is-admin').then(d => {
-                    if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id];
-                }).catch(()=>{});
+            if (IS_WEBAPP) {
+                const [u, s] = await Promise.all([api.get('/api/user/me'), api.get('/api/live/session')]);
+                setUser(u); setSession(s); setLoading(false);
+                if (u?.user_id) {
+                    api.get('/api/user/is-admin').then(d => {
+                        if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id];
+                    }).catch(()=>{});
+                }
+            } else {
+                // Public site: try stored auth, otherwise load anonymously
+                const token = localStorage.getItem('f1hub_auth_token');
+                const s = await api.get('/api/live/session');
+                setSession(s);
+                if (token) {
+                    const u = await api.get('/api/user/me');
+                    if (u) { setUser(u); setLoading(false); return; }
+                    // Token expired, clear it
+                    localStorage.removeItem('f1hub_auth_token');
+                }
+                setLoading(false);
             }
         })();
+    }, []);
+
+    // Public site: listen for auth-expired events
+    useEffect(() => {
+        if (IS_WEBAPP) return;
+        const handler = () => {
+            localStorage.removeItem('f1hub_auth_token');
+            setUser(null);
+            setShowLogin(true);
+        };
+        window.addEventListener('f1:auth-expired', handler);
+        return () => window.removeEventListener('f1:auth-expired', handler);
     }, []);
 
     useEffect(() => {
@@ -4150,6 +4238,28 @@ const App = () => {
             <div className="f1-lights"><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/><div className="f1-light"/></div>
         </div>
     );
+
+    // Public site: show login page when requested or for auth-required tabs
+    if (!IS_WEBAPP && showLogin) {
+        return <PublicLoginPage onLogin={(tgUser) => {
+            setShowLogin(false);
+            if (tgUser) {
+                api.get('/api/user/me').then(u => { if (u) setUser(u); });
+            }
+        }} />;
+    }
+
+    // Public: tabs requiring auth → prompt login
+    const needsAuth = !IS_WEBAPP && !user && (tab === 'predict' || tab === 'profile' || tab === 'games');
+    if (needsAuth) {
+        return <PublicLoginPage onLogin={(tgUser) => {
+            if (tgUser) {
+                api.get('/api/user/me').then(u => { if (u) setUser(u); });
+            } else {
+                setTab('home');
+            }
+        }} />;
+    }
 
     const renderTab = () => {
         switch(tab) {

@@ -7,7 +7,8 @@ services:
       - "127.0.0.1:8002:8000"
     volumes:
       - ./data:/app/data
-      - ./index.html:/app/index.html:ro
+      - ./webapp.html:/app/webapp.html:ro
+      - ./public.html:/app/public.html:ro
       - ./static:/app/static:ro
     env_file: .env
     healthcheck:
