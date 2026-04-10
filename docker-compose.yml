@@ -7,6 +7,12 @@ services:
       - "127.0.0.1:8002:8000"
     volumes:
       - ./data:/app/data
+      - ./api.py:/app/api.py:ro
+      - ./config.py:/app/config.py:ro
+      - ./f1_data.py:/app/f1_data.py:ro
+      - ./database.py:/app/database.py:ro
+      - ./f1_live.py:/app/f1_live.py:ro
+      - ./settle_predictions.py:/app/settle_predictions.py:ro
       - ./webapp.html:/app/webapp.html:ro
       - ./public.html:/app/public.html:ro
       - ./static:/app/static:ro
@@ -25,6 +31,9 @@ services:
     command: python bot.py
     volumes:
       - ./data:/app/data
+      - ./bot.py:/app/bot.py:ro
+      - ./config.py:/app/config.py:ro
+      - ./database.py:/app/database.py:ro
     env_file: .env
     depends_on:
       api:

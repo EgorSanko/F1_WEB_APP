@@ -7,8 +7,8 @@ __pycache__/
 *.pyc
 .DS_Store
 *.log
+*.bak
+*.orig
 test-*.html
 node_modules/
 package-lock.json
-index-old.html
-static/app.min.js.map
