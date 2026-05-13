@@ -15,8 +15,11 @@ import { Image } from 'expo-image';
 
 import { useAuth } from '@/lib/auth';
 import { api, setTgAuth } from '@/lib/api';
+import { router } from 'expo-router';
 
-const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
+  { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
+  { icon: 'newspaper-outline', label: 'Новости', href: '/news' },
   { icon: 'list-outline', label: 'Мои прогнозы' },
   { icon: 'notifications-outline', label: 'Уведомления' },
   { icon: 'settings-outline', label: 'Настройки' },
@@ -231,6 +234,7 @@ export default function ProfileScreen() {
             {MENU.map((m, i) => (
               <Pressable
                 key={i}
+                onPress={() => m.href && router.push(m.href as never)}
                 className={`flex-row items-center py-4 ${
                   i < MENU.length - 1 ? 'border-b border-line' : ''
                 }`}>

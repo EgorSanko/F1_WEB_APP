@@ -76,24 +76,85 @@ export type Race = {
   sprint?: { datetime?: string } | null;
 };
 
-export type DriverStanding = {
-  position: number;
-  driver_id: string;
-  full_name: string;
-  number?: number;
-  constructor?: string;
-  points: number;
-  wins?: number;
+export type Driver = {
+  driver_number: number;
+  name: string;
+  first_name?: string;
+  last_name?: string;
+  code?: string;
+  team?: string;
+  team_color?: string;
+  country?: string;
   photo_url?: string;
   card_photo_url?: string;
+  photo_url_large?: string;
+  position?: number;
+  points?: number;
+  wins?: number;
+};
+
+export type DriverStanding = Driver & {
+  position: number;
+  points: number;
+  gap_to_leader?: number;
 };
 
 export type ConstructorStanding = {
   position: number;
-  constructor_id: string;
-  name: string;
+  team: string;
+  team_color?: string;
   points: number;
+  gap_to_leader?: number;
   wins?: number;
+  nationality?: string;
+  drivers?: Driver[];
+};
+
+export type RaceResultDriver = Driver & {
+  position: number;
+  grid?: number;
+  laps?: number;
+  status?: string;
+  is_dnf?: boolean;
+  points: number;
+  time?: string;
+  gap?: string;
+  fastest_lap_time?: string;
+  fastest_lap_rank?: number;
+  fastest_lap_lap?: number;
+};
+
+export type RaceResults = {
+  round: number;
+  name: string;
+  circuit?: string;
+  country?: string;
+  date: string;
+  results: RaceResultDriver[];
+};
+
+export type QualifyingDriver = Driver & {
+  position: number;
+  q1?: string;
+  q2?: string;
+  q3?: string;
+};
+
+export type QualifyingResults = {
+  round: number;
+  name: string;
+  date: string;
+  results: QualifyingDriver[];
+};
+
+export type NewsPost = {
+  url: string;
+  title: string;
+  preview?: string;
+  image?: string;
+  photo?: string;
+  source?: string;
+  published_at?: string;
 };
 
 export type HomeData = {
@@ -134,16 +195,24 @@ export const api = {
   raceNext: () => apiFetch<Race>('/api/race/next', { auth: false }),
   raceLast: () => apiFetch<Race>('/api/race/last', { auth: false }),
   raceResults: (round: number) =>
-    apiFetch(`/api/race/${round}/results`, { auth: false }),
+    apiFetch<RaceResults>(`/api/race/${round}/results`, { auth: false }),
   raceQualifying: (round: number) =>
-    apiFetch(`/api/race/${round}/qualifying`, { auth: false }),
+    apiFetch<QualifyingResults>(`/api/race/${round}/qualifying`, { auth: false }),
   raceTyres: (round: number) =>
-    apiFetch(`/api/race/${round}/tyres`, { auth: false }),
+    apiFetch<{ detail?: string; strategies?: unknown[] }>(
+      `/api/race/${round}/tyres`,
+      { auth: false },
+    ),
   standingsDrivers: () =>
-    apiFetch<DriverStanding[]>('/api/standings/drivers', { auth: false }),
+    apiFetch<{ standings: DriverStanding[] }>('/api/standings/drivers', {
+      auth: false,
+    }),
   standingsConstructors: () =>
-    apiFetch<ConstructorStanding[]>('/api/standings/constructors', { auth: false }),
-  news: () => apiFetch('/api/news', { auth: false }),
+    apiFetch<{ standings: ConstructorStanding[] }>(
+      '/api/standings/constructors',
+      { auth: false },
+    ),
+  news: () => apiFetch<{ posts: NewsPost[] }>('/api/news', { auth: false }),
   broadcasts: () => apiFetch('/api/broadcasts', { auth: false }),
 
   // Auth

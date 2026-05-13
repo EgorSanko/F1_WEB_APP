@@ -124,6 +124,46 @@ export default function HomeScreen() {
             </>
           )}
 
+          {/* Standings top-3 quick links */}
+          {home.data?.standings_top3 && home.data.standings_top3.length > 0 && (
+            <>
+              <View className="px-5 mt-7 mb-3 flex-row items-center justify-between">
+                <Text className="text-text text-xl font-extrabold">Таблица сезона</Text>
+                <Link href="/standings" asChild>
+                  <Pressable className="flex-row items-center">
+                    <Text className="text-muted text-sm font-semibold mr-1">Все</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#A0A0B0" />
+                  </Pressable>
+                </Link>
+              </View>
+              <View className="px-4 gap-2">
+                {home.data.standings_top3.slice(0, 3).map((d, i) => (
+                  <View
+                    key={d.driver_number}
+                    className="bg-surface rounded-xl p-3 border border-line flex-row items-center">
+                    <Text className="text-text font-extrabold w-7 text-center">{i + 1}</Text>
+                    <View
+                      className="w-1 h-10 rounded-full mx-2"
+                      style={{ backgroundColor: d.team_color || '#666' }}
+                    />
+                    {d.photo_url ? (
+                      <Image
+                        source={{ uri: d.photo_url }}
+                        style={{ width: 36, height: 36, borderRadius: 18 }}
+                        contentFit="cover"
+                      />
+                    ) : null}
+                    <View className="flex-1 ml-3">
+                      <Text className="text-text font-bold">{d.name}</Text>
+                      <Text className="text-muted text-xs">{d.team}</Text>
+                    </View>
+                    <Text className="text-text font-extrabold">{d.points}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <>

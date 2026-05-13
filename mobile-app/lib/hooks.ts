@@ -30,7 +30,19 @@ export const useRaceResults = (round: number | null) =>
     queryKey: ['race', round, 'results'],
     queryFn: () => api.raceResults(round!),
     enabled: round != null,
+    retry: false,
   });
+
+export const useRaceQualifying = (round: number | null) =>
+  useQuery({
+    queryKey: ['race', round, 'qualifying'],
+    queryFn: () => api.raceQualifying(round!),
+    enabled: round != null,
+    retry: false,
+  });
+
+export const useNews = () =>
+  useQuery({ queryKey: ['news'], queryFn: api.news, staleTime: 5 * 60_000 });
 
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
