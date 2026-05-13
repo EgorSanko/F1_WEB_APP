@@ -1,10 +1,20 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
-import { signInWithTelegram, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
+import { api, setTgAuth } from '@/lib/api';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { icon: 'list-outline', label: 'Мои прогнозы' },
@@ -15,17 +25,46 @@ const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
 
 export default function ProfileScreen() {
   const { user, isAdmin, isLoading, refresh, logout } = useAuth();
+  const [showCodeForm, setShowCodeForm] = useState(false);
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const handleLogin = async () => {
+  const openBot = async () => {
+    setShowCodeForm(true);
+    try {
+      await Linking.openURL('https://t.me/F1_egor_bot?start=code');
+    } catch {
+      // tg:// fallback
+      try {
+        await Linking.openURL('tg://resolve?domain=F1_egor_bot');
+      } catch {
+        Alert.alert(
+          'Telegram не открылся',
+          'Открой Telegram вручную, напиши боту @F1_egor_bot команду /code и введи код ниже.',
+        );
+      }
+    }
+  };
+
+  const submitCode = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      Alert.alert('Введите код');
+      return;
+    }
     setBusy(true);
     try {
-      const res = await signInWithTelegram();
-      if (res?.user) {
-        await refresh();
-      }
+      const res = await api.authCode(trimmed);
+      // `token` is the Login-Widget-compatible query string we send as TgLogin header
+      await setTgAuth(res.token);
+      await refresh();
+      setShowCodeForm(false);
+      setCode('');
     } catch (e: unknown) {
-      Alert.alert('Ошибка входа', e instanceof Error ? e.message : 'Не удалось войти');
+      Alert.alert(
+        'Не удалось войти',
+        e instanceof Error ? e.message : 'Неизвестная ошибка',
+      );
     } finally {
       setBusy(false);
     }
@@ -50,33 +89,64 @@ export default function ProfileScreen() {
     return (
       <View className="flex-1 bg-bg">
         <SafeAreaView edges={['top']} className="flex-1">
-          <View className="px-5 pt-2 pb-3">
-            <Text className="text-text text-3xl font-extrabold">Профиль</Text>
-          </View>
-          <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line items-center">
-            <View className="w-20 h-20 rounded-full bg-surface-2 items-center justify-center">
-              <Ionicons name="person" size={40} color="#A0A0B0" />
+          <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+            <View className="px-5 pt-2 pb-3">
+              <Text className="text-text text-3xl font-extrabold">Профиль</Text>
             </View>
-            <Text className="text-text text-lg font-bold mt-4">
-              Войдите, чтобы делать прогнозы
-            </Text>
-            <Text className="text-muted text-sm mt-1 text-center">
-              Сохраняем статистику, push о гонках
-            </Text>
-            <Pressable
-              onPress={handleLogin}
-              disabled={busy}
-              className="bg-red rounded-full px-6 py-3 mt-5 w-full items-center flex-row justify-center active:opacity-80">
-              {busy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="paper-plane" size={16} color="#fff" />
-                  <Text className="text-text font-bold ml-2">Войти через Telegram</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+
+            <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line items-center">
+              <View className="w-20 h-20 rounded-full bg-surface-2 items-center justify-center">
+                <Ionicons name="person" size={40} color="#A0A0B0" />
+              </View>
+              <Text className="text-text text-lg font-bold mt-4">
+                Войдите, чтобы делать прогнозы
+              </Text>
+              <Text className="text-muted text-sm mt-1 text-center">
+                Сохраняем статистику, push о гонках
+              </Text>
+              <Pressable
+                onPress={openBot}
+                className="bg-red rounded-full px-6 py-3 mt-5 w-full items-center flex-row justify-center active:opacity-80">
+                <Ionicons name="paper-plane" size={16} color="#fff" />
+                <Text className="text-text font-bold ml-2">Войти через Telegram</Text>
+              </Pressable>
+            </View>
+
+            {showCodeForm && (
+              <View className="mx-4 mt-3 bg-surface rounded-2xl p-5 border border-line">
+                <Text className="text-text font-bold mb-1">Введите код из Telegram</Text>
+                <Text className="text-muted text-xs mb-3 leading-5">
+                  В чате с @F1_egor_bot отправь команду <Text className="text-text font-bold">/code</Text> — бот пришлёт 6-значный код. Введи его ниже.
+                </Text>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  placeholder="123456"
+                  placeholderTextColor="#6B6B7B"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                  className="bg-surface-2 text-text text-2xl font-extrabold tracking-[8px] text-center px-4 py-3 rounded-xl border border-line"
+                  style={{ letterSpacing: 8 }}
+                />
+                <Pressable
+                  onPress={submitCode}
+                  disabled={busy || code.length < 4}
+                  className={`bg-red rounded-full py-3 mt-3 items-center ${
+                    busy || code.length < 4 ? 'opacity-50' : ''
+                  }`}>
+                  {busy ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text className="text-text font-bold">Войти</Text>
+                  )}
+                </Pressable>
+                <Pressable onPress={openBot} className="py-3 items-center">
+                  <Text className="text-muted text-sm">Открыть бота ещё раз</Text>
+                </Pressable>
+              </View>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </View>
     );
@@ -117,12 +187,13 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <View className="bg-surface-2 px-3 py-1 rounded-full mt-2">
-                <Text className="text-muted text-[11px] font-bold tracking-widest">ID {user.user_id}</Text>
+                <Text className="text-muted text-[11px] font-bold tracking-widest">
+                  ID {user.user_id}
+                </Text>
               </View>
             )}
           </View>
 
-          {/* Stats */}
           <View className="flex-row mt-6 px-4">
             <View className="flex-1 items-center">
               <Text className="text-text text-2xl font-extrabold">
@@ -149,7 +220,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Achievements summary */}
           <View className="px-5 mt-7 flex-row items-center justify-between">
             <Text className="text-text text-lg font-extrabold">Достижения</Text>
             <Text className="text-muted text-sm font-semibold">
@@ -157,7 +227,6 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-          {/* Menu */}
           <View className="px-4 mt-6">
             {MENU.map((m, i) => (
               <Pressable
@@ -172,7 +241,6 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* Logout */}
           <Pressable onPress={handleLogout} className="px-4 mt-2">
             <View className="flex-row items-center py-4 border-t border-line">
               <Ionicons name="log-out-outline" size={22} color="#E10600" />
