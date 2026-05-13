@@ -20,9 +20,11 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
-            <Text className="text-text text-2xl font-extrabold tracking-tight">
-              F1<Text className="text-red">/HUB</Text>
-            </Text>
+            <Image
+              source={require('../../assets/images/logo-f1hub.png')}
+              style={{ width: 110, height: 40 }}
+              contentFit="contain"
+            />
             <Pressable className="w-10 h-10 rounded-full bg-surface items-center justify-center border border-line">
               <Ionicons name="notifications-outline" size={20} color="#FAFAFA" />
             </Pressable>
