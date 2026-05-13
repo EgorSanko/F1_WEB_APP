@@ -44,6 +44,13 @@ export const useRaceQualifying = (round: number | null) =>
 export const useNews = () =>
   useQuery({ queryKey: ['news'], queryFn: api.news, staleTime: 5 * 60_000 });
 
+export const useDriver = (number: number | null) =>
+  useQuery({
+    queryKey: ['driver', number],
+    queryFn: () => api.driver(number!),
+    enabled: number != null,
+  });
+
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
   if (!countryCode || countryCode.length !== 2) return '🏁';

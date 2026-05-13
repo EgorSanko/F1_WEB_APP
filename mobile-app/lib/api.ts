@@ -87,10 +87,33 @@ export type Driver = {
   country?: string;
   photo_url?: string;
   card_photo_url?: string;
+  card_photo_position?: string;
   photo_url_large?: string;
   position?: number;
   points?: number;
   wins?: number;
+};
+
+export type DriverSeasonResult = {
+  round: number;
+  race: string;
+  position?: number;
+  grid?: number;
+  points: number;
+  status?: string;
+};
+
+export type DriverProfile = Driver & {
+  season_stats: {
+    races: number;
+    points: number;
+    wins: number;
+    podiums: number;
+    dnfs: number;
+    best_finish: number;
+    results: DriverSeasonResult[];
+  };
+  teammate?: Driver;
 };
 
 export type DriverStanding = Driver & {
@@ -213,6 +236,8 @@ export const api = {
       { auth: false },
     ),
   news: () => apiFetch<{ posts: NewsPost[] }>('/api/news', { auth: false }),
+  driver: (number: number) =>
+    apiFetch<DriverProfile>(`/api/driver/${number}`, { auth: false }),
   broadcasts: () => apiFetch('/api/broadcasts', { auth: false }),
 
   // Auth
