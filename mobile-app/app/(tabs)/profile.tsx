@@ -1,8 +1,10 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 
-import { PROFILE } from '@/lib/mock';
+import { signInWithTelegram, useAuth } from '@/lib/auth';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { icon: 'list-outline', label: 'Мои прогнозы' },
@@ -11,14 +13,79 @@ const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { icon: 'help-circle-outline', label: 'Поддержка' },
 ];
 
-const ACHIEVEMENTS = [
-  { color: '#7F7F8F', icon: 'trophy' as const },
-  { color: '#E10600', icon: 'trophy' as const },
-  { color: '#A0A0B0', icon: 'trophy' as const },
-  { color: '#FFCB05', icon: 'trophy' as const },
-];
-
 export default function ProfileScreen() {
+  const { user, isAdmin, isLoading, refresh, logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+
+  const handleLogin = async () => {
+    setBusy(true);
+    try {
+      const res = await signInWithTelegram();
+      if (res?.user) {
+        await refresh();
+      }
+    } catch (e: unknown) {
+      Alert.alert('Ошибка входа', e instanceof Error ? e.message : 'Не удалось войти');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Выход', 'Точно выйти из аккаунта?', [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Выйти', style: 'destructive', onPress: logout },
+    ]);
+  };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-bg items-center justify-center">
+        <ActivityIndicator size="large" color="#E10600" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View className="flex-1 bg-bg">
+        <SafeAreaView edges={['top']} className="flex-1">
+          <View className="px-5 pt-2 pb-3">
+            <Text className="text-text text-3xl font-extrabold">Профиль</Text>
+          </View>
+          <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line items-center">
+            <View className="w-20 h-20 rounded-full bg-surface-2 items-center justify-center">
+              <Ionicons name="person" size={40} color="#A0A0B0" />
+            </View>
+            <Text className="text-text text-lg font-bold mt-4">
+              Войдите, чтобы делать прогнозы
+            </Text>
+            <Text className="text-muted text-sm mt-1 text-center">
+              Сохраняем статистику, push о гонках
+            </Text>
+            <Pressable
+              onPress={handleLogin}
+              disabled={busy}
+              className="bg-red rounded-full px-6 py-3 mt-5 w-full items-center flex-row justify-center active:opacity-80">
+              {busy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="paper-plane" size={16} color="#fff" />
+                  <Text className="text-text font-bold ml-2">Войти через Telegram</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Authenticated state
+  const displayName = user.first_name || user.username || 'Пользователь';
+  const handle = user.username ? `@${user.username}` : '';
+
   return (
     <View className="flex-1 bg-bg">
       <SafeAreaView edges={['top']} className="flex-1">
@@ -29,59 +96,65 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 140 }}
-          showsVerticalScrollIndicator={false}>
-          {/* Avatar + name */}
+        <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           <View className="items-center mt-4">
-            <View className="w-24 h-24 rounded-full bg-surface items-center justify-center border-2 border-red">
-              <Ionicons name="person" size={48} color="#A0A0B0" />
-            </View>
-            <Text className="text-text text-2xl font-extrabold mt-3">{PROFILE.name}</Text>
-            <Text className="text-muted text-sm">{PROFILE.username}</Text>
-            <View className="bg-red px-3 py-1 rounded-full mt-2">
-              <Text className="text-text text-[11px] font-bold tracking-widest">
-                {PROFILE.badge}
-              </Text>
-            </View>
+            {user.photo_url ? (
+              <Image
+                source={{ uri: user.photo_url }}
+                style={{ width: 96, height: 96, borderRadius: 48 }}
+                contentFit="cover"
+              />
+            ) : (
+              <View className="w-24 h-24 rounded-full bg-surface items-center justify-center border-2 border-red">
+                <Ionicons name="person" size={48} color="#A0A0B0" />
+              </View>
+            )}
+            <Text className="text-text text-2xl font-extrabold mt-3">{displayName}</Text>
+            {handle ? <Text className="text-muted text-sm">{handle}</Text> : null}
+            {isAdmin ? (
+              <View className="bg-red px-3 py-1 rounded-full mt-2">
+                <Text className="text-text text-[11px] font-bold tracking-widest">АДМИН</Text>
+              </View>
+            ) : (
+              <View className="bg-surface-2 px-3 py-1 rounded-full mt-2">
+                <Text className="text-muted text-[11px] font-bold tracking-widest">ID {user.user_id}</Text>
+              </View>
+            )}
           </View>
 
           {/* Stats */}
           <View className="flex-row mt-6 px-4">
             <View className="flex-1 items-center">
               <Text className="text-text text-2xl font-extrabold">
-                {PROFILE.points.toLocaleString('ru-RU')}
+                {(user.points ?? 0).toLocaleString('ru-RU')}
               </Text>
               <Text className="text-muted text-xs mt-1">Очков</Text>
             </View>
             <View className="w-px bg-line" />
             <View className="flex-1 items-center">
-              <Text className="text-text text-2xl font-extrabold">{PROFILE.predictions}</Text>
+              <Text className="text-text text-2xl font-extrabold">
+                {user.predictions_total ?? 0}
+              </Text>
               <Text className="text-muted text-xs mt-1">Прогнозов</Text>
             </View>
             <View className="w-px bg-line" />
             <View className="flex-1 items-center">
-              <Text className="text-text text-2xl font-extrabold">{PROFILE.accuracy}%</Text>
+              <Text className="text-text text-2xl font-extrabold">
+                {user.predictions_total
+                  ? Math.round(((user.predictions_correct ?? 0) / user.predictions_total) * 100)
+                  : 0}
+                %
+              </Text>
               <Text className="text-muted text-xs mt-1">Точность</Text>
             </View>
           </View>
 
-          {/* Achievements */}
+          {/* Achievements summary */}
           <View className="px-5 mt-7 flex-row items-center justify-between">
             <Text className="text-text text-lg font-extrabold">Достижения</Text>
-            <Pressable className="flex-row items-center">
-              <Text className="text-muted text-sm font-semibold mr-1">Все</Text>
-              <Ionicons name="chevron-forward" size={14} color="#A0A0B0" />
-            </Pressable>
-          </View>
-          <View className="flex-row gap-3 px-4 mt-3">
-            {ACHIEVEMENTS.map((a, i) => (
-              <View
-                key={i}
-                className="flex-1 aspect-square bg-surface rounded-2xl items-center justify-center border border-line">
-                <Ionicons name={a.icon} size={28} color={a.color} />
-              </View>
-            ))}
+            <Text className="text-muted text-sm font-semibold">
+              {user.achievements_count ?? 0} / {user.achievements_total ?? 0}
+            </Text>
           </View>
 
           {/* Menu */}
@@ -100,7 +173,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Logout */}
-          <Pressable className="px-4 mt-2">
+          <Pressable onPress={handleLogout} className="px-4 mt-2">
             <View className="flex-row items-center py-4 border-t border-line">
               <Ionicons name="log-out-outline" size={22} color="#E10600" />
               <Text className="text-red text-base font-semibold ml-3 flex-1">Выйти</Text>
