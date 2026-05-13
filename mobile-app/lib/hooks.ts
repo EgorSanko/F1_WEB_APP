@@ -69,6 +69,34 @@ export const useMyPredictions = (enabled = true) =>
 export const useLeaderboard = () =>
   useQuery({ queryKey: ['leaderboard'], queryFn: api.leaderboard });
 
+export const useDrivers = (season = 2026) =>
+  useQuery({
+    queryKey: ['drivers', season],
+    queryFn: () => api.drivers(season),
+    staleTime: 60 * 60_000,
+  });
+
+export const useTeams = (season = 2026) =>
+  useQuery({
+    queryKey: ['teams', season],
+    queryFn: () => api.teams(season),
+    staleTime: 60 * 60_000,
+  });
+
+export const useHeadToHead = (season = 2026) =>
+  useQuery({
+    queryKey: ['h2h', season],
+    queryFn: () => api.headToHead(season),
+    staleTime: 5 * 60_000,
+  });
+
+export const usePointsProgression = (season = 2026) =>
+  useQuery({
+    queryKey: ['progression', season],
+    queryFn: () => api.pointsProgression(season),
+    staleTime: 5 * 60_000,
+  });
+
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
   if (!countryCode || countryCode.length !== 2) return '🏁';

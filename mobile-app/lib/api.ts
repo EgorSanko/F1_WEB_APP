@@ -227,6 +227,47 @@ export type Prediction = {
   resolved_at?: string;
 };
 
+export type Team = {
+  name: string;
+  color?: string;
+  logo_url?: string;
+  car_url?: string;
+  drivers?: Driver[];
+};
+
+export type H2HPilot = {
+  name: string; // code like "ANT"
+  full_name: string;
+  number: number;
+  points: number;
+  wins: number;
+  photo_url?: string;
+};
+
+export type H2HPair = {
+  team: string;
+  color?: string;
+  driver1: H2HPilot;
+  driver2: H2HPilot;
+};
+
+export type PointsProgressionDriver = {
+  driver_number: number;
+  code: string;
+  name: string;
+  team: string;
+  team_color?: string;
+  total_points: number;
+  progression: { round: number; cumulative: number }[];
+};
+
+export type PointsProgression = {
+  drivers: PointsProgressionDriver[];
+  rounds: number[];
+  total_rounds: number;
+  season: number;
+};
+
 export type LeaderboardEntry = {
   user_id: number;
   username?: string;
@@ -297,6 +338,22 @@ export const api = {
   news: () => apiFetch<{ posts: NewsPost[] }>('/api/news', { auth: false }),
   driver: (number: number) =>
     apiFetch<DriverProfile>(`/api/driver/${number}`, { auth: false }),
+  drivers: (season = 2026) =>
+    apiFetch<{ drivers: Driver[] }>(`/api/drivers?season=${season}`, { auth: false }),
+  teams: (season = 2026) =>
+    apiFetch<{ teams: Team[]; season: number }>(`/api/teams?season=${season}`, {
+      auth: false,
+    }),
+  headToHead: (season = 2026) =>
+    apiFetch<{ season: number; head_to_head: H2HPair[] }>(
+      `/api/head-to-head?season=${season}`,
+      { auth: false },
+    ),
+  pointsProgression: (season = 2026) =>
+    apiFetch<PointsProgression>(
+      `/api/standings/points-progression?season=${season}`,
+      { auth: false },
+    ),
   broadcasts: () => apiFetch('/api/broadcasts', { auth: false }),
 
   // Auth
