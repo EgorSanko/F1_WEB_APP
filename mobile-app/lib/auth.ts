@@ -18,26 +18,38 @@ import { api, clearTgAuth, setTgAuth, type User } from './api';
 const TG_BOT_ID =
   (Constants.expoConfig?.extra?.tgBotId as string) ?? '8471280241';
 
-const RETURN_URL = 'https://f1hub.lead-seek.ru/app/auth-callback';
 const ORIGIN = 'https://f1hub.lead-seek.ru';
+const CALLBACK_BASE = 'https://f1hub.lead-seek.ru/app/auth-callback';
+
+/**
+ * The URL the mobile app listens for. In Expo Go this resolves to
+ * exp://192.168.x.x:8081/--/auth; in a dev/standalone build it's f1hub://auth.
+ * We pass this to the backend as `back=...` so it can bounce the OAuth
+ * payload back to whichever runtime is currently active.
+ */
+function appReturnUrl(): string {
+  return Linking.createURL('auth');
+}
 
 function buildTelegramOAuthUrl() {
+  const back = appReturnUrl();
+  const returnTo = `${CALLBACK_BASE}?back=${encodeURIComponent(back)}`;
   const params = new URLSearchParams({
     bot_id: TG_BOT_ID,
     origin: ORIGIN,
     request_access: 'write',
-    return_to: RETURN_URL,
+    return_to: returnTo,
   });
   return `https://oauth.telegram.org/auth?${params.toString()}`;
 }
 
 /**
  * Open Telegram OAuth and return the auth query string if successful.
- * The query string is the part after `?` in the returned f1hub://auth?... URL.
  */
 export async function signInWithTelegram(): Promise<{ user: User } | null> {
   const oauthUrl = buildTelegramOAuthUrl();
-  const result = await WebBrowser.openAuthSessionAsync(oauthUrl, 'f1hub://auth');
+  const back = appReturnUrl();
+  const result = await WebBrowser.openAuthSessionAsync(oauthUrl, back);
 
   if (result.type !== 'success' || !result.url) {
     return null;
