@@ -180,6 +180,55 @@ export type NewsPost = {
   published_at?: string;
 };
 
+export type PredictionType =
+  | 'winner'
+  | 'podium'
+  | 'fastest_lap'
+  | 'dnf_count'
+  | 'safety_car';
+
+export type PredictionTypeInfo = {
+  type: PredictionType;
+  label: string;
+  description: string;
+  max_points: number;
+  already_predicted: boolean;
+};
+
+export type PredictionsAvailable = {
+  available: true;
+  race: Race;
+  predictions: PredictionTypeInfo[];
+  drivers: Driver[];
+};
+
+export type PredictionsUnavailable = { available: false; message?: string };
+
+export type Prediction = {
+  id: number;
+  race_round: number;
+  season: number;
+  prediction_type: PredictionType;
+  prediction_value: unknown;
+  points_bet?: number;
+  points_won?: number;
+  status: 'pending' | 'correct' | 'incorrect' | 'partial';
+  created_at?: string;
+  resolved_at?: string;
+};
+
+export type LeaderboardEntry = {
+  user_id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  photo_url?: string;
+  points: number;
+  rank: number;
+  predictions_correct?: number;
+  predictions_total?: number;
+};
+
 export type HomeData = {
   next_race: Race;
   last_race?: Race & { results?: unknown[] };
@@ -257,19 +306,33 @@ export const api = {
   // Authenticated
   me: () => apiFetch<User>('/api/user/me'),
   isAdmin: () => apiFetch<{ is_admin: boolean }>('/api/user/is-admin'),
-  myPredictions: () => apiFetch('/api/user/predictions'),
-  predictionsAvailable: () => apiFetch('/api/predictions/available'),
+  myPredictions: () =>
+    apiFetch<{ settled: Prediction[]; pending: Prediction[]; total_won: number }>(
+      '/api/predictions/results',
+    ),
+  predictionsAvailable: () =>
+    apiFetch<PredictionsAvailable | PredictionsUnavailable>(
+      '/api/predictions/available',
+    ),
   predictMake: (payload: {
     race_round: number;
-    prediction_type: string;
+    season?: number;
+    prediction_type: PredictionType;
     prediction_value: unknown;
+    points_bet?: number;
   }) =>
-    apiFetch('/api/predictions/make', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    apiFetch<{ status: 'ok'; prediction_id: number; new_achievements?: string[] }>(
+      '/api/predictions/make',
+      {
+        method: 'POST',
+        body: JSON.stringify({ season: 2026, points_bet: 0, ...payload }),
+      },
+    ),
   achievements: () => apiFetch('/api/user/achievements'),
-  leaderboard: () => apiFetch('/api/leaderboard'),
+  leaderboard: () =>
+    apiFetch<{ leaderboard: LeaderboardEntry[] } | LeaderboardEntry[]>(
+      '/api/leaderboard',
+    ),
   setFavorite: (payload: { driver?: number; team?: string }) =>
     apiFetch('/api/user/favorite', {
       method: 'POST',

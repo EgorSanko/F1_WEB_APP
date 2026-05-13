@@ -18,9 +18,10 @@ import { api, setTgAuth } from '@/lib/api';
 import { router } from 'expo-router';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
+  { icon: 'list-outline', label: 'Мои прогнозы', href: '/my-predictions' },
+  { icon: 'people-outline', label: 'Топ игроков', href: '/leaderboard' },
   { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
   { icon: 'newspaper-outline', label: 'Новости', href: '/news' },
-  { icon: 'list-outline', label: 'Мои прогнозы' },
   { icon: 'notifications-outline', label: 'Уведомления' },
   { icon: 'settings-outline', label: 'Настройки' },
   { icon: 'help-circle-outline', label: 'Поддержка' },

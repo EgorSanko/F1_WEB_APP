@@ -51,6 +51,24 @@ export const useDriver = (number: number | null) =>
     enabled: number != null,
   });
 
+export const usePredictionsAvailable = (enabled = true) =>
+  useQuery({
+    queryKey: ['predictions', 'available'],
+    queryFn: api.predictionsAvailable,
+    enabled,
+    staleTime: 30_000,
+  });
+
+export const useMyPredictions = (enabled = true) =>
+  useQuery({
+    queryKey: ['predictions', 'mine'],
+    queryFn: api.myPredictions,
+    enabled,
+  });
+
+export const useLeaderboard = () =>
+  useQuery({ queryKey: ['leaderboard'], queryFn: api.leaderboard });
+
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
   if (!countryCode || countryCode.length !== 2) return '🏁';
