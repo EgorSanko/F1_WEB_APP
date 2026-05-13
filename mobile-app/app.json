@@ -1,0 +1,89 @@
+{
+  "expo": {
+    "name": "F1 Hub",
+    "slug": "f1hub-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "f1hub",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#15151E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ru.leadseek.f1hub",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserNotificationsUsageDescription": "Уведомления о начале гонки и закрытии прогнозов",
+        "LSApplicationQueriesSchemes": ["tg", "telegram"]
+      },
+      "associatedDomains": ["applinks:f1hub.lead-seek.ru"]
+    },
+    "android": {
+      "package": "ru.leadseek.f1hub",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#15151E"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["NOTIFICATIONS", "VIBRATE", "INTERNET"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["DEFAULT", "BROWSABLE"],
+          "data": [
+            { "scheme": "f1hub" },
+            {
+              "scheme": "https",
+              "host": "f1hub.lead-seek.ru",
+              "pathPrefix": "/app"
+            }
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#E10600",
+          "defaultChannel": "default"
+        }
+      ],
+      ["expo-apple-authentication"]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": ""
+      },
+      "apiBaseUrl": "https://f1hub.lead-seek.ru",
+      "tgBotUsername": "F1_egor_bot",
+      "tgBotId": "8471280241"
+    }
+  }
+}
