@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 
-import { useMyPredictions } from '@/lib/hooks';
+import { useMyPredictions, useSchedule, flagFor } from '@/lib/hooks';
 import type { Prediction, PredictionType } from '@/lib/api';
 
 const TYPE_LABEL: Record<PredictionType, string> = {
@@ -29,8 +29,29 @@ export default function MyPredictionsScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<'pending' | 'settled'>('pending');
   const data = useMyPredictions();
+  const schedule = useSchedule();
 
   const list = tab === 'pending' ? data.data?.pending ?? [] : data.data?.settled ?? [];
+
+  const raceByRound = useMemo(() => {
+    const m = new Map<number, { name: string; country_code?: string }>();
+    schedule.data?.races.forEach((r) =>
+      m.set(r.round, { name: r.name, country_code: r.country_code }),
+    );
+    return m;
+  }, [schedule.data]);
+
+  // Group predictions by race_round
+  const grouped = useMemo(() => {
+    const m = new Map<number, Prediction[]>();
+    for (const p of list) {
+      if (!m.has(p.race_round)) m.set(p.race_round, []);
+      m.get(p.race_round)!.push(p);
+    }
+    return Array.from(m.entries()).sort(
+      (a, b) => (tab === 'pending' ? a[0] - b[0] : b[0] - a[0]),
+    );
+  }, [list, tab]);
 
   return (
     <View className="flex-1 bg-bg">
@@ -88,7 +109,7 @@ export default function MyPredictionsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}>
           {data.isLoading && <ActivityIndicator color="#E10600" />}
           {data.data && list.length === 0 && (
@@ -96,40 +117,66 @@ export default function MyPredictionsScreen() {
               {tab === 'pending' ? 'Нет ожидающих прогнозов' : 'Нет завершённых прогнозов'}
             </Text>
           )}
-          {list.map((p) => {
-            const status = STATUS_INFO[p.status];
+          {grouped.map(([round, preds]) => {
+            const race = raceByRound.get(round);
+            const totalEarned = preds.reduce((s, p) => s + (p.points_won ?? 0), 0);
             return (
-              <View
-                key={p.id}
-                className="bg-surface rounded-xl border border-line p-4">
-                <View className="flex-row items-center mb-2">
-                  <View className="flex-1">
-                    <Text className="text-text font-bold">
-                      Раунд {String(p.race_round).padStart(2, '0')} · {TYPE_LABEL[p.prediction_type]}
-                    </Text>
-                    <Text className="text-muted text-xs mt-0.5">
-                      {formatValue(p.prediction_type, p.prediction_value)}
-                    </Text>
-                  </View>
-                  <View
-                    className="px-2.5 py-1 rounded"
-                    style={{ backgroundColor: status.bg }}>
-                    <Text
-                      className="text-[10px] font-bold tracking-widest"
-                      style={{ color: status.color }}>
-                      {status.label.toUpperCase()}
-                    </Text>
-                  </View>
+              <View key={round} className="mb-5">
+                <View className="flex-row items-center px-1 mb-2">
+                  <Text className="text-text text-2xl font-extrabold mr-2">
+                    R{String(round).padStart(2, '0')}
+                  </Text>
+                  {race?.country_code ? (
+                    <Text className="text-xl mr-2">{flagFor(race.country_code)}</Text>
+                  ) : null}
+                  <Text className="text-text text-base font-bold flex-1" numberOfLines={1}>
+                    {race?.name ?? `Гран-при ${round}`}
+                  </Text>
+                  {tab === 'settled' && totalEarned > 0 && (
+                    <View className="bg-red/15 px-2 py-1 rounded">
+                      <Text className="text-red text-xs font-extrabold">
+                        +{totalEarned} оч.
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                {p.status !== 'pending' && (
-                  <View className="flex-row items-center mt-1">
-                    <Ionicons name="trophy-outline" size={14} color="#A0A0B0" />
-                    <Text className="text-muted text-xs ml-1">
-                      Получено: {' '}
-                      <Text className="text-text font-bold">+{p.points_won ?? 0}</Text> очков
-                    </Text>
-                  </View>
-                )}
+                <View className="bg-surface rounded-2xl border border-line overflow-hidden">
+                  {preds.map((p, i) => {
+                    const status = STATUS_INFO[p.status];
+                    return (
+                      <View
+                        key={p.id}
+                        className={`px-4 py-3 ${
+                          i < preds.length - 1 ? 'border-b border-line' : ''
+                        }`}>
+                        <View className="flex-row items-center">
+                          <View className="flex-1">
+                            <Text className="text-text font-bold">
+                              {TYPE_LABEL[p.prediction_type]}
+                            </Text>
+                            <Text className="text-muted text-xs mt-0.5">
+                              {formatValue(p.prediction_type, p.prediction_value)}
+                            </Text>
+                          </View>
+                          <View
+                            className="px-2.5 py-1 rounded ml-2"
+                            style={{ backgroundColor: status.bg }}>
+                            <Text
+                              className="text-[10px] font-bold tracking-widest"
+                              style={{ color: status.color }}>
+                              {status.label.toUpperCase()}
+                            </Text>
+                          </View>
+                          {p.status !== 'pending' && (
+                            <Text className="text-text font-extrabold text-sm ml-2 w-12 text-right">
+                              {p.points_won ? `+${p.points_won}` : '0'}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             );
           })}

@@ -41,20 +41,44 @@ export default function RaceDetail() {
   const tabs = isPast ? (['Расписание', 'Результаты', 'Квалификация'] as const) : baseTabs;
   const [tab, setTab] = useState<string>(tabs[0]);
 
-  // Group sessions by day
+  // Group sessions by day. /api/schedule returns sessions as a dict
+  // { fp1: { date, time }, qualifying: {...}, ... }, not an array.
   const sessionsByDay = useMemo(() => {
     if (!race?.sessions) return [];
+    const SESSION_ORDER = [
+      'fp1',
+      'fp2',
+      'fp3',
+      'sprint_qualifying',
+      'sprint',
+      'qualifying',
+      'race',
+    ] as const;
+    type S = (typeof SESSION_ORDER)[number];
+
+    const entries: { datetime: Date; dayKey: string; type: S }[] = [];
+    for (const type of SESSION_ORDER) {
+      const s = race.sessions[type];
+      if (!s?.date || !s?.time) continue;
+      // time is like "16:00:00Z", date is "2026-05-01"
+      const datetime = new Date(`${s.date}T${s.time.includes('Z') ? s.time : s.time + 'Z'}`);
+      if (Number.isNaN(datetime.getTime())) continue;
+      entries.push({ datetime, dayKey: datetime.toISOString().slice(0, 10), type });
+    }
+    entries.sort((a, b) => a.datetime.getTime() - b.datetime.getTime());
+
     const map = new Map<string, { day: string; sessions: { time: string; label: string }[] }>();
-    for (const s of race.sessions) {
-      const dt = new Date(s.datetime);
-      const dayKey = dt.toISOString().slice(0, 10);
-      const dayLabel = DAY_FMT.format(dt);
-      if (!map.has(dayKey)) {
-        map.set(dayKey, { day: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1), sessions: [] });
+    for (const e of entries) {
+      if (!map.has(e.dayKey)) {
+        const dayLabel = DAY_FMT.format(e.datetime);
+        map.set(e.dayKey, {
+          day: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
+          sessions: [],
+        });
       }
-      map.get(dayKey)!.sessions.push({
-        time: TIME_FMT.format(dt),
-        label: SESSION_LABELS[s.type] ?? s.type,
+      map.get(e.dayKey)!.sessions.push({
+        time: TIME_FMT.format(e.datetime),
+        label: SESSION_LABELS[e.type] ?? e.type,
       });
     }
     return Array.from(map.values());

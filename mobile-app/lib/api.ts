@@ -56,7 +56,17 @@ export async function apiFetch<T = unknown>(
 
 // ============ DOMAIN TYPES ============
 
-export type Session = { type: string; datetime: string };
+export type SessionEntry = { date: string; time: string };
+
+export type SessionsMap = {
+  fp1?: SessionEntry;
+  fp2?: SessionEntry;
+  fp3?: SessionEntry;
+  qualifying?: SessionEntry;
+  sprint_qualifying?: SessionEntry;
+  sprint?: SessionEntry;
+  race?: SessionEntry;
+};
 
 export type Race = {
   round: number;
@@ -72,8 +82,8 @@ export type Race = {
   date: string;
   time?: string;
   race_datetime: string;
-  sessions?: Session[];
-  sprint?: { datetime?: string } | null;
+  sessions?: SessionsMap;
+  sprint?: SessionEntry | null;
 };
 
 export type Driver = {
