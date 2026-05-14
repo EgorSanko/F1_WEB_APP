@@ -1,8 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import 'react-native-reanimated';
@@ -47,6 +48,19 @@ export default function RootLayout() {
       loadSpoiler();
     }
   }, [loaded, refreshAuth, loadSpoiler]);
+
+  // Handle taps on push notifications → deep-link to race detail
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as
+        | { type?: string; race_round?: number }
+        | undefined;
+      if (data?.type === 'race_reminder' && data.race_round) {
+        router.push(`/race/${data.race_round}` as never);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!loaded) return null;
 

@@ -14,6 +14,7 @@ import Constants from 'expo-constants';
 import { create } from 'zustand';
 
 import { api, clearTgAuth, setTgAuth, type User } from './api';
+import { registerPushNotifications, unregisterPushNotifications } from './push';
 
 const TG_BOT_ID =
   (Constants.expoConfig?.extra?.tgBotId as string) ?? '8471280241';
@@ -111,6 +112,8 @@ export const useAuth = create<AuthState>((set) => ({
       } catch {
         set({ isAdmin: false });
       }
+      // Best-effort push registration (silently fails in Expo Go without projectId)
+      registerPushNotifications().catch(() => {});
     } catch {
       set({ user: null, isAdmin: false });
     } finally {
@@ -118,6 +121,7 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
   logout: async () => {
+    await unregisterPushNotifications().catch(() => {});
     await signOut();
     set({ user: null, isAdmin: false });
   },
