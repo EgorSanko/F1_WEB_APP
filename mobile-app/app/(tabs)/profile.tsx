@@ -13,20 +13,28 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import Svg, { Polygon } from 'react-native-svg';
+import { router } from 'expo-router';
 
 import { useAuth } from '@/lib/auth';
 import { useSpoiler } from '@/lib/spoiler';
 import { absUrl, api, setTgAuth } from '@/lib/api';
-import { router } from 'expo-router';
 
-const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
-  { icon: 'list-outline', label: 'Мои прогнозы', href: '/my-predictions' },
-  { icon: 'heart-outline', label: 'Любимец сезона', href: '/favorite' },
-  { icon: 'game-controller-outline', label: 'Игры', href: '/games' },
-  { icon: 'people-outline', label: 'Топ игроков', href: '/leaderboard' },
-  { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
-  { icon: 'newspaper-outline', label: 'Новости', href: '/news' },
-  { icon: 'notifications-outline', label: 'Уведомления', href: '/notifications' },
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
+const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
+
+type MenuItem = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  href: string;
+};
+
+const MENU: MenuItem[] = [
+  { icon: 'trending-up', label: 'Мои прогнозы', href: '/my-predictions' },
+  { icon: 'heart', label: 'Любимец сезона', href: '/favorite' },
+  { icon: 'game-controller', label: 'Игры', href: '/games' },
+  { icon: 'people', label: 'Топ игроков', href: '/leaderboard' },
 ];
 
 export default function ProfileScreen() {
@@ -42,7 +50,6 @@ export default function ProfileScreen() {
     try {
       await Linking.openURL('https://t.me/F1_egor_bot?start=code');
     } catch {
-      // tg:// fallback
       try {
         await Linking.openURL('tg://resolve?domain=F1_egor_bot');
       } catch {
@@ -63,16 +70,12 @@ export default function ProfileScreen() {
     setBusy(true);
     try {
       const res = await api.authCode(trimmed);
-      // `token` is the Login-Widget-compatible query string we send as TgLogin header
       await setTgAuth(res.token);
       await refresh();
       setShowCodeForm(false);
       setCode('');
     } catch (e: unknown) {
-      Alert.alert(
-        'Не удалось войти',
-        e instanceof Error ? e.message : 'Неизвестная ошибка',
-      );
+      Alert.alert('Не удалось войти', e instanceof Error ? e.message : 'Неизвестная ошибка');
     } finally {
       setBusy(false);
     }
@@ -87,7 +90,7 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View style={{ flex: 1, backgroundColor: DARK_BG, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color="#E10600" />
       </View>
     );
@@ -95,18 +98,38 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 bg-bg">
-        <SafeAreaView edges={['top']} className="flex-1">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-            <View className="px-5 pt-2 pb-3">
-              <Text className="text-text text-3xl font-extrabold">Профиль</Text>
+            <View style={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 12 }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 32, fontWeight: '800' }}>Профиль</Text>
             </View>
 
-            <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line items-center">
-              <View className="w-20 h-20 rounded-full bg-surface-2 items-center justify-center">
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginTop: 8,
+                backgroundColor: CARD_BG,
+                borderRadius: 18,
+                padding: 24,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)',
+              }}>
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: '#1A1A24',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: '#E10600',
+                }}>
                 <Ionicons name="person" size={40} color="#A0A0B0" />
               </View>
-              <Text className="text-text text-lg font-bold mt-4">
+              <Text style={{ color: '#FAFAFA', fontSize: 16, fontWeight: '800', marginTop: 16 }}>
                 Войдите, чтобы делать прогнозы
               </Text>
               <Text className="text-muted text-sm mt-1 text-center">
@@ -114,17 +137,38 @@ export default function ProfileScreen() {
               </Text>
               <Pressable
                 onPress={openBot}
-                className="bg-red rounded-full px-6 py-3 mt-5 w-full items-center flex-row justify-center active:opacity-80">
+                style={{
+                  backgroundColor: '#E10600',
+                  borderRadius: 999,
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  marginTop: 18,
+                  width: '100%',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
                 <Ionicons name="paper-plane" size={16} color="#fff" />
                 <Text className="text-text font-bold ml-2">Войти через Telegram</Text>
               </Pressable>
             </View>
 
             {showCodeForm && (
-              <View className="mx-4 mt-3 bg-surface rounded-2xl p-5 border border-line">
+              <View
+                style={{
+                  marginHorizontal: 16,
+                  marginTop: 12,
+                  backgroundColor: CARD_BG,
+                  borderRadius: 18,
+                  padding: 18,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.05)',
+                }}>
                 <Text className="text-text font-bold mb-1">Введите код из Telegram</Text>
-                <Text className="text-muted text-xs mb-3 leading-5">
-                  В чате с @F1_egor_bot отправь команду <Text className="text-text font-bold">/code</Text> — бот пришлёт 6-значный код. Введи его ниже.
+                <Text className="text-muted text-xs mb-3" style={{ lineHeight: 16 }}>
+                  В чате с @F1_egor_bot отправь команду{' '}
+                  <Text className="text-text font-bold">/code</Text> — бот пришлёт 6-значный
+                  код. Введи его ниже.
                 </Text>
                 <TextInput
                   value={code}
@@ -134,22 +178,38 @@ export default function ProfileScreen() {
                   keyboardType="number-pad"
                   maxLength={6}
                   autoFocus
-                  className="bg-surface-2 text-text text-2xl font-extrabold tracking-[8px] text-center px-4 py-3 rounded-xl border border-line"
-                  style={{ letterSpacing: 8 }}
+                  style={{
+                    backgroundColor: '#1A1A24',
+                    color: '#FAFAFA',
+                    fontSize: 22,
+                    fontWeight: '800',
+                    textAlign: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.06)',
+                    letterSpacing: 8,
+                  }}
                 />
                 <Pressable
                   onPress={submitCode}
                   disabled={busy || code.length < 4}
-                  className={`bg-red rounded-full py-3 mt-3 items-center ${
-                    busy || code.length < 4 ? 'opacity-50' : ''
-                  }`}>
+                  style={{
+                    backgroundColor: '#E10600',
+                    borderRadius: 999,
+                    paddingVertical: 12,
+                    marginTop: 12,
+                    alignItems: 'center',
+                    opacity: busy || code.length < 4 ? 0.5 : 1,
+                  }}>
                   {busy ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text className="text-text font-bold">Войти</Text>
                   )}
                 </Pressable>
-                <Pressable onPress={openBot} className="py-3 items-center">
+                <Pressable onPress={openBot} style={{ paddingVertical: 12, alignItems: 'center' }}>
                   <Text className="text-muted text-sm">Открыть бота ещё раз</Text>
                 </Pressable>
               </View>
@@ -163,128 +223,498 @@ export default function ProfileScreen() {
   // Authenticated state
   const displayName = user.first_name || user.username || 'Пользователь';
   const handle = user.username ? `@${user.username}` : '';
+  const points = user.points ?? 0;
+  const predTotal = user.predictions_total ?? 0;
+  const predCorrect = user.predictions_correct ?? 0;
+  const accuracy = predTotal ? Math.round((predCorrect / predTotal) * 100) : 0;
+  const achCount = user.achievements_count ?? 0;
+  const achTotal = user.achievements_total ?? 12;
+
+  // 4 milestone achievements shown as badges
+  const achievementsPreview = [
+    {
+      icon: 'flag' as const,
+      label: 'Первые шаги',
+      desc: 'Сделал 1 прогноз',
+      unlocked: predTotal >= 1,
+    },
+    {
+      icon: 'trophy' as const,
+      label: 'Профи',
+      desc: 'Сделал 10 прогнозов',
+      unlocked: predTotal >= 10,
+    },
+    {
+      icon: 'locate' as const,
+      label: 'Точный глаз',
+      desc: 'Точность 70%+',
+      unlocked: accuracy >= 70 && predTotal >= 5,
+    },
+    {
+      icon: 'ribbon' as const,
+      label: 'Эксперт',
+      desc: 'Сделал 50 прогнозов',
+      unlocked: predTotal >= 50,
+    },
+  ];
 
   return (
-    <View className="flex-1 bg-bg">
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-5 pt-2 pb-3">
-          <Text className="text-text text-3xl font-extrabold">Профиль</Text>
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        {/* Header with F1 car decoration */}
+        <View
+          style={{
+            paddingHorizontal: 20,
+            paddingTop: 6,
+            paddingBottom: 6,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'relative',
+            overflow: 'hidden',
+            height: 60,
+          }}>
+          <Text style={{ color: '#FAFAFA', fontSize: 32, fontWeight: '800', letterSpacing: -0.5 }}>
+            Профиль
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable
+              onPress={() => router.push('/settings' as never)}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                backgroundColor: CARD_BG,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)',
+              }}>
+              <Ionicons name="settings-outline" size={18} color="#FAFAFA" />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/notifications' as never)}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                backgroundColor: CARD_BG,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)',
+              }}>
+              <Ionicons name="notifications-outline" size={18} color="#FAFAFA" />
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: '#E10600',
+                  borderWidth: 1.5,
+                  borderColor: DARK_BG,
+                }}
+              />
+            </Pressable>
+          </View>
+          <Image
+            source={{ uri: CAR_OVERLAY }}
+            style={{
+              position: 'absolute',
+              right: -30,
+              top: -30,
+              width: 320,
+              height: 160,
+              opacity: 0.25,
+            }}
+            contentFit="contain"
+            pointerEvents="none"
+          />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
-          <View className="items-center mt-4">
-            {absUrl(user.photo_url) ? (
-              <Image
-                source={{ uri: absUrl(user.photo_url) }}
-                style={{ width: 96, height: 96, borderRadius: 48 }}
-                contentFit="cover"
-              />
-            ) : (
-              <View className="w-24 h-24 rounded-full bg-surface items-center justify-center border-2 border-red">
-                <Ionicons name="person" size={48} color="#A0A0B0" />
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}>
+          {/* User row */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingTop: 16 }}>
+            <View style={{ position: 'relative' }}>
+              <View
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  borderWidth: 2,
+                  borderColor: '#E10600',
+                  padding: 3,
+                  shadowColor: '#E10600',
+                  shadowOpacity: 0.4,
+                  shadowRadius: 14,
+                  shadowOffset: { width: 0, height: 0 },
+                  elevation: 6,
+                }}>
+                {absUrl(user.photo_url) ? (
+                  <Image
+                    source={{ uri: absUrl(user.photo_url) }}
+                    style={{ width: '100%', height: '100%', borderRadius: 48 }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: 48,
+                      backgroundColor: '#1A1A24',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Ionicons name="person" size={42} color="#A0A0B0" />
+                  </View>
+                )}
               </View>
-            )}
-            <Text className="text-text text-2xl font-extrabold mt-3">{displayName}</Text>
-            {handle ? <Text className="text-muted text-sm">{handle}</Text> : null}
-            {isAdmin ? (
-              <View className="bg-red px-3 py-1 rounded-full mt-2">
-                <Text className="text-text text-[11px] font-bold tracking-widest">АДМИН</Text>
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  right: -2,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: CARD_BG,
+                  borderWidth: 2,
+                  borderColor: DARK_BG,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons name="camera" size={14} color="#A0A0B0" />
               </View>
-            ) : (
-              <View className="bg-surface-2 px-3 py-1 rounded-full mt-2">
-                <Text className="text-muted text-[11px] font-bold tracking-widest">
-                  ID {user.user_id}
+            </View>
+
+            <View style={{ flex: 1, marginLeft: 18, justifyContent: 'center' }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 26, fontWeight: '800' }}>
+                {displayName}
+              </Text>
+              {handle ? (
+                <Text className="text-muted" style={{ fontSize: 13, marginTop: 2 }}>
+                  {handle}
                 </Text>
-              </View>
-            )}
-          </View>
-
-          <View className="flex-row mt-6 px-4">
-            <View className="flex-1 items-center">
-              <Text className="text-text text-2xl font-extrabold">
-                {(user.points ?? 0).toLocaleString('ru-RU')}
-              </Text>
-              <Text className="text-muted text-xs mt-1">Очков</Text>
-            </View>
-            <View className="w-px bg-line" />
-            <View className="flex-1 items-center">
-              <Text className="text-text text-2xl font-extrabold">
-                {user.predictions_total ?? 0}
-              </Text>
-              <Text className="text-muted text-xs mt-1">Прогнозов</Text>
-            </View>
-            <View className="w-px bg-line" />
-            <View className="flex-1 items-center">
-              <Text className="text-text text-2xl font-extrabold">
-                {user.predictions_total
-                  ? Math.round(((user.predictions_correct ?? 0) / user.predictions_total) * 100)
-                  : 0}
-                %
-              </Text>
-              <Text className="text-muted text-xs mt-1">Точность</Text>
+              ) : null}
+              {isAdmin ? (
+                <View
+                  style={{
+                    alignSelf: 'flex-start',
+                    backgroundColor: '#E10600',
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                    borderRadius: 5,
+                    marginTop: 8,
+                  }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 }}>
+                    АДМИН
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
+          {/* Bio */}
+          <Text
+            className="text-muted"
+            style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 20, marginTop: 14 }}
+            numberOfLines={3}>
+            Фанат Формулы-1 и скорости. Аналитика, прогнозы и гонки! 🏁
+          </Text>
+
+          {/* Stats card */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 18,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+              flexDirection: 'row',
+              paddingVertical: 16,
+            }}>
+            <StatCell icon="trophy" value={points.toLocaleString('ru-RU')} label="Очков" />
+            <StatDivider />
+            <StatCell icon="trending-up" value={String(predTotal)} label="Прогнозов" />
+            <StatDivider />
+            <StatCell icon="locate" value={`${accuracy}%`} label="Точность" />
+          </View>
+
+          {/* Premium banner */}
           <Pressable
-            onPress={() => router.push('/achievements' as never)}
-            className="px-5 mt-7 flex-row items-center justify-between active:opacity-80">
-            <Text className="text-text text-lg font-extrabold">Достижения</Text>
-            <View className="flex-row items-center">
-              <Text className="text-muted text-sm font-semibold mr-1">
-                {user.achievements_count ?? 0} / {user.achievements_total ?? 0}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color="#A0A0B0" />
+            onPress={() =>
+              Alert.alert('Премиум статус', 'Скоро. Больше возможностей для подписчиков.')
+            }
+            style={{
+              marginHorizontal: 16,
+              marginTop: 10,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(225,6,0,0.18)',
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                backgroundColor: 'rgba(225,6,0,0.15)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Ionicons name="shield-checkmark" size={20} color="#E10600" />
             </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 15, fontWeight: '800' }}>
+                Премиум статус
+              </Text>
+              <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                Больше возможностей и эксклюзивный контент
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
           </Pressable>
 
-          {/* Spoiler toggle */}
-          <View className="mx-4 mt-6 bg-surface rounded-2xl border border-line p-4 flex-row items-center">
-            <View className="w-10 h-10 rounded-full bg-surface-2 items-center justify-center">
-              <Ionicons
-                name={spoilerEnabled ? 'eye-off' : 'eye'}
-                size={20}
-                color={spoilerEnabled ? '#E10600' : '#A0A0B0'}
+          {/* Achievements */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+              padding: 16,
+            }}>
+            <Pressable
+              onPress={() => router.push('/achievements' as never)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 18, fontWeight: '800' }}>
+                Достижения
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ color: '#E10600', fontSize: 13, fontWeight: '800' }}>
+                  {achCount} / {achTotal}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#E10600" style={{ marginLeft: 4 }} />
+              </View>
+            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {achievementsPreview.map((a) => (
+                <AchievementBadge
+                  key={a.label}
+                  icon={a.icon}
+                  label={a.label}
+                  desc={a.desc}
+                  unlocked={a.unlocked}
+                />
+              ))}
+            </View>
+
+            {/* Spoiler toggle inline at the bottom of achievements card */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                marginTop: 16,
+                marginBottom: 4,
+              }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(225,6,0,0.15)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons
+                  name={spoilerEnabled ? 'eye-off' : 'eye'}
+                  size={18}
+                  color="#E10600"
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: '#FAFAFA', fontSize: 14, fontWeight: '800' }}>
+                  Антиспойлер
+                </Text>
+                <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                  Скрывает результаты гонок и таблицу сезона
+                </Text>
+              </View>
+              <Switch
+                value={spoilerEnabled}
+                onValueChange={toggleSpoiler}
+                trackColor={{ false: '#2A2A38', true: '#E10600' }}
+                thumbColor="#fff"
+                ios_backgroundColor="#2A2A38"
               />
             </View>
-            <View className="flex-1 ml-3">
-              <Text className="text-text font-bold">
-                Антиспойлер {spoilerEnabled ? 'вкл' : 'выкл'}
-              </Text>
-              <Text className="text-muted text-xs mt-0.5">
-                Скрывает результаты гонок и таблицу сезона
-              </Text>
-            </View>
-            <Switch
-              value={spoilerEnabled}
-              onValueChange={toggleSpoiler}
-              trackColor={{ false: '#2F2F3E', true: '#E10600' }}
-              thumbColor="#fff"
-            />
           </View>
 
-          <View className="px-4 mt-3">
+          {/* Menu */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 10,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+              overflow: 'hidden',
+            }}>
             {MENU.map((m, i) => (
               <Pressable
-                key={i}
-                onPress={() => m.href && router.push(m.href as never)}
-                className={`flex-row items-center py-4 ${
-                  i < MENU.length - 1 ? 'border-b border-line' : ''
-                }`}>
-                <Ionicons name={m.icon} size={22} color="#A0A0B0" />
-                <Text className="text-text text-base ml-3 flex-1">{m.label}</Text>
+                key={m.label}
+                onPress={() => router.push(m.href as never)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderBottomWidth: i < MENU.length - 1 ? 1 : 0,
+                  borderBottomColor: 'rgba(255,255,255,0.05)',
+                }}>
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    backgroundColor: 'rgba(225,6,0,0.15)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons name={m.icon} size={15} color="#E10600" />
+                </View>
+                <Text style={{ color: '#FAFAFA', fontSize: 15, marginLeft: 14, flex: 1 }}>
+                  {m.label}
+                </Text>
                 <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
               </Pressable>
             ))}
           </View>
 
-          <Pressable onPress={handleLogout} className="px-4 mt-2">
-            <View className="flex-row items-center py-4 border-t border-line">
-              <Ionicons name="log-out-outline" size={22} color="#E10600" />
-              <Text className="text-red text-base font-semibold ml-3 flex-1">Выйти</Text>
-            </View>
+          {/* Logout */}
+          <Pressable
+            onPress={handleLogout}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              paddingVertical: 14,
+              alignItems: 'center',
+            }}>
+            <Text style={{ color: '#E10600', fontSize: 14, fontWeight: '700' }}>
+              Выйти из аккаунта
+            </Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+// ============ STAT CELL ============
+
+function StatCell({
+  icon,
+  value,
+  label,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  label: string;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name={icon} size={16} color="#E10600" style={{ marginRight: 6 }} />
+        <Text style={{ color: '#FAFAFA', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 }}>
+          {value}
+        </Text>
+      </View>
+      <Text className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function StatDivider() {
+  return <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 4 }} />;
+}
+
+// ============ ACHIEVEMENT BADGE ============
+
+function AchievementBadge({
+  icon,
+  label,
+  desc,
+  unlocked,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  desc: string;
+  unlocked: boolean;
+}) {
+  const color = unlocked ? '#E10600' : '#3A3A4A';
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <View
+        style={{
+          width: 60,
+          height: 66,
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          shadowColor: unlocked ? '#E10600' : 'transparent',
+          shadowOpacity: unlocked ? 0.4 : 0,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 0 },
+          elevation: unlocked ? 4 : 0,
+        }}>
+        <Svg width={60} height={66} viewBox="0 0 60 66" style={{ position: 'absolute' }}>
+          <Polygon
+            points="30,2 56,16 56,50 30,64 4,50 4,16"
+            fill={CARD_BG}
+            stroke={color}
+            strokeWidth={2}
+          />
+        </Svg>
+        <Ionicons name={icon} size={22} color={unlocked ? '#FAFAFA' : '#6B6B7B'} />
+      </View>
+      <Text
+        style={{
+          color: unlocked ? '#FAFAFA' : '#A0A0B0',
+          fontSize: 11,
+          fontWeight: '800',
+          marginTop: 8,
+          textAlign: 'center',
+        }}
+        numberOfLines={1}>
+        {label}
+      </Text>
+      <Text
+        style={{ color: '#6B6B7B', fontSize: 9, marginTop: 2, textAlign: 'center' }}
+        numberOfLines={2}>
+        {desc}
+      </Text>
     </View>
   );
 }
