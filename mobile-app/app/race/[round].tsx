@@ -201,12 +201,15 @@ export default function RaceDetail() {
             date={race.date}
           />
 
-          {/* Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 12, gap: 8, paddingVertical: 4 }}
-            style={{ marginTop: 16 }}>
+          {/* Tabs — компактные, все 4 в одну строку */}
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingHorizontal: 12,
+              marginTop: 16,
+              alignItems: 'center',
+              justifyContent: 'space-around',
+            }}>
             {tabs.map((t) => {
               const active = t === tab;
               const meta = TAB_META[t];
@@ -217,37 +220,47 @@ export default function RaceDetail() {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    paddingVertical: 11,
-                    paddingHorizontal: 18,
-                    borderRadius: 999,
-                    backgroundColor: active ? '#E10600' : CARD_BG,
-                    borderWidth: 1,
-                    borderColor: active ? '#E10600' : 'rgba(255,255,255,0.05)',
-                    shadowColor: active ? '#E10600' : 'transparent',
-                    shadowOpacity: active ? 0.4 : 0,
-                    shadowRadius: 12,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: active ? 6 : 0,
+                    paddingVertical: 10,
+                    paddingHorizontal: 4,
+                    flexShrink: 1,
                   }}>
                   <Ionicons
                     name={meta.icon}
-                    size={14}
-                    color={active ? '#FAFAFA' : '#A0A0B0'}
-                    style={{ marginRight: 7 }}
+                    size={13}
+                    color={active ? '#E10600' : '#6B6B7B'}
+                    style={{ marginRight: 5 }}
                   />
                   <Text
+                    numberOfLines={1}
                     style={{
-                      color: active ? '#FAFAFA' : '#A0A0B0',
-                      fontWeight: '800',
-                      fontSize: 11,
-                      letterSpacing: 1.5,
+                      color: active ? '#FAFAFA' : '#6B6B7B',
+                      fontWeight: '700',
+                      fontSize: 12.5,
+                      letterSpacing: 0.2,
                     }}>
-                    {meta.label}
+                    {t}
                   </Text>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
+          {/* Active underline */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 12 }}>
+            {tabs.map((t) => {
+              const active = t === tab;
+              return (
+                <View
+                  key={t}
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    backgroundColor: active ? '#E10600' : 'transparent',
+                    borderRadius: 1,
+                  }}
+                />
+              );
+            })}
+          </View>
 
           {tab === 'Расписание' && (
             <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
@@ -350,54 +363,7 @@ export default function RaceDetail() {
               {qualifying.isLoading && <ActivityIndicator color="#E10600" />}
               {qualifying.isError && <Text className="text-muted text-sm">Данных нет</Text>}
               {qualifying.data?.results && (
-                <View
-                  style={{
-                    backgroundColor: CARD_BG,
-                    borderRadius: 18,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.05)',
-                    overflow: 'hidden',
-                  }}>
-                  {qualifying.data.results.map((d: QualifyingDriver, i) => (
-                    <View
-                      key={d.driver_number}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        paddingHorizontal: 14,
-                        borderBottomWidth: i < qualifying.data!.results.length - 1 ? 1 : 0,
-                        borderBottomColor: 'rgba(255,255,255,0.05)',
-                      }}>
-                      <Text
-                        style={{
-                          color: '#FAFAFA',
-                          fontWeight: '800',
-                          fontSize: 18,
-                          width: 28,
-                          textAlign: 'center',
-                        }}>
-                        {d.position}
-                      </Text>
-                      <View
-                        style={{
-                          width: 3,
-                          height: 36,
-                          borderRadius: 2,
-                          marginHorizontal: 10,
-                          backgroundColor: d.team_color || '#666',
-                        }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text className="text-text font-bold">{d.name}</Text>
-                        <Text className="text-muted text-xs">{d.team}</Text>
-                      </View>
-                      <Text className="text-text font-bold tabular-nums">
-                        {d.q3 || d.q2 || d.q1 || '—'}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+                <QualifyingView results={qualifying.data.results} stats={stats} />
               )}
             </View>
           )}
@@ -786,10 +752,30 @@ function ResultsView({
     <View>
       {/* Podium */}
       {top3.length === 3 && (
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginBottom: 18 }}>
-          <PodiumCard driver={top3[1]} place={2} color={podiumColors[2]} />
-          <PodiumCard driver={top3[0]} place={1} color={podiumColors[1]} winner />
-          <PodiumCard driver={top3[2]} place={3} color={podiumColors[3]} />
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginBottom: 22, marginTop: 8 }}>
+          <PodiumCard
+            driver={top3[1]}
+            place={2}
+            color={podiumColors[2]}
+            primary={`${top3[1].points} PTS`}
+            secondary={top3[1].gap || '—'}
+          />
+          <PodiumCard
+            driver={top3[0]}
+            place={1}
+            color={podiumColors[1]}
+            winner
+            primary={`${top3[0].points} PTS`}
+            secondary={top3[0].time || '—'}
+            secondaryColor="#A0A0B0"
+          />
+          <PodiumCard
+            driver={top3[2]}
+            place={3}
+            color={podiumColors[3]}
+            primary={`${top3[2].points} PTS`}
+            secondary={top3[2].gap || '—'}
+          />
         </View>
       )}
 
@@ -937,46 +923,74 @@ function tableHeaderStyle(
   };
 }
 
+type PodiumDriver = {
+  photo_url?: string;
+  team?: string;
+  team_color?: string;
+  last_name?: string;
+  name: string;
+};
+
 function PodiumCard({
   driver,
   place,
   color,
   winner = false,
+  primary,
+  secondary,
+  secondaryColor,
 }: {
-  driver: RaceResultDriver;
+  driver: PodiumDriver;
   place: 1 | 2 | 3;
   color: string;
   winner?: boolean;
+  primary: string;
+  secondary?: string;
+  secondaryColor?: string;
 }) {
   return (
     <View
       style={{
-        flex: winner ? 1.15 : 1,
+        flex: winner ? 1.18 : 1,
         backgroundColor: CARD_BG,
-        borderRadius: 18,
+        borderRadius: 20,
         borderWidth: 1.5,
-        borderColor: color + (winner ? 'AA' : '55'),
-        paddingTop: winner ? 18 : 12,
-        paddingBottom: 14,
+        borderColor: color + (winner ? 'CC' : '55'),
+        paddingTop: winner ? 22 : 14,
+        paddingBottom: 16,
         paddingHorizontal: 8,
         alignItems: 'center',
         shadowColor: color,
-        shadowOpacity: winner ? 0.45 : 0.2,
-        shadowRadius: winner ? 18 : 10,
+        shadowOpacity: winner ? 0.5 : 0.22,
+        shadowRadius: winner ? 22 : 12,
         shadowOffset: { width: 0, height: 6 },
-        elevation: winner ? 8 : 4,
+        elevation: winner ? 10 : 4,
         position: 'relative',
       }}>
       {winner && (
-        <Text style={{ fontSize: 22, position: 'absolute', top: -12 }}>🏆</Text>
+        <View
+          style={{
+            position: 'absolute',
+            top: -16,
+            backgroundColor: CARD_BG,
+            paddingHorizontal: 8,
+            borderRadius: 999,
+            borderWidth: 1.5,
+            borderColor: color,
+          }}>
+          <Text style={{ fontSize: 20 }}>🏆</Text>
+        </View>
       )}
       <Text
         style={{
           color,
           fontWeight: '800',
-          fontSize: winner ? 28 : 22,
+          fontSize: winner ? 36 : 28,
           letterSpacing: -1,
-          lineHeight: winner ? 30 : 24,
+          lineHeight: winner ? 38 : 30,
+          textShadowColor: color + '88',
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: winner ? 12 : 0,
         }}>
         {place}
       </Text>
@@ -984,31 +998,33 @@ function PodiumCard({
         <Image
           source={{ uri: driver.photo_url }}
           style={{
-            width: winner ? 64 : 52,
-            height: winner ? 64 : 52,
-            borderRadius: winner ? 32 : 26,
-            marginTop: 4,
-            borderWidth: 1.5,
+            width: winner ? 72 : 58,
+            height: winner ? 72 : 58,
+            borderRadius: winner ? 36 : 29,
+            marginTop: 6,
+            borderWidth: 2,
             borderColor: color,
           }}
         />
       ) : (
         <View
           style={{
-            width: winner ? 64 : 52,
-            height: winner ? 64 : 52,
-            borderRadius: winner ? 32 : 26,
-            marginTop: 4,
+            width: winner ? 72 : 58,
+            height: winner ? 72 : 58,
+            borderRadius: winner ? 36 : 29,
+            marginTop: 6,
             backgroundColor: '#2A2A38',
+            borderWidth: 2,
+            borderColor: color,
           }}
         />
       )}
       <Text
         style={{
           color: '#FAFAFA',
-          fontSize: 12,
-          fontWeight: '700',
-          marginTop: 8,
+          fontSize: winner ? 14 : 12,
+          fontWeight: '800',
+          marginTop: 10,
           textAlign: 'center',
         }}
         numberOfLines={1}>
@@ -1022,19 +1038,19 @@ function PodiumCard({
         }}>
         <View
           style={{
-            width: 4,
-            height: 4,
-            borderRadius: 2,
+            width: 5,
+            height: 5,
+            borderRadius: 3,
             backgroundColor: driver.team_color || '#666',
             marginRight: 5,
           }}
         />
         <Text
           style={{
-            color: '#6B6B7B',
-            fontSize: 9,
-            fontWeight: '700',
-            letterSpacing: 0.5,
+            color: '#A0A0B0',
+            fontSize: 9.5,
+            fontWeight: '600',
+            letterSpacing: 0.3,
           }}
           numberOfLines={1}>
           {driver.team}
@@ -1044,21 +1060,213 @@ function PodiumCard({
         style={{
           color: '#FAFAFA',
           fontWeight: '800',
-          fontSize: winner ? 16 : 14,
-          marginTop: 10,
+          fontSize: winner ? 17 : 15,
+          marginTop: 12,
+          letterSpacing: -0.3,
         }}>
-        {driver.points} PTS
+        {primary}
       </Text>
-      <Text
+      {secondary ? (
+        <Text
+          style={{
+            color: secondaryColor ?? (winner ? '#A0A0B0' : '#E10600'),
+            fontSize: 10.5,
+            fontWeight: '700',
+            marginTop: 2,
+          }}
+          numberOfLines={1}>
+          {secondary}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+// ============ QUALIFYING VIEW (podium + table) ============
+
+function parseLapTime(t?: string): number {
+  if (!t) return 0;
+  // "1:23.456" → 83.456
+  const m = t.match(/^(\d+):(\d+(?:\.\d+)?)$/);
+  if (m) return parseInt(m[1], 10) * 60 + parseFloat(m[2]);
+  return parseFloat(t) || 0;
+}
+
+function QualifyingView({
+  results,
+  stats,
+}: {
+  results: QualifyingDriver[];
+  stats: ReturnType<typeof getCircuitStats>;
+}) {
+  const top3 = results.slice(0, 3);
+  const rest = results.slice(3);
+  const podiumColors = { 1: '#FFCB05', 2: '#C0C0C0', 3: '#CD7F32' } as const;
+
+  const poleSec = top3[0] ? parseLapTime(top3[0].q3 || top3[0].q2 || top3[0].q1) : 0;
+  const bestOf = (d: QualifyingDriver) => d.q3 || d.q2 || d.q1 || '—';
+  const gapTo = (d: QualifyingDriver): string => {
+    const t = parseLapTime(d.q3 || d.q2 || d.q1);
+    if (!t || !poleSec) return '—';
+    const diff = t - poleSec;
+    if (diff <= 0) return 'POLE';
+    return `+${diff.toFixed(3)}`;
+  };
+
+  return (
+    <View>
+      {/* Podium */}
+      {top3.length === 3 && (
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginBottom: 22, marginTop: 8 }}>
+          <PodiumCard
+            driver={top3[1]}
+            place={2}
+            color={podiumColors[2]}
+            primary={bestOf(top3[1])}
+            secondary={gapTo(top3[1])}
+          />
+          <PodiumCard
+            driver={top3[0]}
+            place={1}
+            color={podiumColors[1]}
+            winner
+            primary={bestOf(top3[0])}
+            secondary="POLE"
+            secondaryColor="#FFCB05"
+          />
+          <PodiumCard
+            driver={top3[2]}
+            place={3}
+            color={podiumColors[3]}
+            primary={bestOf(top3[2])}
+            secondary={gapTo(top3[2])}
+          />
+        </View>
+      )}
+
+      {/* Table header */}
+      {rest.length > 0 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            marginBottom: 6,
+          }}>
+          <Text style={tableHeaderStyle('left', 28)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 50 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('left', 50)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 70)}>Лучшее</Text>
+          <Text style={tableHeaderStyle('right', 60)}>Разрыв</Text>
+        </View>
+      )}
+
+      {/* Rows */}
+      <View
         style={{
-          color: winner ? '#A0A0B0' : '#E10600',
-          fontSize: 10,
-          fontWeight: '700',
-          marginTop: 2,
-        }}
-        numberOfLines={1}>
-        {winner ? driver.time || '—' : driver.gap || '—'}
-      </Text>
+          backgroundColor: CARD_BG,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+        }}>
+        {rest.map((d, i) => (
+          <View
+            key={d.driver_number}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderBottomWidth: i < rest.length - 1 ? 1 : 0,
+              borderBottomColor: 'rgba(255,255,255,0.04)',
+            }}>
+            <Text
+              style={{
+                color: d.team_color || '#FAFAFA',
+                fontWeight: '800',
+                fontSize: 22,
+                width: 28,
+                textAlign: 'center',
+                letterSpacing: -0.5,
+              }}>
+              {d.position}
+            </Text>
+            {d.photo_url ? (
+              <Image
+                source={{ uri: d.photo_url }}
+                style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 12 }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  marginLeft: 12,
+                  backgroundColor: '#2A2A38',
+                }}
+              />
+            )}
+            <Text
+              style={{
+                flex: 1,
+                color: '#FAFAFA',
+                fontWeight: '700',
+                fontSize: 14,
+                marginLeft: 10,
+              }}
+              numberOfLines={1}>
+              {d.name}
+            </Text>
+            <View style={{ width: 50, alignItems: 'center' }}>
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 3,
+                  borderRadius: 5,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderLeftWidth: 2,
+                  borderLeftColor: d.team_color || '#666',
+                }}>
+                <Text
+                  style={{
+                    color: d.team_color || '#A0A0B0',
+                    fontWeight: '800',
+                    fontSize: 9,
+                    letterSpacing: 1,
+                  }}>
+                  {teamAbbr(d.team)}
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={{
+                width: 70,
+                textAlign: 'right',
+                color: '#FAFAFA',
+                fontSize: 12,
+                fontWeight: '700',
+              }}>
+              {bestOf(d)}
+            </Text>
+            <Text
+              style={{
+                width: 60,
+                textAlign: 'right',
+                color: '#E10600',
+                fontSize: 11,
+                fontWeight: '700',
+              }}>
+              {gapTo(d)}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Stats footer */}
+      {stats && <StatsFooter stats={stats} />}
     </View>
   );
 }
