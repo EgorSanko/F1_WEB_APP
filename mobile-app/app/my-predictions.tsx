@@ -6,6 +6,10 @@ import { Stack, useRouter } from 'expo-router';
 
 import { useMyPredictions, useSchedule, flagFor } from '@/lib/hooks';
 import type { Prediction, PredictionType } from '@/lib/api';
+import { ruRaceTitle } from '@/lib/locale';
+
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
 
 const TYPE_LABEL: Record<PredictionType, string> = {
   winner: 'Победитель',
@@ -15,14 +19,22 @@ const TYPE_LABEL: Record<PredictionType, string> = {
   safety_car: 'Safety Car',
 };
 
+const TYPE_ICON: Record<PredictionType, keyof typeof Ionicons.glyphMap> = {
+  winner: 'trophy',
+  podium: 'medal',
+  fastest_lap: 'flash',
+  dnf_count: 'flag',
+  safety_car: 'shield-checkmark',
+};
+
 const STATUS_INFO: Record<
   Prediction['status'],
   { label: string; color: string; bg: string }
 > = {
   pending: { label: 'Ожидает', color: '#A0A0B0', bg: 'rgba(255,255,255,0.06)' },
-  correct: { label: 'Верно', color: '#10B981', bg: 'rgba(16,185,129,0.15)' },
-  incorrect: { label: 'Неверно', color: '#A0A0B0', bg: 'rgba(255,255,255,0.04)' },
-  partial: { label: 'Частично', color: '#FFCB05', bg: 'rgba(255,203,5,0.15)' },
+  correct: { label: 'Верно', color: '#10B981', bg: 'rgba(16,185,129,0.18)' },
+  incorrect: { label: 'Неверно', color: '#A0A0B0', bg: 'rgba(255,255,255,0.05)' },
+  partial: { label: 'Частично', color: '#FFCB05', bg: 'rgba(255,203,5,0.18)' },
 };
 
 export default function MyPredictionsScreen() {
@@ -34,14 +46,13 @@ export default function MyPredictionsScreen() {
   const list = tab === 'pending' ? data.data?.pending ?? [] : data.data?.settled ?? [];
 
   const raceByRound = useMemo(() => {
-    const m = new Map<number, { name: string; country_code?: string }>();
+    const m = new Map<number, { name: string; country?: string; country_code?: string }>();
     schedule.data?.races.forEach((r) =>
-      m.set(r.round, { name: r.name, country_code: r.country_code }),
+      m.set(r.round, { name: r.name, country: r.country, country_code: r.country_code }),
     );
     return m;
   }, [schedule.data]);
 
-  // Group predictions by race_round
   const grouped = useMemo(() => {
     const m = new Map<number, Prediction[]>();
     for (const p of list) {
@@ -54,53 +65,92 @@ export default function MyPredictionsScreen() {
   }, [list, tab]);
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
-          </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Мои прогнозы
-          </Text>
-        </View>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <Header onBack={() => router.back()} title="Мои прогнозы" />
 
+        {/* Summary card */}
         {data.data && (
-          <View className="mx-4 mb-3 bg-surface rounded-xl border border-line p-4 flex-row items-center">
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 6,
+              marginBottom: 12,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(225,6,0,0.18)',
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
             <View
-              className="w-12 h-12 rounded-full items-center justify-center"
-              style={{ backgroundColor: 'rgba(225,6,0,0.15)' }}>
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                backgroundColor: 'rgba(225,6,0,0.15)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Ionicons name="trophy" size={22} color="#E10600" />
             </View>
-            <View className="flex-1 ml-3">
-              <Text className="text-text text-2xl font-extrabold">
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>
                 {data.data.total_won.toLocaleString('ru-RU')}
               </Text>
-              <Text className="text-muted text-xs">Очков заработано</Text>
+              <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                Очков заработано
+              </Text>
             </View>
-            <View className="items-end">
-              <Text className="text-text font-bold">
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 16, fontWeight: '800' }}>
                 {data.data.settled.length} / {data.data.settled.length + data.data.pending.length}
               </Text>
-              <Text className="text-muted text-xs">завершено</Text>
+              <Text className="text-muted" style={{ fontSize: 10, marginTop: 2 }}>
+                завершено
+              </Text>
             </View>
           </View>
         )}
 
-        <View className="flex-row gap-2 px-4 pb-3">
+        {/* Segmented tabs */}
+        <View
+          style={{
+            flexDirection: 'row',
+            marginHorizontal: 16,
+            marginBottom: 12,
+            padding: 4,
+            backgroundColor: CARD_BG,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.05)',
+          }}>
           {(['pending', 'settled'] as const).map((t) => {
             const active = t === tab;
             return (
               <Pressable
                 key={t}
                 onPress={() => setTab(t)}
-                className={`flex-1 py-2.5 rounded-full items-center ${
-                  active ? 'bg-red' : 'bg-surface border border-line'
-                }`}>
-                <Text className={`text-xs font-bold ${active ? 'text-text' : 'text-muted'}`}>
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 999,
+                  alignItems: 'center',
+                  backgroundColor: active ? '#E10600' : 'transparent',
+                  shadowColor: active ? '#E10600' : 'transparent',
+                  shadowOpacity: active ? 0.4 : 0,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 3 },
+                  elevation: active ? 4 : 0,
+                }}>
+                <Text
+                  style={{
+                    color: active ? '#FAFAFA' : '#A0A0B0',
+                    fontWeight: '800',
+                    fontSize: 12,
+                  }}>
                   {t === 'pending' ? 'Ожидают' : 'Завершены'}
                 </Text>
               </Pressable>
@@ -111,68 +161,148 @@ export default function MyPredictionsScreen() {
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}>
-          {data.isLoading && <ActivityIndicator color="#E10600" />}
-          {data.data && list.length === 0 && (
-            <Text className="text-muted text-sm px-2 mt-4">
-              {tab === 'pending' ? 'Нет ожидающих прогнозов' : 'Нет завершённых прогнозов'}
-            </Text>
+          {data.isLoading && (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <ActivityIndicator color="#E10600" />
+            </View>
           )}
+          {data.data && list.length === 0 && (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <Ionicons name="ticket-outline" size={36} color="#3A3A4A" />
+              <Text className="text-muted text-sm mt-2">
+                {tab === 'pending' ? 'Нет ожидающих прогнозов' : 'Нет завершённых прогнозов'}
+              </Text>
+            </View>
+          )}
+
           {grouped.map(([round, preds]) => {
             const race = raceByRound.get(round);
+            const titleGen = race ? ruRaceTitle(race.country, race.name) : `Раунд ${round}`;
             const totalEarned = preds.reduce((s, p) => s + (p.points_won ?? 0), 0);
             return (
-              <View key={round} className="mb-5">
-                <View className="flex-row items-center px-1 mb-2">
-                  <Text className="text-text text-2xl font-extrabold mr-2">
-                    R{String(round).padStart(2, '0')}
+              <View key={round} style={{ marginBottom: 18 }}>
+                {/* Race section header */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 10,
+                    paddingHorizontal: 4,
+                  }}>
+                  <View
+                    style={{
+                      width: 3,
+                      height: 26,
+                      backgroundColor: '#E10600',
+                      borderRadius: 2,
+                      marginRight: 10,
+                    }}
+                  />
+                  <Text style={{ fontSize: 18, marginRight: 8 }}>
+                    {race?.country_code ? flagFor(race.country_code) : '🏁'}
                   </Text>
-                  {race?.country_code ? (
-                    <Text className="text-xl mr-2">{flagFor(race.country_code)}</Text>
-                  ) : null}
-                  <Text className="text-text text-base font-bold flex-1" numberOfLines={1}>
-                    {race?.name ?? `Гран-при ${round}`}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{ color: '#E10600', fontSize: 9, fontWeight: '800', letterSpacing: 1.5 }}>
+                      ГРАН-ПРИ · РАУНД {String(round).padStart(2, '0')}
+                    </Text>
+                    <Text
+                      style={{ color: '#FAFAFA', fontSize: 16, fontWeight: '800', letterSpacing: -0.2 }}
+                      numberOfLines={1}>
+                      {titleGen}
+                    </Text>
+                  </View>
                   {tab === 'settled' && totalEarned > 0 && (
-                    <View className="bg-red/15 px-2 py-1 rounded">
-                      <Text className="text-red text-xs font-extrabold">
+                    <View
+                      style={{
+                        backgroundColor: 'rgba(225,6,0,0.18)',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: 'rgba(225,6,0,0.35)',
+                      }}>
+                      <Text style={{ color: '#E10600', fontSize: 11, fontWeight: '800' }}>
                         +{totalEarned} оч.
                       </Text>
                     </View>
                   )}
                 </View>
-                <View className="bg-surface rounded-2xl border border-line overflow-hidden">
+
+                <View
+                  style={{
+                    backgroundColor: CARD_BG,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.05)',
+                    overflow: 'hidden',
+                  }}>
                   {preds.map((p, i) => {
                     const status = STATUS_INFO[p.status];
                     return (
                       <View
                         key={p.id}
-                        className={`px-4 py-3 ${
-                          i < preds.length - 1 ? 'border-b border-line' : ''
-                        }`}>
-                        <View className="flex-row items-center">
-                          <View className="flex-1">
-                            <Text className="text-text font-bold">
-                              {TYPE_LABEL[p.prediction_type]}
-                            </Text>
-                            <Text className="text-muted text-xs mt-0.5">
-                              {formatValue(p.prediction_type, p.prediction_value)}
-                            </Text>
-                          </View>
-                          <View
-                            className="px-2.5 py-1 rounded ml-2"
-                            style={{ backgroundColor: status.bg }}>
-                            <Text
-                              className="text-[10px] font-bold tracking-widest"
-                              style={{ color: status.color }}>
-                              {status.label.toUpperCase()}
-                            </Text>
-                          </View>
-                          {p.status !== 'pending' && (
-                            <Text className="text-text font-extrabold text-sm ml-2 w-12 text-right">
-                              {p.points_won ? `+${p.points_won}` : '0'}
-                            </Text>
-                          )}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          borderBottomWidth: i < preds.length - 1 ? 1 : 0,
+                          borderBottomColor: 'rgba(255,255,255,0.04)',
+                        }}>
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: 'rgba(225,6,0,0.15)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                          <Ionicons
+                            name={TYPE_ICON[p.prediction_type]}
+                            size={16}
+                            color="#E10600"
+                          />
                         </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ color: '#FAFAFA', fontSize: 14, fontWeight: '800' }}>
+                            {TYPE_LABEL[p.prediction_type]}
+                          </Text>
+                          <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                            {formatValue(p.prediction_type, p.prediction_value)}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 5,
+                            backgroundColor: status.bg,
+                          }}>
+                          <Text
+                            style={{
+                              color: status.color,
+                              fontSize: 9,
+                              fontWeight: '800',
+                              letterSpacing: 1.2,
+                            }}>
+                            {status.label.toUpperCase()}
+                          </Text>
+                        </View>
+                        {p.status !== 'pending' && (
+                          <Text
+                            style={{
+                              color: p.points_won ? '#E10600' : '#6B6B7B',
+                              fontWeight: '800',
+                              fontSize: 13,
+                              marginLeft: 10,
+                              width: 40,
+                              textAlign: 'right',
+                            }}>
+                            {p.points_won ? `+${p.points_won}` : '0'}
+                          </Text>
+                        )}
                       </View>
                     );
                   })}
@@ -182,6 +312,37 @@ export default function MyPredictionsScreen() {
           })}
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 6,
+      }}>
+      <Pressable
+        onPress={onBack}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
+      </Pressable>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          color: '#FAFAFA',
+          fontSize: 19,
+          fontWeight: '700',
+          marginRight: 44,
+        }}
+        numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }

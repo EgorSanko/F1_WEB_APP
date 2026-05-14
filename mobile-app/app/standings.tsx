@@ -43,16 +43,31 @@ export default function StandingsScreen() {
   const [revealed, setRevealed] = useState(false);
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: '#0A0A12' }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 12,
+            paddingTop: 4,
+            paddingBottom: 8,
+          }}>
           <Pressable
             onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
           </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
+          <Text
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              color: '#FAFAFA',
+              fontSize: 19,
+              fontWeight: '700',
+              marginRight: 44,
+            }}>
             Чемпионат
           </Text>
         </View>
@@ -74,11 +89,26 @@ export default function StandingsScreen() {
               <Pressable
                 key={t}
                 onPress={() => setTab(t)}
-                className={`px-4 py-2 rounded-full ${
-                  active ? 'bg-red' : 'bg-surface border border-line'
-                }`}>
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
+                  borderRadius: 999,
+                  backgroundColor: active ? '#E10600' : '#12121C',
+                  borderWidth: 1,
+                  borderColor: active ? '#E10600' : 'rgba(255,255,255,0.05)',
+                  shadowColor: active ? '#E10600' : 'transparent',
+                  shadowOpacity: active ? 0.35 : 0,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 3 },
+                  elevation: active ? 4 : 0,
+                }}>
                 <Text
-                  className={`text-xs font-bold ${active ? 'text-text' : 'text-muted'}`}>
+                  style={{
+                    color: active ? '#FAFAFA' : '#A0A0B0',
+                    fontWeight: '800',
+                    fontSize: 11.5,
+                    letterSpacing: 0.3,
+                  }}>
                   {t}
                 </Text>
               </Pressable>

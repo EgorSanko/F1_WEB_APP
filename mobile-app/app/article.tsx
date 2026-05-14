@@ -27,18 +27,38 @@ export default function ArticleScreen() {
   const article = useArticle(url ?? null);
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: '#0A0A12' }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 12,
+            paddingTop: 4,
+            paddingBottom: 8,
+          }}>
           <Pressable
             onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
           </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
+          <Text
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              color: '#FAFAFA',
+              fontSize: 19,
+              fontWeight: '700',
+              marginRight: 44,
+            }}>
             Статья
           </Text>
+          <Pressable
+            onPress={() => url && Linking.openURL(url)}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="open-outline" size={20} color="#A0A0B0" />
+          </Pressable>
         </View>
 
         {article.isLoading && (

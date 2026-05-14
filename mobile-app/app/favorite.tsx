@@ -17,9 +17,13 @@ import {
   flagFor,
   useConstructorStandings,
   useDriverStandings,
+  useTeams,
 } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
 
 const TABS = ['Пилот', 'Команда'] as const;
 type Tab = (typeof TABS)[number];
@@ -33,18 +37,35 @@ export default function FavoriteScreen() {
 
   const drivers = useDriverStandings();
   const constructors = useConstructorStandings();
+  const teams = useTeams();
+  const teamLogos = teams.data?.teams.reduce<Record<string, string>>((acc, t) => {
+    if (t.logo_url) acc[t.name] = t.logo_url;
+    return acc;
+  }, {}) ?? {};
 
   if (!user) {
     return (
-      <View className="flex-1 bg-bg">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView edges={['top']} className="flex-1 items-center justify-center px-6">
+        <SafeAreaView
+          edges={['top']}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
           <Ionicons name="heart-outline" size={48} color="#6B6B7B" />
-          <Text className="text-text font-bold text-lg mt-4">Войди в аккаунт</Text>
+          <Text style={{ color: '#FAFAFA', fontSize: 18, fontWeight: '800', marginTop: 16 }}>
+            Войди в аккаунт
+          </Text>
           <Pressable
             onPress={() => router.back()}
-            className="mt-6 bg-surface px-6 py-3 rounded-full border border-line">
-            <Text className="text-text font-bold">Назад</Text>
+            style={{
+              marginTop: 20,
+              backgroundColor: CARD_BG,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}>
+            <Text style={{ color: '#FAFAFA', fontWeight: '700' }}>Назад</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -78,37 +99,47 @@ export default function FavoriteScreen() {
   };
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
-          </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Любимец сезона
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <Header onBack={() => router.back()} title="Любимец сезона" />
+
+        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+          <Text className="text-muted" style={{ fontSize: 12, lineHeight: 17 }}>
+            Выбери одного пилота и одну команду — они подсветятся в таблицах и hub'е сезона.
           </Text>
         </View>
 
-        <View className="px-5 mb-3">
-          <Text className="text-muted text-xs leading-5">
-            Выбери одного пилота и одну команду — они подсветятся в таблицах.
-          </Text>
-        </View>
-
-        <View className="flex-row gap-2 px-4 pb-3">
+        <View
+          style={{
+            flexDirection: 'row',
+            marginHorizontal: 16,
+            marginBottom: 14,
+            padding: 4,
+            backgroundColor: CARD_BG,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.05)',
+          }}>
           {TABS.map((t) => {
             const active = t === tab;
             return (
               <Pressable
                 key={t}
                 onPress={() => setTab(t)}
-                className={`flex-1 py-2.5 rounded-full items-center ${
-                  active ? 'bg-red' : 'bg-surface border border-line'
-                }`}>
-                <Text className={`text-xs font-bold ${active ? 'text-text' : 'text-muted'}`}>
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 999,
+                  alignItems: 'center',
+                  backgroundColor: active ? '#E10600' : 'transparent',
+                }}>
+                <Text
+                  style={{
+                    color: active ? '#FAFAFA' : '#A0A0B0',
+                    fontWeight: '800',
+                    fontSize: 12,
+                  }}>
                   {t}
                 </Text>
               </Pressable>
@@ -116,70 +147,211 @@ export default function FavoriteScreen() {
           })}
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 8 }}>
-          {tab === 'Пилот' && drivers.isLoading && <ActivityIndicator color="#E10600" />}
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 10 }}
+          showsVerticalScrollIndicator={false}>
+          {tab === 'Пилот' && drivers.isLoading && (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator color="#E10600" />
+            </View>
+          )}
           {tab === 'Пилот' &&
             drivers.data?.standings.map((d) => {
               const selected = user.favorite_driver === d.driver_number;
+              const teamColor = d.team_color || '#666';
+              const logo = d.team ? teamLogos[d.team] : undefined;
               return (
                 <Pressable
                   key={d.driver_number}
                   onPress={() => pickDriver(d.driver_number)}
                   disabled={busy}
-                  className={`rounded-xl p-3 flex-row items-center border active:opacity-80 ${
-                    selected ? 'bg-red/15 border-red' : 'bg-surface border-line'
-                  }`}>
+                  style={{
+                    backgroundColor: CARD_BG,
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: selected ? '#E10600' : 'rgba(255,255,255,0.05)',
+                    padding: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    overflow: 'hidden',
+                    shadowColor: selected ? '#E10600' : 'transparent',
+                    shadowOpacity: selected ? 0.3 : 0,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: selected ? 5 : 0,
+                  }}>
                   <View
-                    className="w-1 h-10 rounded-full mr-3"
-                    style={{ backgroundColor: d.team_color || '#666' }}
+                    style={{
+                      width: 4,
+                      height: 42,
+                      borderRadius: 2,
+                      backgroundColor: teamColor,
+                      marginRight: 10,
+                    }}
                   />
                   {d.photo_url ? (
                     <Image
                       source={{ uri: d.photo_url }}
-                      style={{ width: 40, height: 40, borderRadius: 20 }}
+                      style={{ width: 44, height: 44, borderRadius: 22 }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: '#1A1A24',
+                      }}
+                    />
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ color: '#FAFAFA', fontSize: 15, fontWeight: '800' }}>
+                        {d.name}
+                      </Text>
+                      {d.country ? (
+                        <Text style={{ fontSize: 13, marginLeft: 6 }}>{flagFor(d.country)}</Text>
+                      ) : null}
+                    </View>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <View
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: 3,
+                          backgroundColor: teamColor,
+                          marginRight: 5,
+                        }}
+                      />
+                      <Text style={{ color: teamColor, fontSize: 11, fontWeight: '700' }}>
+                        {d.team}
+                      </Text>
+                    </View>
+                  </View>
+                  {logo ? (
+                    <Image
+                      source={{ uri: logo }}
+                      style={{ width: 26, height: 26, marginRight: 10 }}
+                      contentFit="contain"
                     />
                   ) : null}
-                  <View className="flex-1 ml-3">
-                    <View className="flex-row items-center">
-                      <Text className="text-text font-bold">{d.name}</Text>
-                      <Text className="text-muted text-xs ml-2">{flagFor(d.country)}</Text>
-                    </View>
-                    <Text className="text-muted text-xs">{d.team}</Text>
-                  </View>
-                  {selected && <Ionicons name="heart" size={20} color="#E10600" />}
+                  <Ionicons
+                    name={selected ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={selected ? '#E10600' : '#3A3A4A'}
+                  />
                 </Pressable>
               );
             })}
 
-          {tab === 'Команда' && constructors.isLoading && <ActivityIndicator color="#E10600" />}
+          {tab === 'Команда' && constructors.isLoading && (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator color="#E10600" />
+            </View>
+          )}
           {tab === 'Команда' &&
             constructors.data?.standings.map((c) => {
               const selected = user.favorite_team === c.team;
+              const teamColor = c.team_color || '#666';
+              const logo = teamLogos[c.team];
               return (
                 <Pressable
                   key={c.team}
                   onPress={() => pickTeam(c.team)}
                   disabled={busy}
-                  className={`rounded-2xl p-4 flex-row items-center border active:opacity-80 ${
-                    selected ? 'bg-red/15 border-red' : 'bg-surface border-line'
-                  }`}
-                  style={selected ? undefined : { backgroundColor: (c.team_color || '#666') + '15' }}>
+                  style={{
+                    backgroundColor: CARD_BG,
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: selected ? '#E10600' : teamColor + '44',
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    overflow: 'hidden',
+                    shadowColor: selected ? '#E10600' : 'transparent',
+                    shadowOpacity: selected ? 0.3 : 0,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: selected ? 5 : 0,
+                  }}>
                   <View
-                    className="w-1.5 h-10 rounded-full mr-3"
-                    style={{ backgroundColor: c.team_color || '#666' }}
+                    style={{
+                      width: 4,
+                      height: 44,
+                      borderRadius: 2,
+                      backgroundColor: teamColor,
+                      marginRight: 12,
+                    }}
                   />
-                  <View className="flex-1">
-                    <Text className="text-text font-extrabold">{c.team}</Text>
-                    <Text className="text-muted text-xs mt-0.5">
+                  {logo ? (
+                    <Image
+                      source={{ uri: logo }}
+                      style={{ width: 44, height: 44 }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 8,
+                        backgroundColor: teamColor + '22',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Ionicons name="car-sport" size={22} color={teamColor} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ color: '#FAFAFA', fontSize: 16, fontWeight: '800' }}>
+                      {c.team}
+                    </Text>
+                    <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
                       {c.points} очков · P{c.position ?? '—'}
                     </Text>
                   </View>
-                  {selected && <Ionicons name="heart" size={22} color="#E10600" />}
+                  <Ionicons
+                    name={selected ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={selected ? '#E10600' : '#3A3A4A'}
+                  />
                 </Pressable>
               );
             })}
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 8,
+      }}>
+      <Pressable
+        onPress={onBack}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
+      </Pressable>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          color: '#FAFAFA',
+          fontSize: 19,
+          fontWeight: '700',
+          marginRight: 44,
+        }}
+        numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }

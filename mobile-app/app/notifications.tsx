@@ -15,6 +15,9 @@ import { Stack, useRouter } from 'expo-router';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
+
 type Prefs = { notify_race: boolean; notify_review: boolean };
 
 export default function NotificationsScreen() {
@@ -40,7 +43,6 @@ export default function NotificationsScreen() {
       const saved = await api.pushPrefsSet(next);
       setPrefs(saved);
     } catch (e: unknown) {
-      // revert on failure
       setPrefs(prefs);
       Alert.alert('Ошибка', e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
@@ -50,18 +52,31 @@ export default function NotificationsScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 bg-bg">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView edges={['top']} className="flex-1 items-center justify-center px-6">
+        <SafeAreaView
+          edges={['top']}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
           <Ionicons name="notifications-off" size={48} color="#6B6B7B" />
-          <Text className="text-text font-bold text-lg mt-4">Войди в аккаунт</Text>
-          <Text className="text-muted text-sm mt-1 text-center">
+          <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 18, marginTop: 16 }}>
+            Войди в аккаунт
+          </Text>
+          <Text
+            style={{ color: '#A0A0B0', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
             Уведомления настраиваются только для авторизованных пользователей.
           </Text>
           <Pressable
             onPress={() => router.back()}
-            className="mt-6 bg-surface px-6 py-3 rounded-full border border-line">
-            <Text className="text-text font-bold">Назад</Text>
+            style={{
+              marginTop: 24,
+              backgroundColor: CARD_BG,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}>
+            <Text style={{ color: '#FAFAFA', fontWeight: '700' }}>Назад</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -69,33 +84,32 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
-          </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Уведомления
-          </Text>
-        </View>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <Header onBack={() => router.back()} title="Уведомления" />
 
         {prefs == null ? (
-          <View className="flex-1 items-center justify-center">
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color="#E10600" />
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-            <View className="px-5 mt-2 mb-3">
-              <Text className="text-muted text-xs leading-5">
+            <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+              <Text className="text-muted" style={{ fontSize: 12, lineHeight: 17 }}>
                 Push приходят на этот телефон. Выключи то, что не нужно.
               </Text>
             </View>
 
-            <View className="mx-4 bg-surface rounded-2xl border border-line">
+            <View
+              style={{
+                marginHorizontal: 16,
+                backgroundColor: CARD_BG,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)',
+                overflow: 'hidden',
+              }}>
               <Row
                 icon="flag"
                 label="Старт гонки"
@@ -103,8 +117,8 @@ export default function NotificationsScreen() {
                 value={prefs.notify_race}
                 onChange={(v) => updatePref('notify_race', v)}
                 disabled={busy}
+                isLast={false}
               />
-              <View className="h-px bg-line mx-4" />
               <Row
                 icon="film"
                 label="Новый обзор гонки"
@@ -112,19 +126,75 @@ export default function NotificationsScreen() {
                 value={prefs.notify_review}
                 onChange={(v) => updatePref('notify_review', v)}
                 disabled={busy}
+                isLast
               />
             </View>
 
-            <View className="mx-4 mt-4 bg-surface rounded-xl border border-line p-4 flex-row items-start">
-              <Ionicons name="information-circle-outline" size={18} color="#A0A0B0" />
-              <Text className="text-muted text-xs ml-2 flex-1 leading-5">
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginTop: 14,
+                backgroundColor: CARD_BG,
+                borderRadius: 14,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)',
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+              }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 1,
+                }}>
+                <Ionicons name="information" size={16} color="#A0A0B0" />
+              </View>
+              <Text
+                className="text-muted"
+                style={{ fontSize: 12, marginLeft: 10, flex: 1, lineHeight: 17 }}>
                 Уведомления о результатах прогнозов приходят через Telegram-бота{' '}
-                <Text className="text-text font-bold">@F1_egor_bot</Text>.
+                <Text style={{ color: '#FAFAFA', fontWeight: '700' }}>@F1_egor_bot</Text>.
               </Text>
             </View>
           </ScrollView>
         )}
       </SafeAreaView>
+    </View>
+  );
+}
+
+function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 8,
+      }}>
+      <Pressable
+        onPress={onBack}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
+      </Pressable>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          color: '#FAFAFA',
+          fontSize: 19,
+          fontWeight: '700',
+          marginRight: 44,
+        }}
+        numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }
@@ -136,6 +206,7 @@ function Row({
   value,
   onChange,
   disabled,
+  isLast,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -143,21 +214,40 @@ function Row({
   value: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  isLast: boolean;
 }) {
   return (
-    <View className="px-4 py-4 flex-row items-center">
-      <View className="w-10 h-10 rounded-full bg-surface-2 items-center justify-center">
-        <Ionicons name={icon} size={18} color={value ? '#E10600' : '#A0A0B0'} />
+    <View
+      style={{
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+      }}>
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          backgroundColor: 'rgba(225,6,0,0.15)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Ionicons name={icon} size={18} color="#E10600" />
       </View>
-      <View className="flex-1 ml-3">
-        <Text className="text-text font-bold">{label}</Text>
-        <Text className="text-muted text-xs mt-0.5">{hint}</Text>
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 14 }}>{label}</Text>
+        <Text className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+          {hint}
+        </Text>
       </View>
       <Switch
         value={value}
         onValueChange={onChange}
         disabled={disabled}
-        trackColor={{ false: '#2F2F3E', true: '#E10600' }}
+        trackColor={{ false: '#2A2A38', true: '#E10600' }}
         thumbColor="#fff"
       />
     </View>

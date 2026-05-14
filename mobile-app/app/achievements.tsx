@@ -2,13 +2,16 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Polygon } from 'react-native-svg';
 import { Stack, useRouter } from 'expo-router';
 
 import { useAchievements } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
 import type { UnlockedAchievement } from '@/lib/api';
 
-// Mirror of backend ACHIEVEMENTS dict — kept in sync with config.py
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
+
 const ACHIEVEMENTS: { key: string; name: string; desc: string; icon: string }[] = [
   { key: 'first_prediction', name: 'Первый прогноз', desc: 'Сделай свой первый прогноз', icon: '🔮' },
   { key: 'first_win', name: 'Первая победа', desc: 'Угадай победителя гонки', icon: '🏆' },
@@ -37,18 +40,30 @@ export default function AchievementsScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 bg-bg">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView edges={['top']} className="flex-1 items-center justify-center px-6">
+        <SafeAreaView
+          edges={['top']}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
           <Ionicons name="trophy" size={48} color="#6B6B7B" />
-          <Text className="text-text font-bold text-lg mt-4">Войди в аккаунт</Text>
-          <Text className="text-muted text-sm mt-1 text-center">
+          <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 18, marginTop: 16 }}>
+            Войди в аккаунт
+          </Text>
+          <Text style={{ color: '#A0A0B0', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
             Чтобы видеть открытые достижения и зарабатывать новые.
           </Text>
           <Pressable
             onPress={() => router.back()}
-            className="mt-6 bg-surface px-6 py-3 rounded-full border border-line">
-            <Text className="text-text font-bold">Назад</Text>
+            style={{
+              marginTop: 24,
+              backgroundColor: CARD_BG,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}>
+            <Text style={{ color: '#FAFAFA', fontWeight: '700' }}>Назад</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -57,85 +72,136 @@ export default function AchievementsScreen() {
 
   const unlockedCount = unlockedKeys.size;
   const total = ACHIEVEMENTS.length;
+  const percent = Math.round((unlockedCount / total) * 100);
 
   return (
-    <View className="flex-1 bg-bg">
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-4 pt-2 pb-2 flex-row items-center">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
-          </Pressable>
-          <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Достижения
-          </Text>
-        </View>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <Header onBack={() => router.back()} title="Достижения" />
 
-        <View className="mx-4 mb-3 bg-surface rounded-2xl border border-line p-4">
-          <View className="flex-row items-center">
-            <View className="w-12 h-12 rounded-full bg-red/15 items-center justify-center">
+        {/* Progress card */}
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginBottom: 16,
+            backgroundColor: CARD_BG,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(225,6,0,0.18)',
+            padding: 16,
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: 'rgba(225,6,0,0.15)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Ionicons name="trophy" size={22} color="#E10600" />
             </View>
-            <View className="flex-1 ml-3">
-              <Text className="text-text text-2xl font-extrabold">
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
                 {unlockedCount} / {total}
               </Text>
-              <Text className="text-muted text-xs">Разблокировано</Text>
+              <Text style={{ color: '#A0A0B0', fontSize: 11, marginTop: 2 }}>Разблокировано</Text>
             </View>
-            <View>
-              <Text className="text-red text-xl font-extrabold">
-                {Math.round((unlockedCount / total) * 100)}%
-              </Text>
-            </View>
+            <Text style={{ color: '#E10600', fontSize: 22, fontWeight: '800' }}>{percent}%</Text>
           </View>
           {/* Progress bar */}
-          <View className="h-1.5 bg-surface-2 rounded-full mt-3 overflow-hidden">
+          <View
+            style={{
+              height: 6,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              borderRadius: 3,
+              marginTop: 12,
+              overflow: 'hidden',
+            }}>
             <View
-              className="h-full bg-red rounded-full"
-              style={{ width: `${(unlockedCount / total) * 100}%` }}
+              style={{
+                height: '100%',
+                width: `${percent}%`,
+                backgroundColor: '#E10600',
+                borderRadius: 3,
+              }}
             />
           </View>
         </View>
 
         {ach.isLoading && (
-          <View className="py-6 items-center">
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
             <ActivityIndicator color="#E10600" />
           </View>
         )}
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 120 }}>
-          <View className="flex-row flex-wrap">
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 120 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {ACHIEVEMENTS.map((a) => {
               const unlocked = unlockedKeys.has(a.key);
               return (
-                <View key={a.key} style={{ width: '50%', paddingHorizontal: 8, marginBottom: 12 }}>
+                <View
+                  key={a.key}
+                  style={{ width: '50%', paddingHorizontal: 4, marginBottom: 10 }}>
                   <View
-                    className={`rounded-2xl border p-4 items-center ${
-                      unlocked ? 'bg-surface border-red/40' : 'bg-surface border-line'
-                    }`}
-                    style={{ aspectRatio: 0.95 }}>
-                    <Text style={{ fontSize: 44, opacity: unlocked ? 1 : 0.2 }}>
-                      {a.icon}
-                    </Text>
+                    style={{
+                      backgroundColor: CARD_BG,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: unlocked ? 'rgba(225,6,0,0.4)' : 'rgba(255,255,255,0.05)',
+                      padding: 14,
+                      alignItems: 'center',
+                      aspectRatio: 0.95,
+                      shadowColor: unlocked ? '#E10600' : 'transparent',
+                      shadowOpacity: unlocked ? 0.25 : 0,
+                      shadowRadius: 10,
+                      shadowOffset: { width: 0, height: 4 },
+                      elevation: unlocked ? 4 : 0,
+                    }}>
+                    {/* Hex frame */}
+                    <View
+                      style={{ width: 64, height: 70, alignItems: 'center', justifyContent: 'center' }}>
+                      <Svg
+                        width={64}
+                        height={70}
+                        viewBox="0 0 64 70"
+                        style={{ position: 'absolute' }}>
+                        <Polygon
+                          points="32,3 59,17 59,53 32,67 5,53 5,17"
+                          fill="rgba(255,255,255,0.03)"
+                          stroke={unlocked ? '#E10600' : '#3A3A4A'}
+                          strokeWidth={1.8}
+                        />
+                      </Svg>
+                      <Text style={{ fontSize: 32, opacity: unlocked ? 1 : 0.25 }}>{a.icon}</Text>
+                    </View>
                     <Text
-                      className={`font-extrabold text-sm mt-2 text-center ${
-                        unlocked ? 'text-text' : 'text-muted-2'
-                      }`}
+                      style={{
+                        color: unlocked ? '#FAFAFA' : '#6B6B7B',
+                        fontWeight: '800',
+                        fontSize: 13,
+                        marginTop: 8,
+                        textAlign: 'center',
+                      }}
                       numberOfLines={1}>
                       {a.name}
                     </Text>
                     <Text
-                      className={`text-[11px] mt-1 text-center ${
-                        unlocked ? 'text-muted' : 'text-muted-2'
-                      }`}
+                      style={{
+                        color: unlocked ? '#A0A0B0' : '#3A3A4A',
+                        fontSize: 10.5,
+                        marginTop: 3,
+                        textAlign: 'center',
+                        lineHeight: 13,
+                      }}
                       numberOfLines={3}>
                       {a.desc}
                     </Text>
                     {!unlocked && (
-                      <View className="absolute top-2 right-2">
-                        <Ionicons name="lock-closed" size={14} color="#6B6B7B" />
+                      <View style={{ position: 'absolute', top: 8, right: 8 }}>
+                        <Ionicons name="lock-closed" size={12} color="#3A3A4A" />
                       </View>
                     )}
                   </View>
@@ -145,6 +211,37 @@ export default function AchievementsScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function Header({ onBack, title }: { onBack: () => void; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 8,
+      }}>
+      <Pressable
+        onPress={onBack}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
+      </Pressable>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          color: '#FAFAFA',
+          fontSize: 19,
+          fontWeight: '700',
+          marginRight: 44,
+        }}
+        numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }
