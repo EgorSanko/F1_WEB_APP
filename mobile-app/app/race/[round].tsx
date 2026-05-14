@@ -15,13 +15,27 @@ import { useBroadcasts, useRaceQualifying, useRaceResults, useSchedule, useTeams
 import type { Driver, RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
-import { BroadcastThumb } from '@/components/VideoPlayer';
+import { videoThumbnail, type Broadcast } from '@/lib/api';
 import { CircuitOutline } from '@/components/CircuitOutline';
 import { ruCity } from '@/lib/locale';
 import { getCircuitStats } from '@/lib/circuit-stats';
 
 const DARK_BG = '#0A0A12';
 const CARD_BG = '#12121C';
+const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
+
+// Цвет категории записи. Гонка — красный, квалификация — мерседес-тил,
+// практики — синий, обзор — оранжевый, и т.д. Унификация с мокапом.
+const SESSION_COLOR: Record<string, string> = {
+  race: '#E10600',
+  sprint: '#E10600',
+  qualifying: '#27F4D2',
+  sprint_qualifying: '#27F4D2',
+  fp1: '#3B9BFF',
+  fp2: '#3B9BFF',
+  fp3: '#3B9BFF',
+  review: '#FF9500',
+};
 
 const SESSION_ORDER_FOR_BROADCAST = [
   'fp1', 'fp2', 'fp3', 'sprint_qualifying', 'sprint', 'qualifying', 'race', 'review',
@@ -209,7 +223,7 @@ export default function RaceDetail() {
             date={race.date}
           />
 
-          {/* Tabs — сегментированная пилюля, активный таб с красной подложкой */}
+          {/* Tabs — сегментированная пилюля с иконками, активный таб красный */}
           <View
             style={{
               flexDirection: 'row',
@@ -223,14 +237,18 @@ export default function RaceDetail() {
             }}>
             {tabs.map((t) => {
               const active = t === tab;
+              const meta = TAB_META[t];
               return (
                 <Pressable
                   key={t}
                   onPress={() => setTab(t)}
                   style={{
                     flex: 1,
-                    paddingVertical: 10,
+                    flexDirection: 'row',
                     alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 9,
+                    paddingHorizontal: 4,
                     borderRadius: 999,
                     backgroundColor: active ? '#E10600' : 'transparent',
                     shadowColor: active ? '#E10600' : 'transparent',
@@ -239,12 +257,18 @@ export default function RaceDetail() {
                     shadowOffset: { width: 0, height: 3 },
                     elevation: active ? 4 : 0,
                   }}>
+                  <Ionicons
+                    name={meta.icon}
+                    size={12}
+                    color={active ? '#FAFAFA' : '#A0A0B0'}
+                    style={{ marginRight: 4 }}
+                  />
                   <Text
                     numberOfLines={1}
                     style={{
                       color: active ? '#FAFAFA' : '#A0A0B0',
                       fontWeight: active ? '800' : '600',
-                      fontSize: 12,
+                      fontSize: 11,
                     }}>
                     {t}
                   </Text>
@@ -373,163 +397,62 @@ export default function RaceDetail() {
               <View
                 style={{
                   flexDirection: 'row',
-                  alignItems: 'flex-end',
-                  justifyContent: 'space-between',
-                  marginBottom: 16,
+                  alignItems: 'center',
+                  marginBottom: 18,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  height: 76,
                 }}>
-                <View style={{ flex: 1 }}>
+                <View
+                  style={{
+                    width: 4,
+                    height: 30,
+                    backgroundColor: '#E10600',
+                    borderRadius: 2,
+                    marginRight: 12,
+                    marginTop: 6,
+                  }}
+                />
+                <View style={{ flex: 1, paddingTop: 2 }}>
                   <Text
                     style={{
                       color: '#FAFAFA',
-                      fontSize: 22,
+                      fontSize: 26,
                       fontWeight: '800',
                       letterSpacing: -0.3,
                       textTransform: 'uppercase',
                       fontStyle: 'italic',
+                      lineHeight: 28,
                     }}>
                     ЗАПИСИ
                   </Text>
-                  <Text className="text-muted text-xs mt-1">
-                    Смотри ключевые моменты уикенда{race.locality ? ` в ${ruCity(race.locality)}е` : ''}
+                  <Text
+                    className="text-muted"
+                    style={{ fontSize: 12, marginTop: 6, lineHeight: 16 }}
+                    numberOfLines={2}>
+                    Смотри ключевые моменты уикенда
+                    {race.locality ? ` в ${ruCity(race.locality)}е` : ''}
                   </Text>
                 </View>
-                <View
-                  pointerEvents="none"
+                {/* F1 car silhouette decoration */}
+                <Image
+                  source={{ uri: CAR_OVERLAY }}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    marginBottom: 8,
-                  }}>
-                  <View style={{ width: 20, height: 2, backgroundColor: '#3A3A4A', borderRadius: 1 }} />
-                  <View style={{ width: 28, height: 2, backgroundColor: '#E10600', borderRadius: 1 }} />
-                  <View
-                    style={{ width: 14, height: 2, backgroundColor: '#E10600', opacity: 0.5, borderRadius: 1 }}
-                  />
-                </View>
+                    position: 'absolute',
+                    right: -16,
+                    top: -8,
+                    width: 170,
+                    height: 90,
+                    opacity: 0.7,
+                  }}
+                  contentFit="contain"
+                />
               </View>
 
               <View style={{ gap: 12 }}>
-                {raceBroadcasts.map((b) => {
-                  const badge = SESSION_SHORT[b.session_type] ?? b.session_type.toUpperCase();
-                  const titleRu = (SESSION_LABELS[b.session_type] ?? b.session_type).toUpperCase();
-                  const dateStr = b.started_at
-                    ? new Date(b.started_at).toLocaleDateString('ru-RU', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })
-                    : null;
-                  return (
-                    <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                      <Pressable
-                        style={{
-                          backgroundColor: CARD_BG,
-                          borderRadius: 18,
-                          borderWidth: 1,
-                          borderColor: 'rgba(255,255,255,0.05)',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          overflow: 'hidden',
-                        }}>
-                        <View style={{ position: 'relative' }}>
-                          <BroadcastThumb
-                            videoUrl={b.video_url}
-                            embedUrl={b.embed_url}
-                            width={140}
-                          />
-                          <View
-                            style={{
-                              position: 'absolute',
-                              left: 8,
-                              top: 8,
-                              backgroundColor: '#E10600',
-                              paddingHorizontal: 7,
-                              paddingVertical: 3,
-                              borderRadius: 5,
-                            }}>
-                            <Text
-                              style={{
-                                color: '#FAFAFA',
-                                fontSize: 9,
-                                fontWeight: '800',
-                                letterSpacing: 1.3,
-                              }}>
-                              {badge}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 14 }}>
-                          <Text
-                            style={{
-                              color: '#FAFAFA',
-                              fontSize: 15,
-                              fontWeight: '800',
-                              letterSpacing: 0.3,
-                            }}
-                            numberOfLines={1}>
-                            {titleRu}
-                          </Text>
-                          {dateStr ? (
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                marginTop: 6,
-                              }}>
-                              <Ionicons
-                                name="calendar-outline"
-                                size={11}
-                                color="#6B6B7B"
-                                style={{ marginRight: 5 }}
-                              />
-                              <Text
-                                style={{ color: '#6B6B7B', fontSize: 11, fontWeight: '600' }}>
-                                {dateStr}
-                              </Text>
-                            </View>
-                          ) : null}
-                          {b.title && b.title !== titleRu ? (
-                            <Text className="text-muted text-xs mt-1.5" numberOfLines={1}>
-                              {b.title}
-                            </Text>
-                          ) : null}
-                          {b.is_live ? (
-                            <View
-                              style={{
-                                alignSelf: 'flex-start',
-                                marginTop: 6,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                              }}>
-                              <View
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: 3,
-                                  backgroundColor: '#E10600',
-                                  marginRight: 5,
-                                }}
-                              />
-                              <Text
-                                style={{
-                                  color: '#E10600',
-                                  fontSize: 9,
-                                  fontWeight: '800',
-                                  letterSpacing: 1.5,
-                                }}>
-                                LIVE
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <View style={{ paddingRight: 14 }}>
-                          <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
-                        </View>
-                      </Pressable>
-                    </Link>
-                  );
-                })}
+                {raceBroadcasts.map((b) => (
+                  <RecordCard key={b.id} broadcast={b} raceName={race.name} />
+                ))}
               </View>
 
               {/* Footer info pill */}
@@ -538,15 +461,25 @@ export default function RaceDetail() {
                   marginTop: 18,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingVertical: 12,
+                  paddingVertical: 14,
                   paddingHorizontal: 14,
                   backgroundColor: CARD_BG,
                   borderRadius: 14,
                   borderWidth: 1,
                   borderColor: 'rgba(255,255,255,0.05)',
                 }}>
-                <Ionicons name="information-circle-outline" size={16} color="#6B6B7B" />
-                <Text className="text-muted text-xs ml-2 flex-1" style={{ lineHeight: 16 }}>
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons name="information" size={16} color="#A0A0B0" />
+                </View>
+                <Text className="text-muted text-xs ml-3 flex-1" style={{ lineHeight: 16 }}>
                   Для просмотра записей требуется стабильное интернет-соединение
                 </Text>
               </View>
@@ -1275,6 +1208,240 @@ function QualifyingView({
       {/* Stats footer */}
       {stats && <StatsFooter stats={stats} />}
     </View>
+  );
+}
+
+// ============ RECORD CARD (Записи) ============
+
+function computeDuration(started?: string, ended?: string | null): string | null {
+  if (!started || !ended) return null;
+  const s = new Date(started).getTime();
+  const e = new Date(ended).getTime();
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return null;
+  const total = Math.floor((e - s) / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+const SESSION_DESCRIPTIONS: Record<string, string> = {
+  race: 'Полная запись гонки',
+  sprint: 'Полная запись спринта',
+  qualifying: 'Полная запись квалификации',
+  sprint_qualifying: 'Полная запись спринт-квалификации',
+  fp1: 'Свободная практика 1',
+  fp2: 'Свободная практика 2',
+  fp3: 'Все сессии третьей практики',
+  review: 'Обзор гран-при',
+};
+
+function RecordCard({ broadcast, raceName }: { broadcast: Broadcast; raceName: string }) {
+  const color = SESSION_COLOR[broadcast.session_type] ?? '#E10600';
+  const badge = SESSION_SHORT[broadcast.session_type] ?? broadcast.session_type.toUpperCase();
+  const title = (SESSION_LABELS[broadcast.session_type] ?? broadcast.session_type).toUpperCase();
+  const description =
+    broadcast.title ??
+    `${SESSION_DESCRIPTIONS[broadcast.session_type] ?? title} ${raceName}`.trim();
+  const dateStr = broadcast.started_at
+    ? new Date(broadcast.started_at).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
+  const duration = computeDuration(broadcast.started_at, broadcast.ended_at);
+  const thumb = videoThumbnail(broadcast.video_url, broadcast.embed_url);
+
+  return (
+    <Link href={`/broadcast/${broadcast.id}` as never} asChild>
+      <Pressable
+        style={{
+          backgroundColor: CARD_BG,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: broadcast.session_type === 'race' ? color + '55' : 'rgba(255,255,255,0.05)',
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          overflow: 'hidden',
+          shadowColor: broadcast.session_type === 'race' ? color : 'transparent',
+          shadowOpacity: broadcast.session_type === 'race' ? 0.2 : 0,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: broadcast.session_type === 'race' ? 4 : 0,
+        }}>
+        {/* Thumbnail with category badge and play overlay */}
+        <View style={{ width: 156, aspectRatio: 16 / 10, backgroundColor: '#1A1A24', position: 'relative' }}>
+          {thumb ? (
+            <Image
+              source={{ uri: thumb }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+            />
+          ) : (
+            <View
+              style={{
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Ionicons name="videocam-outline" size={26} color="#3A3A4A" />
+            </View>
+          )}
+          {/* Category badge */}
+          <View
+            style={{
+              position: 'absolute',
+              left: 8,
+              top: 8,
+              backgroundColor: color,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 5,
+            }}>
+            <Text
+              style={{
+                color: '#FAFAFA',
+                fontSize: 10,
+                fontWeight: '800',
+                letterSpacing: 1.3,
+              }}>
+              {badge}
+            </Text>
+          </View>
+          {/* Play button outline in category color */}
+          <View
+            style={{
+              position: 'absolute',
+              left: 10,
+              bottom: 10,
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              borderWidth: 2,
+              borderColor: color,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.5)',
+            }}>
+            <Ionicons name="play" size={14} color={color} style={{ marginLeft: 2 }} />
+          </View>
+        </View>
+
+        {/* Info */}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'stretch' }}>
+          {/* Category color vertical bar */}
+          <View
+            style={{
+              width: 3,
+              backgroundColor: color,
+              marginVertical: 14,
+              marginLeft: 0,
+              borderTopRightRadius: 2,
+              borderBottomRightRadius: 2,
+            }}
+          />
+          <View style={{ flex: 1, paddingLeft: 10, paddingRight: 10, paddingVertical: 12 }}>
+            <Text
+              style={{
+                color: '#FAFAFA',
+                fontSize: 14,
+                fontWeight: '800',
+                letterSpacing: 0.3,
+              }}
+              numberOfLines={2}>
+              {title}
+            </Text>
+            {dateStr ? (
+              <Text style={{ color: '#A0A0B0', fontSize: 11, marginTop: 4 }}>
+                {dateStr}
+              </Text>
+            ) : null}
+            <Text
+              style={{ color: '#6B6B7B', fontSize: 11, marginTop: 5, lineHeight: 14 }}
+              numberOfLines={2}>
+              {description}
+            </Text>
+            {/* Duration + HD row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 8,
+                flexWrap: 'wrap',
+              }}>
+              {duration ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 6,
+                    paddingVertical: 3,
+                    borderRadius: 5,
+                    backgroundColor: color + '1A',
+                    marginRight: 6,
+                  }}>
+                  <Ionicons name="time-outline" size={10} color={color} />
+                  <Text
+                    style={{
+                      color,
+                      fontSize: 10.5,
+                      fontWeight: '800',
+                      marginLeft: 3,
+                    }}>
+                    {duration}
+                  </Text>
+                </View>
+              ) : null}
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                  borderWidth: 1,
+                  borderColor: color,
+                }}>
+                <Text
+                  style={{
+                    color,
+                    fontSize: 9,
+                    fontWeight: '800',
+                    letterSpacing: 0.5,
+                  }}>
+                  HD
+                </Text>
+              </View>
+              {broadcast.is_live ? (
+                <View
+                  style={{
+                    marginLeft: 6,
+                    backgroundColor: '#E10600',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}>
+                  <Text
+                    style={{
+                      color: '#FAFAFA',
+                      fontSize: 9,
+                      fontWeight: '800',
+                      letterSpacing: 1,
+                    }}>
+                    LIVE
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        <View style={{ paddingRight: 10, justifyContent: 'center' }}>
+          <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+        </View>
+      </Pressable>
+    </Link>
   );
 }
 
