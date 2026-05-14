@@ -493,29 +493,51 @@ function PredictionForm({
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1 bg-bg">
-        <SafeAreaView edges={['top']} className="flex-1">
-          <View className="px-4 pt-2 pb-3 flex-row items-center">
-            <Pressable onPress={onClose} className="w-10 h-10 items-center justify-center">
-              <Ionicons name="close" size={26} color="#FAFAFA" />
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          {/* Header with back arrow */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 }}>
+            <Pressable
+              onPress={onClose}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="chevron-back" size={28} color="#FAFAFA" />
             </Pressable>
-            <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
+            <Text
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                color: '#FAFAFA',
+                fontSize: 19,
+                fontWeight: '700',
+              }}>
               {info.label}
             </Text>
+            <View style={{ width: 44, height: 44 }} />
           </View>
-          <View className="px-5 pb-4">
-            <Text className="text-muted text-sm">
-              {info.description} · до{' '}
-              <Text className="text-red font-bold">+{info.max_points} очков</Text>
+
+          {/* Subtitle: description • до +N очков */}
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingBottom: 16,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+            }}>
+            <Text className="text-muted text-sm">{info.description}</Text>
+            <Text className="text-muted-2 text-sm">  •  </Text>
+            <Text className="text-muted text-sm">до </Text>
+            <Text style={{ color: '#E10600', fontWeight: '800', fontSize: 14 }}>
+              +{info.max_points} очков
             </Text>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
             {(info.type === 'winner' || info.type === 'fastest_lap') && (
               <DriverPickerList
                 drivers={drivers}
                 selected={pick != null ? [pick] : []}
                 onPick={(n) => setPick(n)}
+                single
               />
             )}
 
@@ -524,82 +546,39 @@ function PredictionForm({
             )}
 
             {info.type === 'dnf_count' && (
-              <View className="px-5">
-                <Text className="text-muted text-sm mb-3">
-                  Сколько пилотов сойдёт с дистанции?
-                </Text>
-                <TextInput
-                  value={dnfCount}
-                  onChangeText={(t) => setDnfCount(t.replace(/[^0-9]/g, ''))}
-                  placeholder="0"
-                  placeholderTextColor="#6B6B7B"
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  autoFocus
-                  className="bg-surface text-text text-4xl font-extrabold text-center px-4 py-5 rounded-2xl border border-line"
-                />
-                <Text className="text-muted-2 text-xs mt-2 text-center">
-                  ±1 от верного значения тоже даёт +15 очков
-                </Text>
-              </View>
+              <DnfPicker value={dnfCount} onChange={setDnfCount} />
             )}
 
             {info.type === 'safety_car' && (
-              <View className="px-5">
-                <Text className="text-muted text-sm mb-4">
-                  Появится ли машина безопасности на трассе?
-                </Text>
-                <View className="flex-row gap-3">
-                  <Pressable
-                    onPress={() => setSafetyCar(true)}
-                    className={`flex-1 py-6 rounded-2xl items-center border ${
-                      safetyCar === true ? 'bg-red border-red' : 'bg-surface border-line'
-                    }`}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={36}
-                      color={safetyCar === true ? '#fff' : '#A0A0B0'}
-                    />
-                    <Text
-                      className={`mt-2 font-extrabold ${
-                        safetyCar === true ? 'text-text' : 'text-muted'
-                      }`}>
-                      ДА
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setSafetyCar(false)}
-                    className={`flex-1 py-6 rounded-2xl items-center border ${
-                      safetyCar === false ? 'bg-red border-red' : 'bg-surface border-line'
-                    }`}>
-                    <Ionicons
-                      name="close-circle"
-                      size={36}
-                      color={safetyCar === false ? '#fff' : '#A0A0B0'}
-                    />
-                    <Text
-                      className={`mt-2 font-extrabold ${
-                        safetyCar === false ? 'text-text' : 'text-muted'
-                      }`}>
-                      НЕТ
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+              <SafetyCarPicker value={safetyCar} onChange={setSafetyCar} />
             )}
           </ScrollView>
 
-          <View className="px-4 pb-6 pt-2 border-t border-line bg-bg">
+          {/* Submit */}
+          <View style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12 }}>
             <Pressable
               onPress={handleSubmit}
               disabled={!canSubmit || busy}
-              className={`bg-red rounded-2xl py-4 items-center ${
-                !canSubmit || busy ? 'opacity-40' : 'active:opacity-80'
-              }`}>
+              style={{
+                paddingVertical: 18,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: canSubmit && !busy ? '#E10600' : 'rgba(225,6,0,0.25)',
+                borderWidth: 1,
+                borderColor: canSubmit ? 'rgba(255,255,255,0.12)' : 'rgba(225,6,0,0.3)',
+                shadowColor: '#E10600',
+                shadowOpacity: canSubmit && !busy ? 0.45 : 0,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 6 },
+                elevation: canSubmit && !busy ? 8 : 0,
+              }}>
               {busy ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text className="text-text font-bold text-base">Отправить прогноз</Text>
+                <Text className="text-text font-bold" style={{ fontSize: 16 }}>
+                  Отправить прогноз
+                </Text>
               )}
             </Pressable>
           </View>
@@ -609,55 +588,167 @@ function PredictionForm({
   );
 }
 
+// ============ DRIVER PICKER (winner / fastest_lap / used by podium) ============
+
 function DriverPickerList({
   drivers,
   selected,
   onPick,
+  single = false,
 }: {
   drivers: Driver[];
   selected: number[];
   onPick: (driverNumber: number) => void;
+  single?: boolean;
 }) {
+  const sorted = useMemo(() => {
+    return [...drivers].sort((a, b) => {
+      const pa = a.position ?? 999;
+      const pb = b.position ?? 999;
+      if (pa !== pb) return pa - pb;
+      return (b.points ?? 0) - (a.points ?? 0);
+    });
+  }, [drivers]);
+
   return (
-    <View className="px-4 gap-2">
-      {drivers.map((d) => {
+    <View className="px-4" style={{ gap: 10 }}>
+      {sorted.map((d, i) => {
         const isSelected = selected.includes(d.driver_number);
-        const rank = selected.indexOf(d.driver_number) + 1;
+        const rank = single ? null : selected.indexOf(d.driver_number) + 1;
+        const teamColor = d.team_color || '#666';
+        const num = i + 1;
+
         return (
           <Pressable
             key={d.driver_number}
             onPress={() => onPick(d.driver_number)}
-            className={`bg-surface rounded-xl p-3 border flex-row items-center active:opacity-80 ${
-              isSelected ? 'border-red' : 'border-line'
-            }`}>
-            {isSelected && (
-              <View className="w-7 h-7 rounded-full bg-red items-center justify-center mr-2">
-                <Text className="text-text font-extrabold text-sm">{rank}</Text>
-              </View>
-            )}
+            style={{
+              backgroundColor: CARD_BG,
+              borderRadius: 18,
+              borderWidth: 1.5,
+              borderColor: isSelected ? '#E10600' : 'rgba(255,255,255,0.05)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              overflow: 'hidden',
+              shadowColor: isSelected ? '#E10600' : 'transparent',
+              shadowOpacity: isSelected ? 0.35 : 0,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: isSelected ? 6 : 0,
+            }}>
+            {/* Team-color left stripe */}
             <View
-              className="w-1 h-10 rounded-full mr-3"
-              style={{ backgroundColor: d.team_color || '#666' }}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 12,
+                bottom: 12,
+                width: 4,
+                borderRadius: 2,
+                backgroundColor: teamColor,
+              }}
             />
+
+            {/* Position number, colored by team */}
+            <View style={{ width: 42, alignItems: 'center', marginLeft: 4 }}>
+              <Text
+                style={{
+                  fontSize: 36,
+                  lineHeight: 36,
+                  fontWeight: '800',
+                  color: teamColor,
+                  letterSpacing: -1,
+                }}>
+                {num}
+              </Text>
+            </View>
+
+            {/* Photo */}
             {d.photo_url ? (
               <Image
                 source={{ uri: d.photo_url }}
-                style={{ width: 40, height: 40, borderRadius: 20 }}
+                style={{ width: 56, height: 56, borderRadius: 28, marginLeft: 8 }}
               />
             ) : null}
-            <View className="flex-1 ml-3">
-              <Text className="text-text font-bold">{d.name}</Text>
-              <Text className="text-muted text-xs">
-                #{d.driver_number} · {d.team}
+
+            {/* Name + #N • Team */}
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text
+                style={{
+                  color: '#FAFAFA',
+                  fontSize: 17,
+                  fontWeight: '700',
+                  letterSpacing: -0.3,
+                }}
+                numberOfLines={1}>
+                {d.name}
               </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                <Text style={{ color: '#6B6B7B', fontSize: 13, fontWeight: '600' }}>
+                  #{d.driver_number}
+                </Text>
+                <Text style={{ color: '#3A3A4A', fontSize: 13, marginHorizontal: 6 }}>•</Text>
+                <Text style={{ color: teamColor, fontSize: 13, fontWeight: '700' }}>
+                  {d.team}
+                </Text>
+              </View>
             </View>
-            {isSelected && <Ionicons name="checkmark" size={20} color="#E10600" />}
+
+            {/* Indicator: radio for single, rank pill for podium */}
+            {single ? (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  borderWidth: 2,
+                  borderColor: isSelected ? '#E10600' : '#3A3A4A',
+                  backgroundColor: isSelected ? '#E10600' : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 6,
+                }}>
+                {isSelected && (
+                  <View
+                    style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }}
+                  />
+                )}
+              </View>
+            ) : isSelected && rank ? (
+              <View
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: '#E10600',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 6,
+                }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{rank}</Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  borderWidth: 2,
+                  borderColor: '#3A3A4A',
+                  marginLeft: 6,
+                }}
+              />
+            )}
           </Pressable>
         );
       })}
     </View>
   );
 }
+
+// ============ PODIUM PICKER ============
 
 function PodiumPicker({
   drivers,
@@ -685,30 +776,60 @@ function PodiumPicker({
     return arr;
   }, [value, drivers]);
 
+  const podiumColors = ['#FFCB05', '#C0C0C0', '#CD7F32'];
+
   return (
     <View>
-      <View className="flex-row gap-2 px-4 mb-4">
-        {slots.map((s) => (
+      {/* P1 / P2 / P3 slot row */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 16 }}>
+        {slots.map((s, i) => (
           <View
             key={s.rank}
-            className="flex-1 aspect-[3/4] bg-surface rounded-xl border border-line items-center justify-center">
-            <Text
-              className="font-extrabold text-xl"
+            style={{
+              flex: 1,
+              aspectRatio: 3 / 4,
+              backgroundColor: CARD_BG,
+              borderRadius: 18,
+              borderWidth: 1.5,
+              borderColor: s.driver
+                ? podiumColors[i] + '88'
+                : 'rgba(255,255,255,0.05)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 14,
+            }}>
+            <View
               style={{
-                color: s.rank === 1 ? '#FFCB05' : s.rank === 2 ? '#C0C0C0' : '#CD7F32',
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: podiumColors[i] + '22',
+                borderWidth: 1.5,
+                borderColor: podiumColors[i],
+                alignItems: 'center',
+                justifyContent: 'center',
               }}>
-              P{s.rank}
-            </Text>
+              <Text
+                style={{
+                  color: podiumColors[i],
+                  fontWeight: '800',
+                  fontSize: 14,
+                }}>
+                P{s.rank}
+              </Text>
+            </View>
             {s.driver ? (
               <>
                 {s.driver.photo_url ? (
                   <Image
                     source={{ uri: s.driver.photo_url }}
-                    style={{ width: 56, height: 56, borderRadius: 28, marginTop: 6 }}
+                    style={{ width: 60, height: 60, borderRadius: 30, marginTop: 10 }}
                   />
                 ) : null}
-                <Text className="text-text text-xs font-bold mt-2 text-center px-1" numberOfLines={1}>
-                  {s.driver.last_name}
+                <Text
+                  style={{ color: '#FAFAFA', fontSize: 12, fontWeight: '700', marginTop: 8 }}
+                  numberOfLines={1}>
+                  {s.driver.last_name || s.driver.name}
                 </Text>
               </>
             ) : (
@@ -717,10 +838,170 @@ function PodiumPicker({
           </View>
         ))}
       </View>
-      <Text className="text-muted text-xs px-5 mb-2">
-        Выбирай по порядку: первый тап → P1, второй → P2, третий → P3
+      <Text className="text-muted text-xs px-5 mb-3">
+        Первый тап → P1, второй → P2, третий → P3. Тап повторно — убрать.
       </Text>
       <DriverPickerList drivers={drivers} selected={value} onPick={handlePick} />
+    </View>
+  );
+}
+
+// ============ DNF COUNT PICKER ============
+
+function DnfPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const dec = () => {
+    const n = parseInt(value || '0', 10);
+    onChange(String(Math.max(0, n - 1)));
+  };
+  const inc = () => {
+    const n = parseInt(value || '0', 10);
+    onChange(String(Math.min(20, n + 1)));
+  };
+
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      <Text className="text-muted text-sm mb-4 text-center">
+        Сколько пилотов сойдёт с дистанции?
+      </Text>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 14,
+          marginBottom: 16,
+        }}>
+        <Pressable
+          onPress={dec}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: CARD_BG,
+            borderWidth: 1,
+            borderColor: 'rgba(225,6,0,0.3)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Ionicons name="remove" size={24} color="#E10600" />
+        </Pressable>
+
+        <View
+          style={{
+            backgroundColor: CARD_BG,
+            borderRadius: 22,
+            borderWidth: 1.5,
+            borderColor: 'rgba(225,6,0,0.35)',
+            paddingVertical: 22,
+            paddingHorizontal: 38,
+            minWidth: 130,
+            alignItems: 'center',
+            shadowColor: '#E10600',
+            shadowOpacity: 0.3,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 6,
+          }}>
+          <TextInput
+            value={value}
+            onChangeText={(t) => onChange(t.replace(/[^0-9]/g, '').slice(0, 2))}
+            placeholder="0"
+            placeholderTextColor="#3A3A4A"
+            keyboardType="number-pad"
+            maxLength={2}
+            style={{
+              color: '#FAFAFA',
+              fontSize: 56,
+              lineHeight: 60,
+              fontWeight: '800',
+              textAlign: 'center',
+              minWidth: 70,
+              padding: 0,
+            }}
+          />
+        </View>
+
+        <Pressable
+          onPress={inc}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: CARD_BG,
+            borderWidth: 1,
+            borderColor: 'rgba(225,6,0,0.3)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Ionicons name="add" size={24} color="#E10600" />
+        </Pressable>
+      </View>
+
+      <Text className="text-muted-2 text-xs text-center">
+        ±1 от верного значения тоже даёт +15 очков
+      </Text>
+    </View>
+  );
+}
+
+// ============ SAFETY CAR PICKER ============
+
+function SafetyCarPicker({
+  value,
+  onChange,
+}: {
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={{ paddingHorizontal: 20 }}>
+      <Text className="text-muted text-sm mb-5 text-center">
+        Появится ли машина безопасности на трассе?
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        {[
+          { v: true, label: 'ДА', icon: 'checkmark-circle' as const },
+          { v: false, label: 'НЕТ', icon: 'close-circle' as const },
+        ].map((opt) => {
+          const active = value === opt.v;
+          return (
+            <Pressable
+              key={opt.label}
+              onPress={() => onChange(opt.v)}
+              style={{
+                flex: 1,
+                paddingVertical: 28,
+                borderRadius: 20,
+                alignItems: 'center',
+                backgroundColor: active ? '#E10600' : CARD_BG,
+                borderWidth: 1.5,
+                borderColor: active ? '#E10600' : 'rgba(255,255,255,0.06)',
+                shadowColor: '#E10600',
+                shadowOpacity: active ? 0.4 : 0,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: 6 },
+                elevation: active ? 8 : 0,
+              }}>
+              <Ionicons
+                name={opt.icon}
+                size={40}
+                color={active ? '#fff' : '#6B6B7B'}
+              />
+              <Text
+                style={{
+                  color: active ? '#FAFAFA' : '#A0A0B0',
+                  fontWeight: '800',
+                  fontSize: 16,
+                  marginTop: 10,
+                  letterSpacing: 2,
+                }}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
