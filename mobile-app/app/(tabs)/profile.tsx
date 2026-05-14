@@ -21,6 +21,7 @@ import { router } from 'expo-router';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
   { icon: 'list-outline', label: 'Мои прогнозы', href: '/my-predictions' },
+  { icon: 'game-controller-outline', label: 'Игры', href: '/games' },
   { icon: 'people-outline', label: 'Топ игроков', href: '/leaderboard' },
   { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
   { icon: 'newspaper-outline', label: 'Новости', href: '/news' },

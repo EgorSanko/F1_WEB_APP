@@ -397,6 +397,55 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  // Games
+  gamesStatus: () =>
+    apiFetch<{
+      games: Record<
+        string,
+        { can_play: boolean; seconds_left?: number; best_score?: number }
+      >;
+    }>('/api/games/status'),
+  gameResult: (payload: { game_type: string; score: number; details?: string }) =>
+    apiFetch<{
+      status: 'ok';
+      points_earned: number;
+      new_achievements?: string[];
+    }>('/api/games/result', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  gamesLeaderboard: (game_type?: string) =>
+    apiFetch<{
+      leaderboard: {
+        rank: number;
+        user_id: number;
+        first_name?: string;
+        last_name?: string;
+        photo_url?: string;
+        best_score: number;
+        attempts: number;
+      }[];
+    }>(`/api/games/leaderboard${game_type ? `?game_type=${game_type}` : ''}`, {
+      auth: false,
+    }),
+  quizQuestion: () =>
+    apiFetch<{
+      question: string;
+      options: string[];
+      category: string;
+      question_id: number;
+    }>('/api/quiz/question', { auth: false }),
+  quizAnswer: (payload: { question_id: number; answer: number }) =>
+    apiFetch<{
+      correct: boolean;
+      correct_answer: number;
+      explanation: string;
+    }>('/api/quiz/answer', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      auth: false,
+    }),
+
   // Authenticated
   me: () => apiFetch<User>('/api/user/me'),
   isAdmin: () => apiFetch<{ is_admin: boolean }>('/api/user/is-admin'),
