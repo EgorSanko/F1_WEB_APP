@@ -1,13 +1,15 @@
 /**
- * Unified video player with native playback wherever the backend can extract
- * a direct stream URL.
+ * Unified video player — mirrors how the TG webapp plays Rutube/HLS:
+ * WebView with an HTML page that uses hls.js + native <video> element.
  *
- * Strategy:
- *  - YouTube  → /api/youtube-stream/{id} returns best mp4 → expo-video native.
- *               Fallback to react-native-youtube-iframe if yt-dlp fails.
- *  - Rutube   → /api/rutube-stream/{id} returns HLS m3u8 (proxied) → expo-video.
- *               Fallback to Rutube iframe if backend errors.
- *  - VK / other → WebView iframe (no native SDK; no public direct-stream API).
+ * - Rutube  → fetch /api/rutube-stream/{id} → HLS m3u8 → hls.js <video>.
+ *             Real <video> controls (play/pause/seek/fullscreen/PiP via
+ *             the OS video player chrome), no iframe to Rutube.
+ * - YouTube → react-native-youtube-iframe (typed wrapper, works in Expo Go).
+ * - VK / other → WebView iframe (no public direct stream).
+ *
+ * hls.js is hosted on our backend at /static/vendor/hls.min.js — same one
+ * the TG webapp loads.
  */
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -15,10 +17,9 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { API_BASE } from '@/lib/api';
-import { useRutubeStream, useYoutubeStream } from '@/lib/hooks';
+import { useRutubeStream } from '@/lib/hooks';
 
 type Provider = 'youtube' | 'vk' | 'rutube' | 'other';
 
@@ -87,13 +88,7 @@ export function VideoPlayer({
   const resolved = resolveVideo(videoUrl, embedUrl);
 
   if (!playing) {
-    return (
-      <Poster
-        resolved={resolved}
-        title={title}
-        onPress={() => setPlaying(true)}
-      />
-    );
+    return <Poster resolved={resolved} title={title} onPress={() => setPlaying(true)} />;
   }
 
   if (resolved.provider === 'rutube' && resolved.rutubeId) {
@@ -101,10 +96,22 @@ export function VideoPlayer({
   }
 
   if (resolved.provider === 'youtube' && resolved.ytId) {
-    return <YouTubePlayer videoId={resolved.ytId} />;
+    return (
+      <View style={{ aspectRatio: 16 / 9, backgroundColor: '#000' }}>
+        <YoutubePlayer
+          videoId={resolved.ytId}
+          height={9999}
+          play
+          webViewProps={{
+            allowsFullscreenVideo: true,
+            allowsInlineMediaPlayback: true,
+          }}
+          initialPlayerParams={{ controls: true, modestbranding: true, rel: false }}
+        />
+      </View>
+    );
   }
 
-  // VK / other → WebView iframe
   return <IframePlayer src={resolved.iframeSrc ?? videoUrl} />;
 }
 
@@ -188,7 +195,7 @@ function Poster({
   );
 }
 
-// ============ RUTUBE → native HLS via expo-video ============
+// ============ RUTUBE → HLS via hls.js + <video> ============
 
 function RutubePlayer({ videoId, iframeSrc }: { videoId: string; iframeSrc: string }) {
   const stream = useRutubeStream(videoId);
@@ -209,72 +216,64 @@ function RutubePlayer({ videoId, iframeSrc }: { videoId: string; iframeSrc: stri
   }
 
   if (stream.data?.hls_url) {
-    // hls_url is /api/proxy-stream?url=... — absolute it for expo-video
-    const src = stream.data.hls_url.startsWith('/')
+    const fullHls = stream.data.hls_url.startsWith('/')
       ? `${API_BASE}${stream.data.hls_url}`
       : stream.data.hls_url;
-    return <NativePlayer source={src} />;
+    return <HlsPlayer hlsUrl={fullHls} />;
   }
 
+  // Backend failed → fall back to Rutube iframe
   return <IframePlayer src={iframeSrc} />;
 }
 
-// ============ YOUTUBE → direct mp4 (yt-dlp) or fallback iframe ============
+// ============ HLS PLAYER (WebView + hls.js + <video>) ============
 
-function YouTubePlayer({ videoId }: { videoId: string }) {
-  const stream = useYoutubeStream(videoId);
-
-  if (stream.isLoading) {
-    return (
-      <View
-        style={{
-          aspectRatio: 16 / 9,
-          backgroundColor: '#000',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <ActivityIndicator color="#E10600" />
-        <Text className="text-muted text-xs mt-2">Загружаем плеер…</Text>
-      </View>
-    );
-  }
-
-  if (stream.data?.best_url) {
-    return <NativePlayer source={stream.data.best_url} />;
-  }
-
-  return (
-    <View style={{ aspectRatio: 16 / 9, backgroundColor: '#000' }}>
-      <YoutubePlayer
-        videoId={videoId}
-        height={9999}
-        play
-        webViewProps={{
-          allowsFullscreenVideo: true,
-          allowsInlineMediaPlayback: true,
-        }}
-        initialPlayerParams={{ controls: true, modestbranding: true, rel: false }}
-      />
-    </View>
-  );
-}
-
-// ============ NATIVE PLAYER (expo-video) ============
-
-function NativePlayer({ source }: { source: string }) {
-  const player = useVideoPlayer(source, (p) => {
-    p.play();
-  });
+function HlsPlayer({ hlsUrl }: { hlsUrl: string }) {
+  const safeUrl = hlsUrl.replace(/"/g, '&quot;').replace(/'/g, '%27');
+  const html = `<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<script src="${API_BASE}/static/vendor/hls.min.js"></script>
+<style>
+  html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
+  video{position:fixed;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+</style>
+</head>
+<body>
+<video id="v" controls autoplay playsinline webkit-playsinline></video>
+<script>
+  (function(){
+    var url = "${safeUrl}";
+    var v = document.getElementById('v');
+    if (window.Hls && window.Hls.isSupported()) {
+      var hls = new window.Hls({ enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(v);
+      hls.on(window.Hls.Events.ERROR, function(_, d){
+        if (d.fatal) console.log('hls fatal', d.type);
+      });
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = url;
+    } else {
+      document.body.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;">HLS не поддерживается</div>';
+    }
+  })();
+</script>
+</body></html>`;
 
   return (
     <View style={{ aspectRatio: 16 / 9, backgroundColor: '#000' }}>
-      <VideoView
-        player={player}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="contain"
-        allowsFullscreen
-        allowsPictureInPicture
-        nativeControls
+      <WebView
+        source={{ html, baseUrl: API_BASE }}
+        style={{ flex: 1, backgroundColor: '#000' }}
+        javaScriptEnabled
+        domStorageEnabled
+        allowsFullscreenVideo
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+        scrollEnabled={false}
+        originWhitelist={['*']}
       />
     </View>
   );
@@ -301,7 +300,7 @@ function IframePlayer({ src }: { src: string }) {
   return (
     <View style={{ aspectRatio: 16 / 9, backgroundColor: '#000' }}>
       <WebView
-        source={{ html, baseUrl: 'https://f1hub.lead-seek.ru' }}
+        source={{ html, baseUrl: API_BASE }}
         style={{ flex: 1, backgroundColor: '#000' }}
         javaScriptEnabled
         domStorageEnabled

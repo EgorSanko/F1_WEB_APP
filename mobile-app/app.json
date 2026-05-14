@@ -87,8 +87,7 @@
       ],
       [
         "expo-apple-authentication"
-      ],
-      "expo-video"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
