@@ -55,7 +55,13 @@ export default function StandingsScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>
+          style={{ flexGrow: 0, flexShrink: 0 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 12,
+            gap: 8,
+            alignItems: 'center',
+          }}>
           {TABS.map((t) => {
             const active = t === tab;
             return (
