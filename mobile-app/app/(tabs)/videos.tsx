@@ -38,6 +38,17 @@ const SESSION_LABEL: Record<string, string> = {
   review: 'Обзор',
 };
 
+const SESSION_SHORT: Record<string, string> = {
+  fp1: 'FP1',
+  fp2: 'FP2',
+  fp3: 'FP3',
+  sprint_qualifying: 'Спринт-квалификация',
+  sprint: 'Спринт',
+  qualifying: 'Квалификация',
+  race: 'Гонка',
+  review: 'Обзор',
+};
+
 const SESSION_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   fp1: 'stopwatch-outline',
   fp2: 'stopwatch-outline',
@@ -177,7 +188,7 @@ export default function VideosScreen() {
                         <View className="flex-1 ml-3">
                           <View className="flex-row items-center">
                             <Text className="text-text font-bold flex-1" numberOfLines={1}>
-                              {SESSION_LABEL[b.session_type] ?? b.session_type} ·{' '}
+                              {SESSION_SHORT[b.session_type] ?? b.session_type} ·{' '}
                               {race?.name?.replace('Гран-при ', '')}
                             </Text>
                             {b.is_live ? (

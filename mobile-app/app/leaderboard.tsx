@@ -6,16 +6,14 @@ import { Stack, useRouter } from 'expo-router';
 
 import { useLeaderboard } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
-import type { LeaderboardEntry } from '@/lib/api';
+import { absUrl } from '@/lib/api';
 
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const lb = useLeaderboard();
 
-  const entries: LeaderboardEntry[] = Array.isArray(lb.data)
-    ? lb.data
-    : (lb.data?.leaderboard ?? []);
+  const entries = lb.data?.leaderboard ?? [];
 
   return (
     <View className="flex-1 bg-bg">
@@ -59,9 +57,9 @@ export default function LeaderboardScreen() {
                   }}>
                   {rank}
                 </Text>
-                {e.photo_url ? (
+                {absUrl(e.photo_url) ? (
                   <Image
-                    source={{ uri: e.photo_url }}
+                    source={{ uri: absUrl(e.photo_url) }}
                     style={{ width: 40, height: 40, borderRadius: 20 }}
                   />
                 ) : (
@@ -74,17 +72,16 @@ export default function LeaderboardScreen() {
                     {e.first_name || e.username || `User ${e.user_id}`}
                     {isMe ? ' · Это ты' : ''}
                   </Text>
-                  {e.predictions_total ? (
+                  {e.username && (
                     <Text className="text-muted text-xs">
-                      {e.predictions_correct ?? 0} / {e.predictions_total} прогнозов
+                      @{e.username}
+                      {e.correct_predictions != null && ` · ${e.correct_predictions} верных`}
                     </Text>
-                  ) : (
-                    e.username && <Text className="text-muted text-xs">@{e.username}</Text>
                   )}
                 </View>
                 <View className="items-end">
                   <Text className="text-text font-extrabold">
-                    {(e.points ?? 0).toLocaleString('ru-RU')}
+                    {(e.total_points ?? 0).toLocaleString('ru-RU')}
                   </Text>
                   <Text className="text-muted text-xs">очков</Text>
                 </View>

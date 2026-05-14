@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 
 import { useAuth } from '@/lib/auth';
 import { useSpoiler } from '@/lib/spoiler';
-import { api, setTgAuth } from '@/lib/api';
+import { absUrl, api, setTgAuth } from '@/lib/api';
 import { router } from 'expo-router';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
@@ -167,18 +167,15 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-bg">
       <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
+        <View className="px-5 pt-2 pb-3">
           <Text className="text-text text-3xl font-extrabold">Профиль</Text>
-          <Pressable className="w-10 h-10 rounded-full bg-surface items-center justify-center border border-line">
-            <Ionicons name="settings-outline" size={20} color="#FAFAFA" />
-          </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           <View className="items-center mt-4">
-            {user.photo_url ? (
+            {absUrl(user.photo_url) ? (
               <Image
-                source={{ uri: user.photo_url }}
+                source={{ uri: absUrl(user.photo_url) }}
                 style={{ width: 96, height: 96, borderRadius: 48 }}
                 contentFit="cover"
               />

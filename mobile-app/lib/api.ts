@@ -14,6 +14,15 @@ const API_BASE =
 
 const AUTH_KEY = 'f1hub.tg_auth';
 
+/** Convert a possibly-relative URL to absolute (prepend API_BASE if starts with /). */
+export function absUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return `${API_BASE}${url}`;
+  return url;
+}
+
 export async function setTgAuth(authQueryString: string) {
   await SecureStore.setItemAsync(AUTH_KEY, authQueryString);
 }
@@ -307,10 +316,11 @@ export type LeaderboardEntry = {
   first_name?: string;
   last_name?: string;
   photo_url?: string;
-  points: number;
+  total_points: number;
   rank: number;
-  predictions_correct?: number;
+  correct_predictions?: number;
   predictions_total?: number;
+  updated_at?: string;
 };
 
 export type HomeData = {
@@ -494,9 +504,11 @@ export const api = {
       '/api/user/achievements',
     ),
   leaderboard: () =>
-    apiFetch<{ leaderboard: LeaderboardEntry[] } | LeaderboardEntry[]>(
-      '/api/leaderboard',
-    ),
+    apiFetch<{
+      leaderboard: LeaderboardEntry[];
+      user_rank?: number | null;
+      user_points?: number | null;
+    }>('/api/leaderboard'),
   newsArticle: (url: string) =>
     apiFetch<NewsArticle>(
       `/api/news/article?url=${encodeURIComponent(url)}`,

@@ -14,14 +14,16 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 
-import { useHome, useSchedule, flagFor, countdownParts } from '@/lib/hooks';
+import { useHome, useNews, useSchedule, flagFor, countdownParts } from '@/lib/hooks';
 import { CURRENT_SEASON, isSpoilerHidden, useSpoiler } from '@/lib/spoiler';
+import { router } from 'expo-router';
 
 const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
 
 export default function HomeScreen() {
   const home = useHome();
   const schedule = useSchedule();
+  const news = useNews();
   const spoilerEnabled = useSpoiler((s) => s.enabled);
   const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
   const [now, setNow] = useState(new Date());
@@ -32,10 +34,7 @@ export default function HomeScreen() {
   }, []);
 
   const nextRace = home.data?.next_race;
-  const upcoming =
-    schedule.data?.races
-      ?.filter((r) => new Date(r.race_datetime).getTime() > now.getTime())
-      ?.slice(0, 3) ?? [];
+  const topNews = news.data?.posts?.slice(0, 4) ?? [];
 
   return (
     <View className="flex-1 bg-bg">
@@ -62,7 +61,9 @@ export default function HomeScreen() {
               style={{ width: 110, height: 40 }}
               contentFit="contain"
             />
-            <Pressable className="w-10 h-10 rounded-full bg-surface items-center justify-center border border-line">
+            <Pressable
+              onPress={() => router.push('/notifications' as never)}
+              className="w-10 h-10 rounded-full bg-surface items-center justify-center border border-line active:opacity-80">
               <Ionicons name="notifications-outline" size={20} color="#FAFAFA" />
             </Pressable>
           </View>
@@ -185,12 +186,12 @@ export default function HomeScreen() {
             </>
           )}
 
-          {/* Upcoming */}
-          {upcoming.length > 0 && (
+          {/* Latest news */}
+          {topNews.length > 0 && (
             <>
               <View className="px-5 mt-7 mb-3 flex-row items-center justify-between">
-                <Text className="text-text text-xl font-extrabold">Ближайшие гонки</Text>
-                <Link href="/calendar" asChild>
+                <Text className="text-text text-xl font-extrabold">Новости</Text>
+                <Link href="/news" asChild>
                   <Pressable className="flex-row items-center">
                     <Text className="text-muted text-sm font-semibold mr-1">Все</Text>
                     <Ionicons name="chevron-forward" size={14} color="#A0A0B0" />
@@ -198,24 +199,41 @@ export default function HomeScreen() {
                 </Link>
               </View>
               <View className="px-4 gap-2">
-                {upcoming.map((race) => (
-                  <Link key={race.round} href={`/race/${race.round}` as never} asChild>
-                    <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
-                      <Text className="text-2xl mr-3">{flagFor(race.country_code)}</Text>
-                      <View className="flex-1">
-                        <Text className="text-text font-bold">{race.name}</Text>
-                        <Text className="text-muted text-xs mt-0.5">
-                          {new Date(race.race_datetime).toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'long',
-                          })}
+                {topNews.map((post, i) => {
+                  const image = post.image || post.photo;
+                  return (
+                    <Pressable
+                      key={i}
+                      onPress={() =>
+                        router.push(`/article?url=${encodeURIComponent(post.url)}` as never)
+                      }
+                      className="bg-surface rounded-xl overflow-hidden border border-line flex-row items-center active:opacity-80">
+                      {image ? (
+                        <Image
+                          source={{ uri: image }}
+                          style={{ width: 100, height: 84 }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          className="bg-surface-2 items-center justify-center"
+                          style={{ width: 100, height: 84 }}>
+                          <Ionicons name="newspaper-outline" size={24} color="#6B6B7B" />
+                        </View>
+                      )}
+                      <View className="flex-1 p-3">
+                        {post.source ? (
+                          <Text className="text-muted text-[10px] uppercase tracking-widest font-bold">
+                            {post.source}
+                          </Text>
+                        ) : null}
+                        <Text className="text-text font-semibold text-sm mt-0.5" numberOfLines={2}>
+                          {post.title}
                         </Text>
-                        <Text className="text-muted-2 text-xs">{race.locality}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
                     </Pressable>
-                  </Link>
-                ))}
+                  );
+                })}
               </View>
             </>
           )}

@@ -23,6 +23,18 @@ const SESSION_LABELS: Record<string, string> = {
   sprint_qualifying: 'Спринт-квалификация',
   sprint: 'Спринт',
   race: 'Гонка',
+  review: 'Обзор',
+};
+
+const SESSION_SHORT: Record<string, string> = {
+  fp1: 'FP1',
+  fp2: 'FP2',
+  fp3: 'FP3',
+  qualifying: 'Квалификация',
+  sprint_qualifying: 'Спринт-квалификация',
+  sprint: 'Спринт',
+  race: 'Гонка',
+  review: 'Обзор',
 };
 
 const DAY_FMT = new Intl.DateTimeFormat('ru-RU', {
@@ -301,31 +313,34 @@ export default function RaceDetail() {
 
           {tab === 'Записи' && (
             <View className="px-4 mt-5 gap-2">
-              {raceBroadcasts.map((b) => (
-                <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                  <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
-                    <View className="w-11 h-11 rounded-full bg-red/15 items-center justify-center">
-                      <Ionicons name="play" size={18} color="#E10600" />
-                    </View>
-                    <View className="flex-1 ml-3">
-                      <Text className="text-text font-bold">
-                        {b.title ?? SESSION_LABELS[b.session_type]}
-                      </Text>
-                      <Text className="text-muted text-xs mt-0.5">
-                        {SESSION_LABELS[b.session_type] ?? b.session_type}
-                      </Text>
-                    </View>
-                    {b.is_live ? (
-                      <View className="bg-red px-1.5 py-0.5 rounded mr-2">
-                        <Text className="text-text text-[9px] font-extrabold tracking-widest">
-                          LIVE
+              {raceBroadcasts.map((b) => {
+                const sessionLabel = SESSION_SHORT[b.session_type] ?? b.session_type;
+                return (
+                  <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                    <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
+                      <View className="w-11 h-11 rounded-full bg-red/15 items-center justify-center">
+                        <Ionicons name="play" size={18} color="#E10600" />
+                      </View>
+                      <View className="flex-1 ml-3">
+                        <Text className="text-text font-bold" numberOfLines={1}>
+                          {sessionLabel} · {race.name?.replace('Гран-при ', '')}
+                        </Text>
+                        <Text className="text-muted text-xs mt-0.5">
+                          {SESSION_LABELS[b.session_type] ?? b.session_type}
                         </Text>
                       </View>
-                    ) : null}
-                    <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
-                  </Pressable>
-                </Link>
-              ))}
+                      {b.is_live ? (
+                        <View className="bg-red px-1.5 py-0.5 rounded mr-2">
+                          <Text className="text-text text-[9px] font-extrabold tracking-widest">
+                            LIVE
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+                    </Pressable>
+                  </Link>
+                );
+              })}
             </View>
           )}
         </ScrollView>
