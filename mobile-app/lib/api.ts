@@ -305,6 +305,27 @@ export type Broadcast = {
   created_at?: string;
 };
 
+export type BroadcastSocial = {
+  likes_count: number;
+  comments_count: number;
+  my_liked: boolean;
+};
+
+export type BroadcastComment = {
+  id: number;
+  broadcast_id: number;
+  user_id: number;
+  parent_id: number | null;
+  text: string;
+  created_at: string;
+  user_name: string;
+  user_username?: string | null;
+  user_photo_url?: string | null;
+  likes_count: number;
+  my_liked: boolean;
+  is_mine: boolean;
+};
+
 export type UnlockedAchievement = {
   key: string;
   name?: string;
@@ -429,6 +450,32 @@ export const api = {
       formats: { url: string; height: number; label: string }[];
       best_url: string | null;
     }>(`/api/youtube-stream/${videoId}`, { auth: false }),
+
+  // Broadcast social — likes & comments
+  broadcastSocial: (broadcastId: number) =>
+    apiFetch<BroadcastSocial>(`/api/broadcast/${broadcastId}/social`, { auth: false }),
+  broadcastLikeToggle: (broadcastId: number) =>
+    apiFetch<{ my_liked: boolean; likes_count: number }>(
+      `/api/broadcast/${broadcastId}/like`,
+      { method: 'POST' },
+    ),
+  broadcastComments: (broadcastId: number, sort: 'new' | 'old' = 'new', limit = 20, offset = 0) =>
+    apiFetch<{ comments: BroadcastComment[]; total: number }>(
+      `/api/broadcast/${broadcastId}/comments?sort=${sort}&limit=${limit}&offset=${offset}`,
+      { auth: false },
+    ),
+  broadcastCommentPost: (broadcastId: number, text: string, parent_id?: number | null) =>
+    apiFetch<BroadcastComment>(`/api/broadcast/${broadcastId}/comment`, {
+      method: 'POST',
+      body: JSON.stringify({ text, parent_id: parent_id ?? null }),
+    }),
+  commentLikeToggle: (commentId: number) =>
+    apiFetch<{ my_liked: boolean; likes_count: number }>(
+      `/api/comment/${commentId}/like`,
+      { method: 'POST' },
+    ),
+  commentDelete: (commentId: number) =>
+    apiFetch<{ ok: true }>(`/api/comment/${commentId}`, { method: 'DELETE' }),
 
   // Auth
   authWidget: (authData: string) =>
