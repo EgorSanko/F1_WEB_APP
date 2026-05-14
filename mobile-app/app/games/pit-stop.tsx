@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,58 +7,69 @@ import { Stack, useRouter } from 'expo-router';
 
 import { api } from '@/lib/api';
 
-const WHEELS = ['FL', 'FR', 'RL', 'RR'] as const;
-type Wheel = (typeof WHEELS)[number];
+type WheelId = 'fl' | 'fr' | 'rl' | 'rr';
+type State = 'ready' | 'playing' | 'finished';
 
-const WHEEL_LABEL: Record<Wheel, string> = {
-  FL: 'Передняя левая',
-  FR: 'Передняя правая',
-  RL: 'Задняя левая',
-  RR: 'Задняя правая',
+const WHEEL_LABEL: Record<WheelId, string> = {
+  fl: 'FL',
+  fr: 'FR',
+  rl: 'RL',
+  rr: 'RR',
 };
 
-type State = 'idle' | 'running' | 'done';
+const STEP_LABELS = ['🔩 Открути', '🔄 Смени', '🔧 Закрути', '✅ Готово'];
+const STEP_COLORS = ['#ff4444', '#ffaa00', '#44cc44', '#27F4D2'];
 
 export default function PitStopGame() {
   const router = useRouter();
-  const [state, setState] = useState<State>('idle');
-  const [done, setDone] = useState<Set<Wheel>>(new Set());
-  const [ms, setMs] = useState(0);
-  const [achievement, setAchievement] = useState<string | null>(null);
+  const [state, setState] = useState<State>('ready');
+  const [wheels, setWheels] = useState<Record<WheelId, number>>({ fl: 0, fr: 0, rl: 0, rr: 0 });
+  const [elapsed, setElapsed] = useState(0);
+  const [achievementUnlocked, setAchievementUnlocked] = useState(false);
   const startRef = useRef(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => {
+    if (tickRef.current) clearInterval(tickRef.current);
+  }, []);
 
   const start = () => {
-    setDone(new Set());
-    setAchievement(null);
-    setMs(0);
+    setWheels({ fl: 0, fr: 0, rl: 0, rr: 0 });
+    setElapsed(0);
+    setAchievementUnlocked(false);
+    setState('playing');
     startRef.current = Date.now();
-    setState('running');
+    if (tickRef.current) clearInterval(tickRef.current);
+    tickRef.current = setInterval(() => setElapsed(Date.now() - startRef.current), 16);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const tapWheel = (w: Wheel) => {
-    if (state !== 'running' || done.has(w)) return;
+  const tapWheel = (id: WheelId) => {
+    if (state !== 'playing') return;
+    const cur = wheels[id];
+    if (cur >= 3) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = new Set(done);
-    next.add(w);
-    setDone(next);
-    if (next.size === 4) {
-      const dt = Date.now() - startRef.current;
-      setMs(dt);
-      setState('done');
+    const next = { ...wheels, [id]: cur + 1 };
+    setWheels(next);
+    const allDone = (Object.values(next) as number[]).every((v) => v >= 3);
+    if (allDone) {
+      if (tickRef.current) clearInterval(tickRef.current);
+      const total = Date.now() - startRef.current;
+      setElapsed(total);
+      setState('finished');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      submit(dt);
+      api
+        .gameResult({ game_type: 'pit_stop', score: total })
+        .then((r) => {
+          if (r.new_achievements?.includes('pit_master')) {
+            setAchievementUnlocked(true);
+          }
+        })
+        .catch(() => {});
     }
   };
 
-  const submit = async (score: number) => {
-    try {
-      const res = await api.gameResult({ game_type: 'pit_stop', score });
-      if (res.new_achievements?.includes('pit_master')) {
-        setAchievement('pit_master');
-      }
-    } catch {}
-  };
+  const timeStr = (ms: number) => (ms / 1000).toFixed(3) + 'с';
 
   return (
     <View className="flex-1 bg-bg">
@@ -71,119 +82,126 @@ export default function PitStopGame() {
             <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
           </Pressable>
           <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Пит-стоп
+            🔧 Пит-стоп
           </Text>
         </View>
 
-        <View className="px-5 mb-4">
-          <Text className="text-muted text-sm leading-5">
-            После «Старт» тапни все 4 колеса как можно быстрее. Быстрее{' '}
-            <Text className="text-red font-bold">2 сек</Text> — ачивка Pit Master.
-          </Text>
-        </View>
-
-        {state === 'done' && (
-          <View className="mx-4 mb-4 bg-surface rounded-2xl border border-line p-5 items-center">
-            <Text className="text-muted text-xs tracking-widest font-bold">РЕЗУЛЬТАТ</Text>
-            <Text className="text-text text-4xl font-extrabold mt-1">
-              {(ms / 1000).toFixed(2)} с
+        {state === 'ready' && (
+          <View className="flex-1 items-center justify-center px-6">
+            <Text style={{ fontSize: 76 }}>🏎️</Text>
+            <Text className="text-text text-center text-base mt-4 leading-5">
+              Тапай по каждому колесу 3 раза:
             </Text>
-            <Text className="text-muted text-sm mt-1">
-              {ms < 2000 ? 'Мирового уровня' : ms < 3500 ? 'Хороший пит-стоп' : 'Среднее'}
+            <Text className="text-muted text-sm mt-1 text-center">
+              Открути → Смени → Закрути
             </Text>
-            {achievement === 'pit_master' && (
-              <View className="bg-red px-3 py-1.5 rounded-full mt-3">
-                <Text className="text-text font-bold text-xs">🏆 Pit Master разблокирована</Text>
-              </View>
-            )}
+            <Text className="text-muted-2 text-xs mt-2 text-center">
+              Мировой рекорд Red Bull — 1.80с
+            </Text>
+            <Pressable
+              onPress={start}
+              className="bg-red rounded-2xl px-12 py-4 mt-8 active:opacity-80">
+              <Text className="text-text font-extrabold text-lg">СТАРТ</Text>
+            </Pressable>
           </View>
         )}
 
-        {/* Car illustration with 4 wheels */}
-        <View className="flex-1 items-center justify-center">
-          <View
-            className="bg-surface rounded-3xl border border-line"
-            style={{ width: 260, height: 360, padding: 24, position: 'relative' }}>
-            {/* Top: FL, FR */}
-            <View className="flex-row justify-between">
-              <WheelButton
-                wheel="FL"
-                ready={state === 'running'}
-                done={done.has('FL')}
-                onPress={() => tapWheel('FL')}
-              />
-              <WheelButton
-                wheel="FR"
-                ready={state === 'running'}
-                done={done.has('FR')}
-                onPress={() => tapWheel('FR')}
-              />
+        {state === 'playing' && (
+          <View className="flex-1">
+            {/* Timer */}
+            <View className="items-center mt-2 mb-4">
+              <Text
+                className="text-red font-extrabold"
+                style={{ fontSize: 36, fontVariant: ['tabular-nums'] }}>
+                {timeStr(elapsed)}
+              </Text>
             </View>
-            {/* Body */}
-            <View className="flex-1 items-center justify-center">
-              <View className="w-16 h-32 bg-red rounded-xl" />
-            </View>
-            {/* Bottom: RL, RR */}
-            <View className="flex-row justify-between">
-              <WheelButton
-                wheel="RL"
-                ready={state === 'running'}
-                done={done.has('RL')}
-                onPress={() => tapWheel('RL')}
-              />
-              <WheelButton
-                wheel="RR"
-                ready={state === 'running'}
-                done={done.has('RR')}
-                onPress={() => tapWheel('RR')}
-              />
+            <View className="flex-row flex-wrap justify-center" style={{ gap: 12, paddingHorizontal: 16 }}>
+              {(['fl', 'fr', 'rl', 'rr'] as WheelId[]).map((id) => {
+                const step = wheels[id];
+                const done = step >= 3;
+                return (
+                  <Pressable
+                    key={id}
+                    onPress={() => tapWheel(id)}
+                    disabled={done}
+                    className="rounded-2xl items-center justify-center"
+                    style={{
+                      width: '46%',
+                      paddingVertical: 26,
+                      paddingHorizontal: 16,
+                      backgroundColor: done ? 'rgba(39,244,210,0.15)' : 'rgba(255,255,255,0.06)',
+                      borderWidth: 3,
+                      borderColor: STEP_COLORS[step],
+                    }}>
+                    <Text className="text-muted font-extrabold text-base">
+                      {WHEEL_LABEL[id]}
+                    </Text>
+                    <Text style={{ fontSize: 36, marginTop: 4 }}>{done ? '✅' : '🔴'}</Text>
+                    <Text
+                      className="font-bold text-sm mt-2"
+                      style={{ color: STEP_COLORS[step] }}>
+                      {STEP_LABELS[step]}
+                    </Text>
+                    <View className="flex-row gap-1.5 mt-2">
+                      {[0, 1, 2].map((i) => (
+                        <View
+                          key={i}
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 5,
+                            backgroundColor: i < step ? STEP_COLORS[2] : 'rgba(255,255,255,0.15)',
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
-        </View>
+        )}
 
-        <View className="px-4 pb-6 pt-2">
-          <Pressable
-            onPress={start}
-            disabled={state === 'running'}
-            className={`bg-red rounded-2xl py-4 items-center ${
-              state === 'running' ? 'opacity-40' : 'active:opacity-80'
-            }`}>
-            <Text className="text-text font-bold text-base">
-              {state === 'idle' ? 'Старт' : state === 'running' ? 'Тапай колёса!' : 'Ещё раз'}
+        {state === 'finished' && (
+          <View className="flex-1 items-center justify-center px-6">
+            <Text style={{ fontSize: 72 }}>
+              {elapsed < 2000 ? '🏆' : elapsed < 3000 ? '🥈' : elapsed < 5000 ? '👍' : '😅'}
             </Text>
-          </Pressable>
-        </View>
+            <Text
+              className="text-green-500 font-extrabold mt-2"
+              style={{ fontSize: 44, fontVariant: ['tabular-nums'] }}>
+              {timeStr(elapsed)}
+            </Text>
+            <Text className="text-muted text-sm mt-1">
+              {elapsed < 2000
+                ? 'Мировой уровень!'
+                : elapsed < 2500
+                  ? 'Отличный пит-стоп!'
+                  : elapsed < 3500
+                    ? 'Неплохо!'
+                    : 'Тренируйся!'}
+            </Text>
+            {achievementUnlocked && (
+              <View className="bg-red px-4 py-2 rounded-full mt-4">
+                <Text className="text-text font-bold text-xs">🏅 Pit Master разблокирован!</Text>
+              </View>
+            )}
+            <View className="flex-row gap-3 mt-8">
+              <Pressable
+                onPress={start}
+                className="bg-red rounded-2xl px-6 py-3 active:opacity-80">
+                <Text className="text-text font-bold">Ещё раз</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.back()}
+                className="bg-surface rounded-2xl px-6 py-3 border border-line">
+                <Text className="text-text font-bold">Назад</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     </View>
-  );
-}
-
-function WheelButton({
-  wheel,
-  ready,
-  done,
-  onPress,
-}: {
-  wheel: Wheel;
-  ready: boolean;
-  done: boolean;
-  onPress: () => void;
-}) {
-  const bg = done ? 'bg-green-500' : ready ? 'bg-red' : 'bg-surface-2';
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={done || !ready}
-      className={`${bg} rounded-2xl items-center justify-center`}
-      style={{ width: 76, height: 76 }}>
-      {done ? (
-        <Ionicons name="checkmark" size={32} color="#fff" />
-      ) : (
-        <Text className="text-text font-extrabold text-lg">{wheel}</Text>
-      )}
-      {!done && (
-        <Text className="text-text text-[9px] opacity-80 mt-0.5">{WHEEL_LABEL[wheel].split(' ')[0]}</Text>
-      )}
-    </Pressable>
   );
 }

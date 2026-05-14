@@ -6,90 +6,80 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 
 import { api } from '@/lib/api';
+import { pickReactionFact } from '@/lib/game-data';
 
-type State = 'idle' | 'waiting' | 'ready' | 'tooEarly' | 'done';
+type State = 'ready' | 'lights' | 'green' | 'falseStart' | 'finished';
 
 export default function ReactionGame() {
   const router = useRouter();
-  const [state, setState] = useState<State>('idle');
-  const [ms, setMs] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [achievement, setAchievement] = useState<string | null>(null);
-  const startRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [state, setState] = useState<State>('ready');
+  const [lights, setLights] = useState(0);
+  const [reaction, setReaction] = useState(0);
+  const [fact, setFact] = useState('');
+  const [achievementUnlocked, setAchievementUnlocked] = useState(false);
+  const greenAtRef = useRef(0);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const usedFacts = useRef<Set<string>>(new Set());
 
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
 
-  const start = () => {
-    setAchievement(null);
-    setState('waiting');
-    const delay = 1500 + Math.random() * 3500; // 1.5–5s
-    timerRef.current = setTimeout(() => {
-      startRef.current = Date.now();
-      setState('ready');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, delay);
+  useEffect(() => () => clearTimers(), []);
+
+  const startSequence = () => {
+    setState('lights');
+    setLights(0);
+    setAchievementUnlocked(false);
+    clearTimers();
+    // 5 red lights, each appears 1s after the previous
+    for (let i = 1; i <= 5; i++) {
+      timersRef.current.push(
+        setTimeout(() => {
+          setLights(i);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }, i * 1000),
+      );
+    }
+    // Random green delay 500ms..3000ms after the 5th light
+    const greenDelay = 5000 + 500 + Math.random() * 2500;
+    timersRef.current.push(
+      setTimeout(() => {
+        setState('green');
+        greenAtRef.current = Date.now();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }, greenDelay),
+    );
   };
 
   const handleTap = () => {
-    if (state === 'idle' || state === 'done' || state === 'tooEarly') {
-      start();
+    if (state === 'ready' || state === 'falseStart' || state === 'finished') {
+      startSequence();
       return;
     }
-    if (state === 'waiting') {
-      if (timerRef.current) clearTimeout(timerRef.current);
+    if (state === 'lights') {
+      clearTimers();
+      setState('falseStart');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setState('tooEarly');
       return;
     }
-    if (state === 'ready') {
-      const dt = Date.now() - startRef.current;
-      setMs(dt);
-      setState('done');
+    if (state === 'green') {
+      const rt = Date.now() - greenAtRef.current;
+      setReaction(rt);
+      setFact(pickReactionFact(rt, usedFacts.current));
+      setState('finished');
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      submit(dt);
+      api
+        .gameResult({ game_type: 'reaction', score: rt })
+        .then((r) => {
+          if (r.new_achievements?.includes('reaction_god')) {
+            setAchievementUnlocked(true);
+          }
+        })
+        .catch(() => {});
     }
   };
-
-  const submit = async (score: number) => {
-    setBusy(true);
-    try {
-      const res = await api.gameResult({ game_type: 'reaction', score });
-      if (res.new_achievements?.includes('reaction_god')) {
-        setAchievement('reaction_god');
-      }
-    } catch {}
-    setBusy(false);
-  };
-
-  let bg = 'bg-surface';
-  let label = 'Тапни чтобы начать';
-  let hint = 'Жди зелёного света и нажми как можно быстрее';
-  let icon: keyof typeof Ionicons.glyphMap = 'play';
-
-  if (state === 'waiting') {
-    bg = 'bg-red';
-    label = 'Жди...';
-    hint = 'Не тапай раньше времени';
-    icon = 'eye-off';
-  } else if (state === 'ready') {
-    bg = 'bg-green-500';
-    label = 'ТАП!';
-    hint = 'Сейчас!';
-    icon = 'flash';
-  } else if (state === 'tooEarly') {
-    bg = 'bg-surface-2';
-    label = 'Слишком рано';
-    hint = 'Тапни чтобы попробовать ещё раз';
-    icon = 'refresh';
-  } else if (state === 'done') {
-    bg = ms < 200 ? 'bg-red' : ms < 300 ? 'bg-green-500' : 'bg-surface';
-    label = `${ms} мс`;
-    hint = ms < 200 ? 'Невероятная реакция!' : ms < 300 ? 'Отлично' : ms < 500 ? 'Хорошо' : 'Можешь лучше';
-    icon = 'trophy';
-  }
 
   return (
     <View className="flex-1 bg-bg">
@@ -102,24 +92,104 @@ export default function ReactionGame() {
             <Ionicons name="chevron-back" size={24} color="#FAFAFA" />
           </Pressable>
           <Text className="text-text text-lg font-bold flex-1 text-center mr-10">
-            Реакция
+            🚦 Реакция
           </Text>
         </View>
 
-        <Pressable
-          onPress={handleTap}
-          className={`flex-1 mx-4 mb-6 rounded-3xl items-center justify-center ${bg}`}
-          style={{ borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }}>
-          <Ionicons name={icon} size={64} color="#FAFAFA" />
-          <Text className="text-text text-5xl font-extrabold mt-4">{label}</Text>
-          <Text className="text-text text-sm opacity-80 mt-2 text-center px-6">{hint}</Text>
-          {state === 'done' && achievement === 'reaction_god' && (
-            <View className="bg-bg/40 px-4 py-2 rounded-full mt-6">
-              <Text className="text-text font-bold">🏆 Reaction God!</Text>
+        {/* 5 F1 start lights */}
+        <View className="flex-row justify-center gap-3 mt-8 mb-6">
+          {[1, 2, 3, 4, 5].map((i) => {
+            const isGreen = state === 'green' || state === 'finished';
+            const isRed = !isGreen && i <= lights;
+            return (
+              <View
+                key={i}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  borderWidth: 3,
+                  borderColor: '#555',
+                  backgroundColor: isGreen ? '#00ff00' : isRed ? '#E10600' : '#222',
+                  shadowColor: isGreen ? '#00ff00' : isRed ? '#E10600' : 'transparent',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: isGreen || isRed ? 0.6 : 0,
+                  shadowRadius: 12,
+                  elevation: isGreen || isRed ? 8 : 0,
+                }}
+              />
+            );
+          })}
+        </View>
+
+        <Pressable onPress={handleTap} className="flex-1 mx-4 mb-4">
+          {state === 'ready' && (
+            <View className="flex-1 items-center justify-center">
+              <Text className="text-text text-base text-center px-6">
+                Жди зелёный свет, потом тапни как можно быстрее
+              </Text>
+              <Text className="text-muted text-xs mt-2">Средняя реакция пилота F1 — 200мс</Text>
+              <View className="bg-red rounded-2xl px-10 py-4 mt-8">
+                <Text className="text-text font-extrabold text-lg">СТАРТ</Text>
+              </View>
             </View>
           )}
-          {state === 'done' && (
-            <Text className="text-text/80 text-xs mt-4">Тапни чтобы попробовать ещё</Text>
+
+          {(state === 'lights' || state === 'green') && (
+            <View className="flex-1 items-center justify-center">
+              <Text
+                className={`font-extrabold ${state === 'green' ? 'text-green-500' : 'text-text'}`}
+                style={{ fontSize: 52 }}>
+                {state === 'green' ? 'ТАПНИ!' : 'Жди...'}
+              </Text>
+              <Text className="text-muted text-sm mt-3">
+                {state === 'green' ? '🟢 Сейчас!' : 'Не нажимай раньше времени'}
+              </Text>
+            </View>
+          )}
+
+          {state === 'falseStart' && (
+            <View className="flex-1 items-center justify-center">
+              <Text style={{ fontSize: 80 }}>❌</Text>
+              <Text className="text-red text-2xl font-extrabold mt-2">ФАЛЬСТАРТ!</Text>
+              <Text className="text-muted text-sm mt-1">Рано нажал!</Text>
+              <View className="bg-red rounded-2xl px-8 py-3 mt-6">
+                <Text className="text-text font-bold">Попробовать снова</Text>
+              </View>
+            </View>
+          )}
+
+          {state === 'finished' && (
+            <View className="flex-1 items-center justify-center px-4">
+              <Text style={{ fontSize: 64 }}>
+                {reaction < 200 ? '⚡' : reaction < 300 ? '🏎️' : reaction < 500 ? '👍' : '😅'}
+              </Text>
+              <Text
+                className="font-extrabold text-green-500 mt-2"
+                style={{ fontSize: 48, fontVariant: ['tabular-nums'] }}>
+                {reaction} мс
+              </Text>
+              <Text className="text-muted text-sm mt-1">
+                {reaction < 200
+                  ? 'Нечеловеческая реакция!'
+                  : reaction < 300
+                    ? 'Отличная реакция!'
+                    : reaction < 500
+                      ? 'Неплохо!'
+                      : 'Можно лучше!'}
+              </Text>
+              {fact ? (
+                <View className="bg-surface rounded-2xl border border-line px-5 py-4 mt-5">
+                  <Text className="text-text text-sm leading-5 text-center">{fact}</Text>
+                </View>
+              ) : null}
+              {achievementUnlocked && (
+                <View className="bg-red px-4 py-2 rounded-full mt-4">
+                  <Text className="text-text font-bold text-xs">🏅 Reaction God разблокирован!</Text>
+                </View>
+              )}
+              <Text className="text-muted-2 text-xs mt-6">Тапни чтобы ещё раз</Text>
+            </View>
           )}
         </Pressable>
       </SafeAreaView>
