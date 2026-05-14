@@ -24,7 +24,7 @@ const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string
   { icon: 'people-outline', label: 'Топ игроков', href: '/leaderboard' },
   { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
   { icon: 'newspaper-outline', label: 'Новости', href: '/news' },
-  { icon: 'notifications-outline', label: 'Уведомления' },
+  { icon: 'notifications-outline', label: 'Уведомления', href: '/notifications' },
   { icon: 'settings-outline', label: 'Настройки' },
   { icon: 'help-circle-outline', label: 'Поддержка' },
 ];

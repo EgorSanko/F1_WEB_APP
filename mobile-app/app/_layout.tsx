@@ -49,14 +49,16 @@ export default function RootLayout() {
     }
   }, [loaded, refreshAuth, loadSpoiler]);
 
-  // Handle taps on push notifications → deep-link to race detail
+  // Handle taps on push notifications → deep-link to relevant screen
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as
-        | { type?: string; race_round?: number }
+        | { type?: string; race_round?: number; broadcast_id?: number }
         | undefined;
       if (data?.type === 'race_reminder' && data.race_round) {
         router.push(`/race/${data.race_round}` as never);
+      } else if (data?.type === 'review_uploaded' && data.broadcast_id) {
+        router.push(`/broadcast/${data.broadcast_id}` as never);
       }
     });
     return () => sub.remove();

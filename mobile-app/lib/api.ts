@@ -388,6 +388,15 @@ export const api = {
       auth: false,
     }),
 
+  // Push notifications prefs
+  pushPrefsGet: () =>
+    apiFetch<{ notify_race: boolean; notify_review: boolean }>('/push/prefs'),
+  pushPrefsSet: (payload: { notify_race: boolean; notify_review: boolean }) =>
+    apiFetch<{ notify_race: boolean; notify_review: boolean }>('/push/prefs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   // Authenticated
   me: () => apiFetch<User>('/api/user/me'),
   isAdmin: () => apiFetch<{ is_admin: boolean }>('/api/user/is-admin'),
