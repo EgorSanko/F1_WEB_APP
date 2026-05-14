@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import '../global.css';
 
 import { useAuth } from '@/lib/auth';
+import { useSpoiler } from '@/lib/spoiler';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -33,6 +34,7 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
   const refreshAuth = useAuth((s) => s.refresh);
+  const loadSpoiler = useSpoiler((s) => s.load);
 
   useEffect(() => {
     if (error) throw error;
@@ -42,8 +44,9 @@ export default function RootLayout() {
     if (loaded) {
       SplashScreen.hideAsync();
       refreshAuth();
+      loadSpoiler();
     }
-  }, [loaded, refreshAuth]);
+  }, [loaded, refreshAuth, loadSpoiler]);
 
   if (!loaded) return null;
 

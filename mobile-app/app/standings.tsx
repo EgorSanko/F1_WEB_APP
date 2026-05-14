@@ -22,6 +22,8 @@ import {
   useTeams,
 } from '@/lib/hooks';
 import type { DriverStanding, H2HPair, PointsProgressionDriver, Team } from '@/lib/api';
+import { CURRENT_SEASON, isSpoilerHidden, useSpoiler } from '@/lib/spoiler';
+import { SpoilerCard } from '@/components/SpoilerCard';
 
 const TABS = ['Пилоты', 'Кубок', 'Карточки', 'Команды', 'H2H', 'Прогресс'] as const;
 type Tab = (typeof TABS)[number];
@@ -35,6 +37,10 @@ export default function StandingsScreen() {
   const teams = useTeams();
   const h2h = useHeadToHead();
   const progression = usePointsProgression();
+
+  const spoilerEnabled = useSpoiler((s) => s.enabled);
+  const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
+  const [revealed, setRevealed] = useState(false);
 
   return (
     <View className="flex-1 bg-bg">
@@ -83,36 +89,43 @@ export default function StandingsScreen() {
         <ScrollView
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}>
-          {tab === 'Пилоты' && <DriversTab data={drivers.data?.standings ?? []} loading={drivers.isLoading} />}
-          {tab === 'Кубок' && (
+          {spoilerHidden && !revealed && (
+            <SpoilerCard
+              label={`Чемпионат ${CURRENT_SEASON} скрыт`}
+              hint="Антиспойлер включён. Таблица показывает результаты — раскрой чтобы посмотреть."
+              onReveal={() => setRevealed(true)}
+            />
+          )}
+          {(!spoilerHidden || revealed) && tab === 'Пилоты' && <DriversTab data={drivers.data?.standings ?? []} loading={drivers.isLoading} />}
+          {(!spoilerHidden || revealed) && tab === 'Кубок' && (
             <ConstructorsTab
               data={constructors.data?.standings ?? []}
               loading={constructors.isLoading}
               onPickDriver={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
-          {tab === 'Карточки' && (
+          {(!spoilerHidden || revealed) && tab === 'Карточки' && (
             <DriverCardsTab
               data={drivers.data?.standings ?? []}
               loading={drivers.isLoading}
               onPick={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
-          {tab === 'Команды' && (
+          {(!spoilerHidden || revealed) && tab === 'Команды' && (
             <TeamsTab
               data={teams.data?.teams ?? []}
               loading={teams.isLoading}
               onPickDriver={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
-          {tab === 'H2H' && (
+          {(!spoilerHidden || revealed) && tab === 'H2H' && (
             <H2HTab
               data={h2h.data?.head_to_head ?? []}
               loading={h2h.isLoading}
               onPickDriver={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
-          {tab === 'Прогресс' && (
+          {(!spoilerHidden || revealed) && tab === 'Прогресс' && (
             <ProgressTab
               data={progression.data?.drivers ?? []}
               totalRounds={progression.data?.total_rounds ?? 24}

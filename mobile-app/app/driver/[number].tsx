@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -5,11 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useDriver, flagFor } from '@/lib/hooks';
+import { CURRENT_SEASON, isSpoilerHidden, useSpoiler } from '@/lib/spoiler';
+import { SpoilerCard } from '@/components/SpoilerCard';
 
 export default function DriverProfile() {
   const { number } = useLocalSearchParams<{ number: string }>();
   const router = useRouter();
   const driver = useDriver(Number(number));
+  const spoilerEnabled = useSpoiler((s) => s.enabled);
+  const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
+  const [revealed, setRevealed] = useState(false);
 
   if (driver.isLoading || !driver.data) {
     return (
@@ -75,16 +81,39 @@ export default function DriverProfile() {
 
           {/* Season stats */}
           <View className="px-5 mt-6 mb-2">
-            <Text className="text-text text-base font-bold">Сезон 2026</Text>
+            <Text className="text-text text-base font-bold">Сезон {CURRENT_SEASON}</Text>
           </View>
           <View className="px-4">
             <View className="bg-surface rounded-2xl border border-line overflow-hidden">
-              <Stat label="Очки" value={String(Math.round(stats.points))} accent />
+              <Stat
+                label="Очки"
+                value={spoilerHidden && !revealed ? '••' : String(Math.round(stats.points))}
+                accent
+              />
               <Stat label="Гонки" value={String(stats.races)} />
-              <Stat label="Победы" value={String(stats.wins)} />
-              <Stat label="Подиумы" value={String(stats.podiums)} />
-              <Stat label="Лучший финиш" value={stats.best_finish ? `P${stats.best_finish}` : '—'} />
-              <Stat label="Сходы" value={String(stats.dnfs)} last />
+              <Stat
+                label="Победы"
+                value={spoilerHidden && !revealed ? '••' : String(stats.wins)}
+              />
+              <Stat
+                label="Подиумы"
+                value={spoilerHidden && !revealed ? '••' : String(stats.podiums)}
+              />
+              <Stat
+                label="Лучший финиш"
+                value={
+                  spoilerHidden && !revealed
+                    ? '••'
+                    : stats.best_finish
+                      ? `P${stats.best_finish}`
+                      : '—'
+                }
+              />
+              <Stat
+                label="Сходы"
+                value={spoilerHidden && !revealed ? '••' : String(stats.dnfs)}
+                last
+              />
             </View>
           </View>
 
@@ -92,6 +121,13 @@ export default function DriverProfile() {
           <View className="px-5 mt-6 mb-2">
             <Text className="text-text text-base font-bold">Результаты по гонкам</Text>
           </View>
+          {spoilerHidden && !revealed ? (
+            <SpoilerCard
+              label="Результаты сезона скрыты"
+              hint="Антиспойлер включён. Нажми чтобы посмотреть."
+              onReveal={() => setRevealed(true)}
+            />
+          ) : (
           <View className="px-4">
             <View className="bg-surface rounded-2xl border border-line overflow-hidden">
               {stats.results.map((r, i) => {
@@ -122,6 +158,7 @@ export default function DriverProfile() {
               })}
             </View>
           </View>
+          )}
 
           {d.teammate ? (
             <>

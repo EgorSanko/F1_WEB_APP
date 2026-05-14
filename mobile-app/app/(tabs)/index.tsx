@@ -14,12 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 
 import { useHome, useSchedule, flagFor, countdownParts } from '@/lib/hooks';
+import { CURRENT_SEASON, isSpoilerHidden, useSpoiler } from '@/lib/spoiler';
 
 const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
 
 export default function HomeScreen() {
   const home = useHome();
   const schedule = useSchedule();
+  const spoilerEnabled = useSpoiler((s) => s.enabled);
+  const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -125,7 +128,7 @@ export default function HomeScreen() {
           )}
 
           {/* Standings top-3 quick links */}
-          {home.data?.standings_top3 && home.data.standings_top3.length > 0 && (
+          {home.data?.standings_top3 && home.data.standings_top3.length > 0 && !spoilerHidden && (
             <>
               <View className="px-5 mt-7 mb-3 flex-row items-center justify-between">
                 <Text className="text-text text-xl font-extrabold">Таблица сезона</Text>

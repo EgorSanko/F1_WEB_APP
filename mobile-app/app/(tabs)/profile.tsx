@@ -5,6 +5,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import { useAuth } from '@/lib/auth';
+import { useSpoiler } from '@/lib/spoiler';
 import { api, setTgAuth } from '@/lib/api';
 import { router } from 'expo-router';
 
@@ -29,6 +31,8 @@ const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string
 
 export default function ProfileScreen() {
   const { user, isAdmin, isLoading, refresh, logout } = useAuth();
+  const spoilerEnabled = useSpoiler((s) => s.enabled);
+  const toggleSpoiler = useSpoiler((s) => s.toggle);
   const [showCodeForm, setShowCodeForm] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -231,7 +235,32 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-          <View className="px-4 mt-6">
+          {/* Spoiler toggle */}
+          <View className="mx-4 mt-6 bg-surface rounded-2xl border border-line p-4 flex-row items-center">
+            <View className="w-10 h-10 rounded-full bg-surface-2 items-center justify-center">
+              <Ionicons
+                name={spoilerEnabled ? 'eye-off' : 'eye'}
+                size={20}
+                color={spoilerEnabled ? '#E10600' : '#A0A0B0'}
+              />
+            </View>
+            <View className="flex-1 ml-3">
+              <Text className="text-text font-bold">
+                Антиспойлер {spoilerEnabled ? 'вкл' : 'выкл'}
+              </Text>
+              <Text className="text-muted text-xs mt-0.5">
+                Скрывает результаты гонок и таблицу сезона
+              </Text>
+            </View>
+            <Switch
+              value={spoilerEnabled}
+              onValueChange={toggleSpoiler}
+              trackColor={{ false: '#2F2F3E', true: '#E10600' }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View className="px-4 mt-3">
             {MENU.map((m, i) => (
               <Pressable
                 key={i}

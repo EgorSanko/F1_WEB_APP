@@ -7,6 +7,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useRaceQualifying, useRaceResults, useSchedule, flagFor } from '@/lib/hooks';
 import type { RaceResultDriver, QualifyingDriver } from '@/lib/api';
+import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
+import { SpoilerCard } from '@/components/SpoilerCard';
 
 const SESSION_LABELS: Record<string, string> = {
   fp1: 'Свободная практика 1',
@@ -36,6 +38,11 @@ export default function RaceDetail() {
 
   const results = useRaceResults(isPast ? roundN : null);
   const qualifying = useRaceQualifying(isPast ? roundN : null);
+
+  const spoilerEnabled = useSpoiler((s) => s.enabled);
+  const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
+  const [revealResults, setRevealResults] = useState(false);
+  const [revealQuali, setRevealQuali] = useState(false);
 
   const baseTabs = ['Расписание'] as const;
   const tabs = isPast ? (['Расписание', 'Результаты', 'Квалификация'] as const) : baseTabs;
@@ -182,7 +189,14 @@ export default function RaceDetail() {
             </View>
           )}
 
-          {tab === 'Результаты' && (
+          {tab === 'Результаты' && spoilerHidden && !revealResults && isPast && (
+            <SpoilerCard
+              label="Результаты гонки скрыты"
+              onReveal={() => setRevealResults(true)}
+            />
+          )}
+
+          {tab === 'Результаты' && (!spoilerHidden || revealResults || !isPast) && (
             <View className="px-4 mt-5">
               {results.isLoading && <ActivityIndicator color="#E10600" />}
               {results.isError && (
@@ -222,7 +236,14 @@ export default function RaceDetail() {
             </View>
           )}
 
-          {tab === 'Квалификация' && (
+          {tab === 'Квалификация' && spoilerHidden && !revealQuali && isPast && (
+            <SpoilerCard
+              label="Результаты квалификации скрыты"
+              onReveal={() => setRevealQuali(true)}
+            />
+          )}
+
+          {tab === 'Квалификация' && (!spoilerHidden || revealQuali || !isPast) && (
             <View className="px-4 mt-5">
               {qualifying.isLoading && <ActivityIndicator color="#E10600" />}
               {qualifying.isError && <Text className="text-muted text-sm">Данных нет</Text>}
