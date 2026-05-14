@@ -21,13 +21,12 @@ import { router } from 'expo-router';
 
 const MENU: { icon: keyof typeof Ionicons.glyphMap; label: string; href?: string }[] = [
   { icon: 'list-outline', label: 'Мои прогнозы', href: '/my-predictions' },
+  { icon: 'heart-outline', label: 'Любимец сезона', href: '/favorite' },
   { icon: 'game-controller-outline', label: 'Игры', href: '/games' },
   { icon: 'people-outline', label: 'Топ игроков', href: '/leaderboard' },
   { icon: 'podium-outline', label: 'Таблица сезона', href: '/standings' },
   { icon: 'newspaper-outline', label: 'Новости', href: '/news' },
   { icon: 'notifications-outline', label: 'Уведомления', href: '/notifications' },
-  { icon: 'settings-outline', label: 'Настройки' },
-  { icon: 'help-circle-outline', label: 'Поддержка' },
 ];
 
 export default function ProfileScreen() {
@@ -229,12 +228,17 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <View className="px-5 mt-7 flex-row items-center justify-between">
+          <Pressable
+            onPress={() => router.push('/achievements' as never)}
+            className="px-5 mt-7 flex-row items-center justify-between active:opacity-80">
             <Text className="text-text text-lg font-extrabold">Достижения</Text>
-            <Text className="text-muted text-sm font-semibold">
-              {user.achievements_count ?? 0} / {user.achievements_total ?? 0}
-            </Text>
-          </View>
+            <View className="flex-row items-center">
+              <Text className="text-muted text-sm font-semibold mr-1">
+                {user.achievements_count ?? 0} / {user.achievements_total ?? 0}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#A0A0B0" />
+            </View>
+          </Pressable>
 
           {/* Spoiler toggle */}
           <View className="mx-4 mt-6 bg-surface rounded-2xl border border-line p-4 flex-row items-center">

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,15 @@ export default function NewsScreen() {
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 10 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={news.isFetching && !news.isLoading}
+              onRefresh={() => news.refetch()}
+              tintColor="#E10600"
+              colors={['#E10600']}
+            />
+          }>
           {news.isLoading && <ActivityIndicator color="#E10600" />}
           {news.isError && (
             <View className="bg-surface rounded-xl p-4 border border-line">
@@ -40,7 +48,9 @@ export default function NewsScreen() {
             return (
               <Pressable
                 key={i}
-                onPress={() => Linking.openURL(post.url)}
+                onPress={() =>
+                  router.push(`/article?url=${encodeURIComponent(post.url)}` as never)
+                }
                 className="bg-surface rounded-xl overflow-hidden border border-line active:opacity-80">
                 {image ? (
                   <Image

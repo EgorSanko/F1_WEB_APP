@@ -118,6 +118,21 @@ export const useAdminBroadcasts = (enabled = true) =>
     enabled,
   });
 
+export const useAchievements = (enabled = true) =>
+  useQuery({
+    queryKey: ['achievements'],
+    queryFn: api.achievements,
+    enabled,
+  });
+
+export const useArticle = (url: string | null) =>
+  useQuery({
+    queryKey: ['article', url],
+    queryFn: () => api.newsArticle(url!),
+    enabled: !!url,
+    staleTime: 60 * 60_000,
+  });
+
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
   if (!countryCode || countryCode.length !== 2) return '🏁';

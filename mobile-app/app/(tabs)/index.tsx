@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   ImageBackground,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   Text,
@@ -42,7 +43,18 @@ export default function HomeScreen() {
       <SafeAreaView edges={['top']} className="flex-1">
         <ScrollView
           contentContainerStyle={{ paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={(home.isFetching && !home.isLoading) || (schedule.isFetching && !schedule.isLoading)}
+              onRefresh={() => {
+                home.refetch();
+                schedule.refetch();
+              }}
+              tintColor="#E10600"
+              colors={['#E10600']}
+            />
+          }>
           {/* Header */}
           <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
             <Image

@@ -283,6 +283,24 @@ export type Broadcast = {
   created_at?: string;
 };
 
+export type UnlockedAchievement = {
+  key: string;
+  name?: string;
+  desc?: string;
+  icon?: string;
+  unlocked_at?: string;
+};
+
+export type NewsArticle = {
+  title: string;
+  date?: string;
+  image?: string;
+  paragraphs: string[];
+  quotes?: string[];
+  source_url: string;
+  source?: string;
+};
+
 export type LeaderboardEntry = {
   user_id: number;
   username?: string;
@@ -471,10 +489,18 @@ export const api = {
         body: JSON.stringify({ season: 2026, points_bet: 0, ...payload }),
       },
     ),
-  achievements: () => apiFetch('/api/user/achievements'),
+  achievements: () =>
+    apiFetch<{ achievements: UnlockedAchievement[] } | UnlockedAchievement[]>(
+      '/api/user/achievements',
+    ),
   leaderboard: () =>
     apiFetch<{ leaderboard: LeaderboardEntry[] } | LeaderboardEntry[]>(
       '/api/leaderboard',
+    ),
+  newsArticle: (url: string) =>
+    apiFetch<NewsArticle>(
+      `/api/news/article?url=${encodeURIComponent(url)}`,
+      { auth: false },
     ),
   setFavorite: (payload: { driver?: number; team?: string }) =>
     apiFetch('/api/user/favorite', {

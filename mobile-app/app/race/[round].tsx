@@ -5,10 +5,15 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useRaceQualifying, useRaceResults, useSchedule, flagFor } from '@/lib/hooks';
+import { Link } from 'expo-router';
+import { useBroadcasts, useRaceQualifying, useRaceResults, useSchedule, flagFor } from '@/lib/hooks';
 import type { RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
+
+const SESSION_ORDER_FOR_BROADCAST = [
+  'fp1', 'fp2', 'fp3', 'sprint_qualifying', 'sprint', 'qualifying', 'race', 'review',
+] as const;
 
 const SESSION_LABELS: Record<string, string> = {
   fp1: 'Свободная практика 1',
@@ -38,14 +43,32 @@ export default function RaceDetail() {
 
   const results = useRaceResults(isPast ? roundN : null);
   const qualifying = useRaceQualifying(isPast ? roundN : null);
+  const broadcasts = useBroadcasts();
+  const raceBroadcasts = useMemo(() => {
+    const list =
+      broadcasts.data?.broadcasts.filter(
+        (b) => b.race_round === roundN && b.season === CURRENT_SEASON,
+      ) ?? [];
+    return list.sort(
+      (a, b) =>
+        SESSION_ORDER_FOR_BROADCAST.indexOf(a.session_type as never) -
+        SESSION_ORDER_FOR_BROADCAST.indexOf(b.session_type as never),
+    );
+  }, [broadcasts.data, roundN]);
 
   const spoilerEnabled = useSpoiler((s) => s.enabled);
   const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
   const [revealResults, setRevealResults] = useState(false);
   const [revealQuali, setRevealQuali] = useState(false);
 
-  const baseTabs = ['Расписание'] as const;
-  const tabs = isPast ? (['Расписание', 'Результаты', 'Квалификация'] as const) : baseTabs;
+  const hasBroadcasts = raceBroadcasts.length > 0;
+  const tabs = isPast
+    ? hasBroadcasts
+      ? (['Расписание', 'Результаты', 'Квалификация', 'Записи'] as const)
+      : (['Расписание', 'Результаты', 'Квалификация'] as const)
+    : hasBroadcasts
+      ? (['Расписание', 'Записи'] as const)
+      : (['Расписание'] as const);
   const [tab, setTab] = useState<string>(tabs[0]);
 
   // Group sessions by day. /api/schedule returns sessions as a dict
@@ -273,6 +296,36 @@ export default function RaceDetail() {
                   ))}
                 </View>
               )}
+            </View>
+          )}
+
+          {tab === 'Записи' && (
+            <View className="px-4 mt-5 gap-2">
+              {raceBroadcasts.map((b) => (
+                <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                  <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
+                    <View className="w-11 h-11 rounded-full bg-red/15 items-center justify-center">
+                      <Ionicons name="play" size={18} color="#E10600" />
+                    </View>
+                    <View className="flex-1 ml-3">
+                      <Text className="text-text font-bold">
+                        {b.title ?? SESSION_LABELS[b.session_type]}
+                      </Text>
+                      <Text className="text-muted text-xs mt-0.5">
+                        {SESSION_LABELS[b.session_type] ?? b.session_type}
+                      </Text>
+                    </View>
+                    {b.is_live ? (
+                      <View className="bg-red px-1.5 py-0.5 rounded mr-2">
+                        <Text className="text-text text-[9px] font-extrabold tracking-widest">
+                          LIVE
+                        </Text>
+                      </View>
+                    ) : null}
+                    <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+                  </Pressable>
+                </Link>
+              ))}
             </View>
           )}
         </ScrollView>

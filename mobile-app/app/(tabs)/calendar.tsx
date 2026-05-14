@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
@@ -73,7 +73,15 @@ export default function CalendarScreen() {
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 8 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={schedule.isFetching && !schedule.isLoading}
+              onRefresh={() => schedule.refetch()}
+              tintColor="#E10600"
+              colors={['#E10600']}
+            />
+          }>
           {filtered.map((race) => {
             const isPast = new Date(race.race_datetime).getTime() <= now.getTime();
             return (
