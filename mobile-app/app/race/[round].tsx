@@ -11,8 +11,8 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useBroadcasts, useRaceQualifying, useRaceResults, useSchedule, flagFor } from '@/lib/hooks';
-import type { RaceResultDriver, QualifyingDriver } from '@/lib/api';
+import { useBroadcasts, useRaceQualifying, useRaceResults, useSchedule, useTeams, flagFor } from '@/lib/hooks';
+import type { Driver, RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
 import { BroadcastThumb } from '@/components/VideoPlayer';
@@ -77,6 +77,14 @@ export default function RaceDetail() {
   const results = useRaceResults(isPast ? roundN : null);
   const qualifying = useRaceQualifying(isPast ? roundN : null);
   const broadcasts = useBroadcasts();
+  const teams = useTeams();
+  const teamLogoByName = useMemo(() => {
+    const m: Record<string, string> = {};
+    teams.data?.teams.forEach((t) => {
+      if (t.logo_url) m[t.name] = t.logo_url;
+    });
+    return m;
+  }, [teams.data]);
   const raceBroadcasts = useMemo(() => {
     const list =
       broadcasts.data?.broadcasts.filter(
@@ -201,63 +209,46 @@ export default function RaceDetail() {
             date={race.date}
           />
 
-          {/* Tabs — компактные, все 4 в одну строку */}
+          {/* Tabs — сегментированная пилюля, активный таб с красной подложкой */}
           <View
             style={{
               flexDirection: 'row',
-              paddingHorizontal: 12,
+              marginHorizontal: 16,
               marginTop: 16,
-              alignItems: 'center',
-              justifyContent: 'space-around',
+              padding: 4,
+              backgroundColor: CARD_BG,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
             }}>
             {tabs.map((t) => {
               const active = t === tab;
-              const meta = TAB_META[t];
               return (
                 <Pressable
                   key={t}
                   onPress={() => setTab(t)}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
+                    flex: 1,
                     paddingVertical: 10,
-                    paddingHorizontal: 4,
-                    flexShrink: 1,
+                    alignItems: 'center',
+                    borderRadius: 999,
+                    backgroundColor: active ? '#E10600' : 'transparent',
+                    shadowColor: active ? '#E10600' : 'transparent',
+                    shadowOpacity: active ? 0.4 : 0,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 3 },
+                    elevation: active ? 4 : 0,
                   }}>
-                  <Ionicons
-                    name={meta.icon}
-                    size={13}
-                    color={active ? '#E10600' : '#6B6B7B'}
-                    style={{ marginRight: 5 }}
-                  />
                   <Text
                     numberOfLines={1}
                     style={{
-                      color: active ? '#FAFAFA' : '#6B6B7B',
-                      fontWeight: '700',
-                      fontSize: 12.5,
-                      letterSpacing: 0.2,
+                      color: active ? '#FAFAFA' : '#A0A0B0',
+                      fontWeight: active ? '800' : '600',
+                      fontSize: 12,
                     }}>
                     {t}
                   </Text>
                 </Pressable>
-              );
-            })}
-          </View>
-          {/* Active underline */}
-          <View style={{ flexDirection: 'row', paddingHorizontal: 12 }}>
-            {tabs.map((t) => {
-              const active = t === tab;
-              return (
-                <View
-                  key={t}
-                  style={{
-                    flex: 1,
-                    height: 2,
-                    backgroundColor: active ? '#E10600' : 'transparent',
-                    borderRadius: 1,
-                  }}
-                />
               );
             })}
           </View>
@@ -346,7 +337,11 @@ export default function RaceDetail() {
               {results.isLoading && <ActivityIndicator color="#E10600" />}
               {results.isError && <Text className="text-muted text-sm">Данных нет</Text>}
               {results.data?.results && (
-                <ResultsView results={results.data.results} stats={stats} />
+                <ResultsView
+                  results={results.data.results}
+                  stats={stats}
+                  teamLogos={teamLogoByName}
+                />
               )}
             </View>
           )}
@@ -363,7 +358,11 @@ export default function RaceDetail() {
               {qualifying.isLoading && <ActivityIndicator color="#E10600" />}
               {qualifying.isError && <Text className="text-muted text-sm">Данных нет</Text>}
               {qualifying.data?.results && (
-                <QualifyingView results={qualifying.data.results} stats={stats} />
+                <QualifyingView
+                  results={qualifying.data.results}
+                  stats={stats}
+                  teamLogos={teamLogoByName}
+                />
               )}
             </View>
           )}
@@ -740,9 +739,11 @@ function teamAbbr(team?: string): string {
 function ResultsView({
   results,
   stats,
+  teamLogos,
 }: {
   results: RaceResultDriver[];
   stats: ReturnType<typeof getCircuitStats>;
+  teamLogos: Record<string, string>;
 }) {
   const top3 = results.slice(0, 3);
   const rest = results.slice(3);
@@ -758,7 +759,9 @@ function ResultsView({
             place={2}
             color={podiumColors[2]}
             primary={`${top3[1].points} PTS`}
+            primaryColor={top3[1].team_color}
             secondary={top3[1].gap || '—'}
+            teamLogo={top3[1].team ? teamLogos[top3[1].team] : undefined}
           />
           <PodiumCard
             driver={top3[0]}
@@ -766,15 +769,19 @@ function ResultsView({
             color={podiumColors[1]}
             winner
             primary={`${top3[0].points} PTS`}
+            primaryColor="#FFCB05"
             secondary={top3[0].time || '—'}
             secondaryColor="#A0A0B0"
+            teamLogo={top3[0].team ? teamLogos[top3[0].team] : undefined}
           />
           <PodiumCard
             driver={top3[2]}
             place={3}
             color={podiumColors[3]}
             primary={`${top3[2].points} PTS`}
+            primaryColor={top3[2].team_color}
             secondary={top3[2].gap || '—'}
+            teamLogo={top3[2].team ? teamLogos[top3[2].team] : undefined}
           />
         </View>
       )}
@@ -785,15 +792,17 @@ function ResultsView({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 14,
+            paddingHorizontal: 10,
             paddingVertical: 8,
-            marginBottom: 6,
+            marginBottom: 4,
           }}>
-          <Text style={tableHeaderStyle('left', 28)}>Поз</Text>
-          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 50 })}>Пилот</Text>
-          <Text style={tableHeaderStyle('left', 50)}>Команда</Text>
-          <Text style={tableHeaderStyle('right', 50)}>Очки</Text>
-          <Text style={tableHeaderStyle('right', 70)}>Отставание</Text>
+          {/* skip stripe */}
+          <View style={{ width: 11 }} />
+          <Text style={tableHeaderStyle('center', 24)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 60 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('center', 36)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 64, { marginLeft: 8 })}>Очки</Text>
+          <Text style={tableHeaderStyle('right', 64, { marginLeft: 4 })}>Отставание</Text>
         </View>
       )}
 
@@ -807,96 +816,17 @@ function ResultsView({
           overflow: 'hidden',
         }}>
         {rest.map((d, i) => (
-          <View
+          <ResultRow
             key={d.driver_number}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderBottomWidth: i < rest.length - 1 ? 1 : 0,
-              borderBottomColor: 'rgba(255,255,255,0.04)',
-            }}>
-            <Text
-              style={{
-                color: d.team_color || '#FAFAFA',
-                fontWeight: '800',
-                fontSize: 22,
-                width: 28,
-                textAlign: 'center',
-                letterSpacing: -0.5,
-              }}>
-              {d.position}
-            </Text>
-            {d.photo_url ? (
-              <Image
-                source={{ uri: d.photo_url }}
-                style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 12 }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  marginLeft: 12,
-                  backgroundColor: '#2A2A38',
-                }}
-              />
-            )}
-            <Text
-              style={{
-                flex: 1,
-                color: '#FAFAFA',
-                fontWeight: '700',
-                fontSize: 14,
-                marginLeft: 10,
-              }}
-              numberOfLines={1}>
-              {d.name}
-            </Text>
-            <View
-              style={{
-                width: 50,
-                alignItems: 'center',
-              }}>
-              <View
-                style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 3,
-                  borderRadius: 5,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderLeftWidth: 2,
-                  borderLeftColor: d.team_color || '#666',
-                }}>
-                <Text
-                  style={{
-                    color: d.team_color || '#A0A0B0',
-                    fontWeight: '800',
-                    fontSize: 9,
-                    letterSpacing: 1,
-                  }}>
-                  {teamAbbr(d.team)}
-                </Text>
-              </View>
-            </View>
-            <View style={{ width: 50, alignItems: 'flex-end' }}>
-              <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 13 }}>
-                {d.points}
-              </Text>
-              <Text style={{ color: '#6B6B7B', fontSize: 9, fontWeight: '700' }}>PTS</Text>
-            </View>
-            <Text
-              style={{
-                width: 70,
-                textAlign: 'right',
-                color: d.is_dnf ? '#A0A0B0' : '#E10600',
-                fontSize: 12,
-                fontWeight: '700',
-              }}>
-              {d.is_dnf ? 'DNF' : d.gap || '—'}
-            </Text>
-          </View>
+            driver={d}
+            isLast={i === rest.length - 1}
+            teamLogo={d.team ? teamLogos[d.team] : undefined}
+            performance={`${d.points}`}
+            perfLabel="PTS"
+            perfColor={d.team_color || '#FAFAFA'}
+            gap={d.is_dnf ? 'DNF' : d.gap || '—'}
+            gapColor={d.is_dnf ? '#A0A0B0' : '#FAFAFA'}
+          />
         ))}
       </View>
 
@@ -907,7 +837,7 @@ function ResultsView({
 }
 
 function tableHeaderStyle(
-  align: 'left' | 'right',
+  align: 'left' | 'right' | 'center',
   width: number,
   extra: object = {},
 ): object {
@@ -915,7 +845,7 @@ function tableHeaderStyle(
     color: '#6B6B7B',
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textTransform: 'uppercase' as const,
     width: width || undefined,
     textAlign: align,
@@ -925,8 +855,11 @@ function tableHeaderStyle(
 
 type PodiumDriver = {
   photo_url?: string;
+  card_photo_url?: string;
+  photo_url_large?: string;
   team?: string;
   team_color?: string;
+  first_name?: string;
   last_name?: string;
   name: string;
 };
@@ -937,29 +870,36 @@ function PodiumCard({
   color,
   winner = false,
   primary,
+  primaryColor,
   secondary,
   secondaryColor,
+  teamLogo,
 }: {
   driver: PodiumDriver;
   place: 1 | 2 | 3;
   color: string;
   winner?: boolean;
   primary: string;
+  primaryColor?: string;
   secondary?: string;
   secondaryColor?: string;
+  teamLogo?: string;
 }) {
+  const portrait = driver.card_photo_url || driver.photo_url_large || driver.photo_url;
+  const firstName = driver.first_name || driver.name.split(' ')[0];
+  const lastName = driver.last_name || driver.name.split(' ').slice(1).join(' ');
+  const ptsValue = primary.replace(/\s*PTS\s*$/i, '');
+  const hasPts = /\bPTS\b/i.test(primary);
+
   return (
     <View
       style={{
         flex: winner ? 1.18 : 1,
-        backgroundColor: CARD_BG,
+        backgroundColor: winner ? '#1A1505' : CARD_BG,
         borderRadius: 20,
         borderWidth: 1.5,
         borderColor: color + (winner ? 'CC' : '55'),
-        paddingTop: winner ? 22 : 14,
-        paddingBottom: 16,
-        paddingHorizontal: 8,
-        alignItems: 'center',
+        overflow: 'hidden',
         shadowColor: color,
         shadowOpacity: winner ? 0.5 : 0.22,
         shadowRadius: winner ? 22 : 12,
@@ -967,117 +907,272 @@ function PodiumCard({
         elevation: winner ? 10 : 4,
         position: 'relative',
       }}>
+      {/* Subtle gold tint at top for winner */}
       {winner && (
         <View
+          pointerEvents="none"
           style={{
             position: 'absolute',
-            top: -16,
-            backgroundColor: CARD_BG,
-            paddingHorizontal: 8,
-            borderRadius: 999,
-            borderWidth: 1.5,
-            borderColor: color,
-          }}>
-          <Text style={{ fontSize: 20 }}>🏆</Text>
-        </View>
+            inset: 0,
+            backgroundColor: 'rgba(255, 203, 5, 0.06)',
+          }}
+        />
       )}
+
+      {/* Portrait at top */}
+      <View style={{ width: '100%', height: winner ? 170 : 150, backgroundColor: '#1A1A24' }}>
+        {portrait ? (
+          <Image
+            source={{ uri: portrait }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+          />
+        ) : null}
+        {/* Position number top-left, over photo */}
+        <Text
+          style={{
+            position: 'absolute',
+            top: 4,
+            left: 12,
+            color: '#FAFAFA',
+            fontSize: winner ? 56 : 46,
+            fontWeight: '800',
+            letterSpacing: -2,
+            lineHeight: winner ? 60 : 50,
+            textShadowColor: 'rgba(0,0,0,0.7)',
+            textShadowOffset: { width: 0, height: 2 },
+            textShadowRadius: 8,
+          }}>
+          {place}
+        </Text>
+      </View>
+
+      {/* Info section */}
+      <View style={{ paddingHorizontal: 12, paddingVertical: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{ color: '#FAFAFA', fontSize: winner ? 14 : 12, fontWeight: '700' }}
+              numberOfLines={1}>
+              {firstName}
+            </Text>
+            <Text
+              style={{ color: '#FAFAFA', fontSize: winner ? 14 : 12, fontWeight: '700' }}
+              numberOfLines={1}>
+              {lastName}
+            </Text>
+          </View>
+          {teamLogo ? (
+            <Image
+              source={{ uri: teamLogo }}
+              style={{ width: 26, height: 26 }}
+              contentFit="contain"
+            />
+          ) : (
+            <View
+              style={{
+                width: 5,
+                height: 22,
+                borderRadius: 3,
+                backgroundColor: driver.team_color || '#666',
+              }}
+            />
+          )}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 12 }}>
+          <Text
+            style={{
+              color: primaryColor || driver.team_color || '#FAFAFA',
+              fontWeight: '800',
+              fontSize: winner ? 22 : 19,
+              letterSpacing: -0.5,
+            }}>
+            {hasPts ? ptsValue : primary}
+          </Text>
+          {hasPts ? (
+            <Text
+              style={{
+                color: primaryColor || driver.team_color || '#FAFAFA',
+                fontWeight: '700',
+                fontSize: 11,
+                marginLeft: 4,
+                letterSpacing: 1,
+              }}>
+              PTS
+            </Text>
+          ) : null}
+        </View>
+
+        {secondary ? (
+          <Text
+            style={{
+              color: secondaryColor ?? (winner ? '#A0A0B0' : '#A0A0B0'),
+              fontSize: 11,
+              fontWeight: '700',
+              marginTop: 4,
+              letterSpacing: secondary === 'POLE' ? 2 : 0,
+            }}
+            numberOfLines={1}>
+            {secondary}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+// ============ RESULT ROW (общая для Results и Qualifying таблиц) ============
+
+function ResultRow({
+  driver,
+  isLast,
+  teamLogo,
+  performance,
+  perfLabel,
+  perfColor,
+  gap,
+  gapColor,
+}: {
+  driver: Driver & { position: number };
+  isLast: boolean;
+  teamLogo?: string;
+  performance: string;
+  perfLabel?: string;
+  perfColor: string;
+  gap: string;
+  gapColor: string;
+}) {
+  const portrait = driver.card_photo_url || driver.photo_url;
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      }}>
+      {/* team-color vertical stripe */}
+      <View
+        style={{
+          width: 3,
+          height: 38,
+          backgroundColor: driver.team_color || '#666',
+          borderRadius: 2,
+          marginRight: 8,
+        }}
+      />
       <Text
         style={{
-          color,
+          color: driver.team_color || '#FAFAFA',
           fontWeight: '800',
-          fontSize: winner ? 36 : 28,
-          letterSpacing: -1,
-          lineHeight: winner ? 38 : 30,
-          textShadowColor: color + '88',
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: winner ? 12 : 0,
+          fontSize: 22,
+          width: 24,
+          textAlign: 'center',
+          letterSpacing: -0.5,
         }}>
-        {place}
+        {driver.position}
       </Text>
-      {driver.photo_url ? (
+      {portrait ? (
         <Image
-          source={{ uri: driver.photo_url }}
+          source={{ uri: portrait }}
           style={{
-            width: winner ? 72 : 58,
-            height: winner ? 72 : 58,
-            borderRadius: winner ? 36 : 29,
-            marginTop: 6,
-            borderWidth: 2,
-            borderColor: color,
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            marginLeft: 8,
+            backgroundColor: '#1A1A24',
           }}
+          contentFit="cover"
         />
       ) : (
         <View
           style={{
-            width: winner ? 72 : 58,
-            height: winner ? 72 : 58,
-            borderRadius: winner ? 36 : 29,
-            marginTop: 6,
-            backgroundColor: '#2A2A38',
-            borderWidth: 2,
-            borderColor: color,
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            marginLeft: 8,
+            backgroundColor: '#1A1A24',
           }}
         />
       )}
       <Text
         style={{
+          flex: 1,
           color: '#FAFAFA',
-          fontSize: winner ? 14 : 12,
-          fontWeight: '800',
-          marginTop: 10,
-          textAlign: 'center',
+          fontWeight: '700',
+          fontSize: 14,
+          marginLeft: 10,
         }}
         numberOfLines={1}>
-        {driver.last_name || driver.name}
+        {driver.name}
       </Text>
+      <View style={{ width: 36, alignItems: 'center' }}>
+        {teamLogo ? (
+          <Image
+            source={{ uri: teamLogo }}
+            style={{ width: 28, height: 28 }}
+            contentFit="contain"
+          />
+        ) : (
+          <View
+            style={{
+              paddingHorizontal: 5,
+              paddingVertical: 2,
+              borderRadius: 4,
+              borderLeftWidth: 2,
+              borderLeftColor: driver.team_color || '#666',
+              backgroundColor: 'rgba(255,255,255,0.04)',
+            }}>
+            <Text
+              style={{
+                color: driver.team_color || '#A0A0B0',
+                fontWeight: '800',
+                fontSize: 9,
+                letterSpacing: 0.8,
+              }}>
+              {teamAbbr(driver.team)}
+            </Text>
+          </View>
+        )}
+      </View>
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
-          marginTop: 3,
+          alignItems: 'baseline',
+          width: 64,
+          justifyContent: 'flex-end',
+          marginLeft: 8,
         }}>
-        <View
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: 3,
-            backgroundColor: driver.team_color || '#666',
-            marginRight: 5,
-          }}
-        />
-        <Text
-          style={{
-            color: '#A0A0B0',
-            fontSize: 9.5,
-            fontWeight: '600',
-            letterSpacing: 0.3,
-          }}
-          numberOfLines={1}>
-          {driver.team}
+        <Text style={{ color: perfColor, fontWeight: '800', fontSize: 14 }}>
+          {performance}
         </Text>
+        {perfLabel ? (
+          <Text
+            style={{
+              color: perfColor,
+              fontWeight: '700',
+              fontSize: 9,
+              marginLeft: 3,
+              letterSpacing: 0.8,
+            }}>
+            {perfLabel}
+          </Text>
+        ) : null}
       </View>
       <Text
         style={{
-          color: '#FAFAFA',
-          fontWeight: '800',
-          fontSize: winner ? 17 : 15,
-          marginTop: 12,
-          letterSpacing: -0.3,
+          width: 64,
+          textAlign: 'right',
+          color: gapColor,
+          fontSize: 12,
+          fontWeight: '700',
+          marginLeft: 4,
         }}>
-        {primary}
+        {gap}
       </Text>
-      {secondary ? (
-        <Text
-          style={{
-            color: secondaryColor ?? (winner ? '#A0A0B0' : '#E10600'),
-            fontSize: 10.5,
-            fontWeight: '700',
-            marginTop: 2,
-          }}
-          numberOfLines={1}>
-          {secondary}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -1095,9 +1190,11 @@ function parseLapTime(t?: string): number {
 function QualifyingView({
   results,
   stats,
+  teamLogos,
 }: {
   results: QualifyingDriver[];
   stats: ReturnType<typeof getCircuitStats>;
+  teamLogos: Record<string, string>;
 }) {
   const top3 = results.slice(0, 3);
   const rest = results.slice(3);
@@ -1123,7 +1220,9 @@ function QualifyingView({
             place={2}
             color={podiumColors[2]}
             primary={bestOf(top3[1])}
+            primaryColor={top3[1].team_color}
             secondary={gapTo(top3[1])}
+            teamLogo={top3[1].team ? teamLogos[top3[1].team] : undefined}
           />
           <PodiumCard
             driver={top3[0]}
@@ -1131,15 +1230,19 @@ function QualifyingView({
             color={podiumColors[1]}
             winner
             primary={bestOf(top3[0])}
+            primaryColor="#FFCB05"
             secondary="POLE"
             secondaryColor="#FFCB05"
+            teamLogo={top3[0].team ? teamLogos[top3[0].team] : undefined}
           />
           <PodiumCard
             driver={top3[2]}
             place={3}
             color={podiumColors[3]}
             primary={bestOf(top3[2])}
+            primaryColor={top3[2].team_color}
             secondary={gapTo(top3[2])}
+            teamLogo={top3[2].team ? teamLogos[top3[2].team] : undefined}
           />
         </View>
       )}
@@ -1150,15 +1253,16 @@ function QualifyingView({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 14,
+            paddingHorizontal: 10,
             paddingVertical: 8,
-            marginBottom: 6,
+            marginBottom: 4,
           }}>
-          <Text style={tableHeaderStyle('left', 28)}>Поз</Text>
-          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 50 })}>Пилот</Text>
-          <Text style={tableHeaderStyle('left', 50)}>Команда</Text>
-          <Text style={tableHeaderStyle('right', 70)}>Лучшее</Text>
-          <Text style={tableHeaderStyle('right', 60)}>Разрыв</Text>
+          <View style={{ width: 11 }} />
+          <Text style={tableHeaderStyle('center', 24)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 60 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('center', 36)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 64, { marginLeft: 8 })}>Лучшее</Text>
+          <Text style={tableHeaderStyle('right', 64, { marginLeft: 4 })}>Разрыв</Text>
         </View>
       )}
 
@@ -1172,96 +1276,16 @@ function QualifyingView({
           overflow: 'hidden',
         }}>
         {rest.map((d, i) => (
-          <View
+          <ResultRow
             key={d.driver_number}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderBottomWidth: i < rest.length - 1 ? 1 : 0,
-              borderBottomColor: 'rgba(255,255,255,0.04)',
-            }}>
-            <Text
-              style={{
-                color: d.team_color || '#FAFAFA',
-                fontWeight: '800',
-                fontSize: 22,
-                width: 28,
-                textAlign: 'center',
-                letterSpacing: -0.5,
-              }}>
-              {d.position}
-            </Text>
-            {d.photo_url ? (
-              <Image
-                source={{ uri: d.photo_url }}
-                style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 12 }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  marginLeft: 12,
-                  backgroundColor: '#2A2A38',
-                }}
-              />
-            )}
-            <Text
-              style={{
-                flex: 1,
-                color: '#FAFAFA',
-                fontWeight: '700',
-                fontSize: 14,
-                marginLeft: 10,
-              }}
-              numberOfLines={1}>
-              {d.name}
-            </Text>
-            <View style={{ width: 50, alignItems: 'center' }}>
-              <View
-                style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 3,
-                  borderRadius: 5,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderLeftWidth: 2,
-                  borderLeftColor: d.team_color || '#666',
-                }}>
-                <Text
-                  style={{
-                    color: d.team_color || '#A0A0B0',
-                    fontWeight: '800',
-                    fontSize: 9,
-                    letterSpacing: 1,
-                  }}>
-                  {teamAbbr(d.team)}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={{
-                width: 70,
-                textAlign: 'right',
-                color: '#FAFAFA',
-                fontSize: 12,
-                fontWeight: '700',
-              }}>
-              {bestOf(d)}
-            </Text>
-            <Text
-              style={{
-                width: 60,
-                textAlign: 'right',
-                color: '#E10600',
-                fontSize: 11,
-                fontWeight: '700',
-              }}>
-              {gapTo(d)}
-            </Text>
-          </View>
+            driver={d}
+            isLast={i === rest.length - 1}
+            teamLogo={d.team ? teamLogos[d.team] : undefined}
+            performance={bestOf(d)}
+            perfColor="#FAFAFA"
+            gap={gapTo(d)}
+            gapColor="#E10600"
+          />
         ))}
       </View>
 
