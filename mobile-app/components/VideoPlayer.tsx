@@ -63,7 +63,7 @@ function resolveVideo(videoUrl: string, embedUrl?: string | null): Resolved {
 
 /** Rutube exposes per-video metadata at /api/video/{id}/?format=json with a
  * `thumbnail_url`. We cache by id; one fetch per unique video. */
-function useRutubeThumbnail(videoId: string | null) {
+export function useRutubeThumbnail(videoId: string | null) {
   return useQuery({
     queryKey: ['rutube-thumb', videoId],
     queryFn: async (): Promise<string | null> => {

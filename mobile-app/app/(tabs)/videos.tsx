@@ -13,6 +13,7 @@ import {
 } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
 import { videoThumbnail, type Broadcast } from '@/lib/api';
+import { useRutubeThumbnail } from '@/components/VideoPlayer';
 
 const CURRENT_SEASON = 2026;
 const DARK_BG = '#0A0A12';
@@ -204,27 +205,51 @@ export default function VideosScreen() {
             const race = raceByRound.get(round);
             return (
               <View key={round} style={{ marginBottom: 22 }}>
-                {/* Race section header with F1 car decoration */}
+                {/* Race section header — flag + red Гран-при eyebrow + race name */}
                 <View
                   style={{
                     paddingHorizontal: 20,
                     marginBottom: 14,
-                    height: 64,
+                    height: 70,
                     position: 'relative',
                     overflow: 'hidden',
                     flexDirection: 'row',
                     alignItems: 'center',
                   }}>
-                  <Text style={{ fontSize: 24, marginRight: 10 }}>
+                  <View
+                    style={{
+                      width: 4,
+                      height: 36,
+                      backgroundColor: '#E10600',
+                      borderRadius: 2,
+                      marginRight: 10,
+                    }}
+                  />
+                  <Text style={{ fontSize: 22, marginRight: 10 }}>
                     {race?.country_code ? flagFor(race.country_code) : '🏁'}
                   </Text>
                   <View style={{ flex: 1 }}>
                     <Text
-                      style={{ color: '#FAFAFA', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }}
-                      numberOfLines={1}>
-                      {race?.name ?? `Гран-при ${round}`}
+                      style={{
+                        color: '#E10600',
+                        fontSize: 10,
+                        fontWeight: '800',
+                        letterSpacing: 2,
+                      }}>
+                      ГРАН-ПРИ
                     </Text>
-                    <Text className="text-muted-2" style={{ fontSize: 12, marginTop: 2 }}>
+                    <Text
+                      style={{
+                        color: '#FAFAFA',
+                        fontSize: 19,
+                        fontWeight: '800',
+                        letterSpacing: -0.3,
+                        marginTop: 2,
+                      }}
+                      numberOfLines={1}>
+                      {race?.name?.replace(/^Гран-при\s+/i, '') ?? `Раунд ${round}`}
+                    </Text>
+                    <Text className="text-muted-2" style={{ fontSize: 11, marginTop: 2 }}>
                       Раунд {String(round).padStart(2, '0')} · {CURRENT_SEASON} · {items.length}{' '}
                       {items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}
                     </Text>
@@ -240,6 +265,7 @@ export default function VideosScreen() {
                       opacity: 0.55,
                     }}
                     contentFit="contain"
+                    pointerEvents="none"
                   />
                 </View>
 
@@ -261,11 +287,20 @@ export default function VideosScreen() {
   );
 }
 
+function extractRutubeId(url: string): string | null {
+  const m = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+  return m ? m[1] : null;
+}
+
 function VideoCard({ broadcast: b, raceName }: { broadcast: Broadcast; raceName: string }) {
   const sessionShort = SESSION_SHORT[b.session_type] ?? b.session_type;
   const sessionFull = SESSION_LABEL[b.session_type] ?? b.session_type;
-  const prov = providerLabel(b.video_url || b.embed_url || '');
-  const thumb = videoThumbnail(b.video_url, b.embed_url);
+  const url = b.video_url || b.embed_url || '';
+  const prov = providerLabel(url);
+  const ytThumb = videoThumbnail(b.video_url, b.embed_url);
+  const rutubeId = !ytThumb ? extractRutubeId(url) : null;
+  const rutubeThumb = useRutubeThumbnail(rutubeId);
+  const thumb = ytThumb ?? rutubeThumb.data ?? null;
   const duration = computeDuration(b.started_at, b.ended_at);
   const date = b.started_at
     ? new Date(b.started_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })

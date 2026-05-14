@@ -35,6 +35,8 @@ const MENU: MenuItem[] = [
   { icon: 'heart', label: 'Любимец сезона', href: '/favorite' },
   { icon: 'game-controller', label: 'Игры', href: '/games' },
   { icon: 'people', label: 'Топ игроков', href: '/leaderboard' },
+  { icon: 'podium', label: 'Чемпионат', href: '/standings' },
+  { icon: 'newspaper', label: 'Новости', href: '/news' },
 ];
 
 export default function ProfileScreen() {
@@ -277,49 +279,34 @@ export default function ProfileScreen() {
           <Text style={{ color: '#FAFAFA', fontSize: 32, fontWeight: '800', letterSpacing: -0.5 }}>
             Профиль
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Pressable
-              onPress={() => router.push('/settings' as never)}
+          <Pressable
+            onPress={() => router.push('/notifications' as never)}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              backgroundColor: CARD_BG,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+            }}
+            hitSlop={8}>
+            <Ionicons name="notifications-outline" size={20} color="#FAFAFA" />
+            <View
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                backgroundColor: CARD_BG,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.05)',
-              }}>
-              <Ionicons name="settings-outline" size={18} color="#FAFAFA" />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/notifications' as never)}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                backgroundColor: CARD_BG,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.05)',
-              }}>
-              <Ionicons name="notifications-outline" size={18} color="#FAFAFA" />
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: 6,
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: '#E10600',
-                  borderWidth: 1.5,
-                  borderColor: DARK_BG,
-                }}
-              />
-            </Pressable>
-          </View>
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                width: 9,
+                height: 9,
+                borderRadius: 5,
+                backgroundColor: '#E10600',
+                borderWidth: 1.5,
+                borderColor: DARK_BG,
+              }}
+            />
+          </Pressable>
           <Image
             source={{ uri: CAR_OVERLAY }}
             style={{
