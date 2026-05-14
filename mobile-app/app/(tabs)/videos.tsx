@@ -13,87 +13,78 @@ import {
 import { useAuth } from '@/lib/auth';
 import type { Broadcast } from '@/lib/api';
 
-// Canonical session ordering — Race first (most popular), then Quali, then sprints, then practices, reviews
+const CURRENT_SEASON = 2026;
+
+// Canonical session order WITHIN a race weekend (chronological)
 const SESSION_ORDER = [
-  'race',
-  'qualifying',
-  'sprint',
-  'sprint_qualifying',
-  'fp3',
-  'fp2',
   'fp1',
+  'fp2',
+  'fp3',
+  'sprint_qualifying',
+  'sprint',
+  'qualifying',
+  'race',
   'review',
 ] as const;
 
-const SESSION_META: Record<
-  string,
-  { label: string; plural: string; icon: keyof typeof Ionicons.glyphMap }
-> = {
-  race: { label: 'Гонка', plural: 'Гонки', icon: 'trophy' },
-  qualifying: { label: 'Квалификация', plural: 'Квалификации', icon: 'speedometer' },
-  sprint: { label: 'Спринт', plural: 'Спринты', icon: 'flash' },
-  sprint_qualifying: {
-    label: 'Спринт-квалификация',
-    plural: 'Спринт-квалификации',
-    icon: 'flash-outline',
-  },
-  fp1: { label: 'FP1', plural: 'Свободные практики', icon: 'stopwatch' },
-  fp2: { label: 'FP2', plural: 'Свободные практики', icon: 'stopwatch' },
-  fp3: { label: 'FP3', plural: 'Свободные практики', icon: 'stopwatch' },
-  review: { label: 'Обзор', plural: 'Обзоры', icon: 'film' },
+const SESSION_LABEL: Record<string, string> = {
+  fp1: 'Свободная практика 1',
+  fp2: 'Свободная практика 2',
+  fp3: 'Свободная практика 3',
+  sprint_qualifying: 'Спринт-квалификация',
+  sprint: 'Спринт',
+  qualifying: 'Квалификация',
+  race: 'Гонка',
+  review: 'Обзор',
 };
 
-const FILTERS = [
-  { id: 'all', label: 'Все' },
-  { id: 'race', label: 'Гонки' },
-  { id: 'qualifying', label: 'Квалификации' },
-  { id: 'sprint', label: 'Спринты' },
-  { id: 'review', label: 'Обзоры' },
-  { id: 'practice', label: 'Практики' },
-] as const;
+const SESSION_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  fp1: 'stopwatch-outline',
+  fp2: 'stopwatch-outline',
+  fp3: 'stopwatch-outline',
+  sprint_qualifying: 'flash-outline',
+  sprint: 'flash',
+  qualifying: 'speedometer',
+  race: 'trophy',
+  review: 'film',
+};
 
-type FilterId = (typeof FILTERS)[number]['id'];
-
-function matchesFilter(b: Broadcast, f: FilterId): boolean {
-  if (f === 'all') return true;
-  if (f === 'sprint') return b.session_type === 'sprint' || b.session_type === 'sprint_qualifying';
-  if (f === 'practice') return b.session_type === 'fp1' || b.session_type === 'fp2' || b.session_type === 'fp3';
-  return b.session_type === f;
+function sessionIndex(type: string): number {
+  const i = SESSION_ORDER.indexOf(type as (typeof SESSION_ORDER)[number]);
+  return i === -1 ? 99 : i;
 }
 
 export default function VideosScreen() {
   const { isAdmin } = useAuth();
-  const [filter, setFilter] = useState<FilterId>('all');
   const broadcasts = useBroadcasts();
   const live = useLiveBroadcasts();
   const schedule = useSchedule();
 
-  const raceByKey = useMemo(() => {
-    const m = new Map<string, { name: string; country_code?: string }>();
+  const raceByRound = useMemo(() => {
+    const m = new Map<number, { name: string; country_code?: string; date: string }>();
     schedule.data?.races.forEach((r) =>
-      m.set(`${r.round}-${schedule.data?.season}`, {
-        name: r.name,
-        country_code: r.country_code,
-      }),
+      m.set(r.round, { name: r.name, country_code: r.country_code, date: r.date }),
     );
     return m;
   }, [schedule.data]);
 
-  // Group by session_type (gradation), then within each group sort by season desc, round desc
+  // Group by race_round. Only CURRENT_SEASON. Sort sessions inside by canonical order.
   const grouped = useMemo(() => {
-    const list = (broadcasts.data?.broadcasts ?? []).filter((b) => matchesFilter(b, filter));
-    const m = new Map<string, Broadcast[]>();
+    const list = (broadcasts.data?.broadcasts ?? []).filter(
+      (b) => b.season === CURRENT_SEASON,
+    );
+    const m = new Map<number, Broadcast[]>();
     for (const b of list) {
-      if (!m.has(b.session_type)) m.set(b.session_type, []);
-      m.get(b.session_type)!.push(b);
+      if (!m.has(b.race_round)) m.set(b.race_round, []);
+      m.get(b.race_round)!.push(b);
     }
     for (const arr of m.values()) {
-      arr.sort((a, b) => b.season - a.season || b.race_round - a.race_round);
+      arr.sort((a, b) => sessionIndex(a.session_type) - sessionIndex(b.session_type));
     }
-    return SESSION_ORDER.filter((t) => m.has(t)).map((t) => [t, m.get(t)!] as const);
-  }, [broadcasts.data, filter]);
+    return Array.from(m.entries()).sort(([a], [b]) => b - a); // newest race first
+  }, [broadcasts.data]);
 
-  const liveList = live.data?.broadcasts ?? [];
+  const liveList = (live.data?.broadcasts ?? []).filter((b) => b.season === CURRENT_SEASON);
 
   return (
     <View className="flex-1 bg-bg">
@@ -113,56 +104,27 @@ export default function VideosScreen() {
         {/* Live banner */}
         {liveList.length > 0 && (
           <View className="mx-4 mb-3">
-            {liveList.map((b) => (
-              <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                <Pressable className="bg-red rounded-2xl p-4 active:opacity-80 flex-row items-center">
-                  <View className="w-2.5 h-2.5 rounded-full bg-text mr-2.5" />
-                  <Text className="text-text text-[10px] font-extrabold tracking-widest mr-3">
-                    LIVE
-                  </Text>
-                  <View className="flex-1">
-                    <Text className="text-text font-bold" numberOfLines={1}>
-                      {b.title ?? SESSION_META[b.session_type]?.label}
+            {liveList.map((b) => {
+              const race = raceByRound.get(b.race_round);
+              return (
+                <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                  <Pressable className="bg-red rounded-2xl p-4 active:opacity-80 flex-row items-center">
+                    <View className="w-2.5 h-2.5 rounded-full bg-text mr-2.5" />
+                    <Text className="text-text text-[10px] font-extrabold tracking-widest mr-3">
+                      LIVE
                     </Text>
-                    <Text className="text-text text-xs opacity-80">
-                      Раунд {b.race_round} · {SESSION_META[b.session_type]?.label}
-                    </Text>
-                  </View>
-                  <Ionicons name="play-circle" size={28} color="#FAFAFA" />
-                </Pressable>
-              </Link>
-            ))}
+                    <View className="flex-1">
+                      <Text className="text-text font-bold" numberOfLines={1}>
+                        {SESSION_LABEL[b.session_type]} · {race?.name ?? `Раунд ${b.race_round}`}
+                      </Text>
+                    </View>
+                    <Ionicons name="play-circle" size={28} color="#FAFAFA" />
+                  </Pressable>
+                </Link>
+              );
+            })}
           </View>
         )}
-
-        {/* Filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0, flexShrink: 0 }}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingBottom: 12,
-            gap: 8,
-            alignItems: 'center',
-          }}>
-          {FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <Pressable
-                key={f.id}
-                onPress={() => setFilter(f.id)}
-                className={`px-4 py-2 rounded-full ${
-                  active ? 'bg-red' : 'bg-surface border border-line'
-                }`}>
-                <Text
-                  className={`text-xs font-bold ${active ? 'text-text' : 'text-muted'}`}>
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
 
         <ScrollView
           contentContainerStyle={{ paddingBottom: 120 }}
@@ -176,70 +138,64 @@ export default function VideosScreen() {
           {!broadcasts.isLoading && grouped.length === 0 && (
             <View className="px-5 py-10 items-center">
               <Ionicons name="film-outline" size={36} color="#6B6B7B" />
-              <Text className="text-muted text-sm mt-2">Трансляций пока нет</Text>
+              <Text className="text-muted text-sm mt-2">Записей сезона {CURRENT_SEASON} пока нет</Text>
             </View>
           )}
 
-          {grouped.map(([sessionType, items]) => {
-            const meta = SESSION_META[sessionType] ?? {
-              label: sessionType,
-              plural: sessionType,
-              icon: 'film' as const,
-            };
+          {grouped.map(([round, items]) => {
+            const race = raceByRound.get(round);
             return (
-              <View key={sessionType} className="mb-6">
-                {/* Section header per gradation */}
+              <View key={round} className="mb-6">
+                {/* Race section header */}
                 <View className="flex-row items-center px-5 mb-3">
-                  <View className="w-9 h-9 rounded-full bg-red/15 items-center justify-center">
-                    <Ionicons name={meta.icon} size={18} color="#E10600" />
-                  </View>
-                  <Text className="text-text text-xl font-extrabold ml-3 flex-1">
-                    {meta.plural}
+                  <Text className="text-2xl mr-2">
+                    {race?.country_code ? flagFor(race.country_code) : '🏁'}
                   </Text>
-                  <Text className="text-muted text-sm font-semibold">{items.length}</Text>
+                  <View className="flex-1">
+                    <Text className="text-text text-xl font-extrabold" numberOfLines={1}>
+                      {race?.name ?? `Гран-при ${round}`}
+                    </Text>
+                    <Text className="text-muted text-xs mt-0.5">
+                      Раунд {String(round).padStart(2, '0')} · {CURRENT_SEASON} · {items.length}{' '}
+                      {items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}
+                    </Text>
+                  </View>
                 </View>
+
+                {/* Sessions in canonical order */}
                 <View className="px-4 gap-2">
-                  {items.map((b) => {
-                    const race = raceByKey.get(`${b.race_round}-${b.season}`);
-                    return (
-                      <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                        <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
-                          <View className="w-11 h-11 rounded-full bg-surface-2 items-center justify-center">
-                            <Ionicons name="play" size={18} color="#E10600" />
-                          </View>
-                          <View className="flex-1 ml-3">
-                            <View className="flex-row items-center">
-                              <Text className="text-text font-bold flex-1" numberOfLines={1}>
-                                {b.title ?? race?.name ?? `Раунд ${b.race_round}`}
-                              </Text>
-                              {b.is_live ? (
-                                <View className="bg-red px-1.5 py-0.5 rounded ml-2">
-                                  <Text className="text-text text-[9px] font-extrabold tracking-widest">
-                                    LIVE
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </View>
-                            <View className="flex-row items-center mt-1">
-                              <Text className="text-muted text-xs font-bold mr-2">
-                                R{String(b.race_round).padStart(2, '0')}
-                              </Text>
-                              {race?.country_code && (
-                                <Text className="text-sm mr-1.5">
-                                  {flagFor(race.country_code)}
+                  {items.map((b) => (
+                    <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                      <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
+                        <View className="w-11 h-11 rounded-full bg-red/15 items-center justify-center">
+                          <Ionicons
+                            name={SESSION_ICON[b.session_type] ?? 'film'}
+                            size={20}
+                            color="#E10600"
+                          />
+                        </View>
+                        <View className="flex-1 ml-3">
+                          <View className="flex-row items-center">
+                            <Text className="text-text font-bold flex-1" numberOfLines={1}>
+                              {SESSION_LABEL[b.session_type] ?? b.session_type} ·{' '}
+                              {race?.name?.replace('Гран-при ', '')}
+                            </Text>
+                            {b.is_live ? (
+                              <View className="bg-red px-1.5 py-0.5 rounded ml-2">
+                                <Text className="text-text text-[9px] font-extrabold tracking-widest">
+                                  LIVE
                                 </Text>
-                              )}
-                              <Text className="text-muted text-xs flex-1" numberOfLines={1}>
-                                {race?.name ?? '—'}
-                              </Text>
-                              <Text className="text-muted-2 text-xs ml-2">{b.season}</Text>
-                            </View>
+                              </View>
+                            ) : null}
                           </View>
-                          <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
-                        </Pressable>
-                      </Link>
-                    );
-                  })}
+                          <Text className="text-muted text-xs mt-0.5">
+                            {SESSION_LABEL[b.session_type]}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+                      </Pressable>
+                    </Link>
+                  ))}
                 </View>
               </View>
             );

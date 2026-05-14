@@ -192,6 +192,7 @@ function CreateForm({ onClose, onCreated }: { onClose: () => void; onCreated: ()
   const [roundStr, setRoundStr] = useState('');
   const [sessionType, setSessionType] = useState<string>('race');
   const [videoUrl, setVideoUrl] = useState('');
+  const [titleEdited, setTitleEdited] = useState(false);
   const [title, setTitle] = useState('');
   const [isLive, setIsLive] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -203,6 +204,14 @@ function CreateForm({ onClose, onCreated }: { onClose: () => void; onCreated: ()
     [races, round],
   );
 
+  // Auto-compose title: "Гонка · Гран-при Майами" — until user manually edits
+  const autoTitle =
+    selectedRace
+      ? `${SESSION_LABEL[sessionType] ?? sessionType} · ${selectedRace.name}`
+      : '';
+
+  const titleForSubmit = titleEdited ? title.trim() : autoTitle;
+
   const canSubmit = round > 0 && videoUrl.trim().length > 0;
 
   const handleSubmit = async () => {
@@ -212,7 +221,7 @@ function CreateForm({ onClose, onCreated }: { onClose: () => void; onCreated: ()
         race_round: round,
         session_type: sessionType,
         video_url: videoUrl.trim(),
-        title: title.trim() || undefined,
+        title: titleForSubmit || undefined,
         is_live: isLive,
       });
       Alert.alert('Готово', 'Трансляция добавлена');
@@ -310,14 +319,35 @@ function CreateForm({ onClose, onCreated }: { onClose: () => void; onCreated: ()
               </Text>
             </Field>
 
-            <Field label="Название (необязательно)">
+            <Field label="Название (автоматически)">
               <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Например: Гран-при Канады 2025"
+                value={titleEdited ? title : autoTitle}
+                onChangeText={(t) => {
+                  setTitle(t);
+                  setTitleEdited(true);
+                }}
+                placeholder="Сначала выбери раунд и тип сессии"
                 placeholderTextColor="#6B6B7B"
                 className="bg-surface text-text px-4 py-3 rounded-xl border border-line"
               />
+              <View className="flex-row items-center justify-between mt-1">
+                <Text className="text-muted-2 text-[11px]">
+                  {titleEdited
+                    ? 'Изменено вручную'
+                    : autoTitle
+                      ? 'Авто: ' + autoTitle
+                      : 'Будет составлено автоматически'}
+                </Text>
+                {titleEdited && (
+                  <Pressable
+                    onPress={() => {
+                      setTitleEdited(false);
+                      setTitle('');
+                    }}>
+                    <Text className="text-red text-[11px] font-bold">Сбросить</Text>
+                  </Pressable>
+                )}
+              </View>
             </Field>
 
             <View className="flex-row items-center justify-between bg-surface rounded-xl border border-line px-4 py-3 mt-2">
