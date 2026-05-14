@@ -7,18 +7,10 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Link } from 'expo-router';
 import { useBroadcasts, useRaceQualifying, useRaceResults, useSchedule, flagFor } from '@/lib/hooks';
-import { videoThumbnail } from '@/lib/api';
 import type { RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
-
-function broadcastProviderBadge(url: string): { label: string; color: string } {
-  const u = url.toLowerCase();
-  if (u.includes('youtu')) return { label: 'YT', color: '#FF0000' };
-  if (u.includes('rutube')) return { label: 'RT', color: '#000000' };
-  if (u.includes('vk.com') || u.includes('vkvideo')) return { label: 'VK', color: '#0077FF' };
-  return { label: 'VIDEO', color: '#E10600' };
-}
+import { BroadcastThumb } from '@/components/VideoPlayer';
 
 const SESSION_ORDER_FOR_BROADCAST = [
   'fp1', 'fp2', 'fp3', 'sprint_qualifying', 'sprint', 'qualifying', 'race', 'review',
@@ -324,63 +316,10 @@ export default function RaceDetail() {
             <View className="px-4 mt-5 gap-2">
               {raceBroadcasts.map((b) => {
                 const sessionLabel = SESSION_SHORT[b.session_type] ?? b.session_type;
-                const thumb = videoThumbnail(b.video_url, b.embed_url);
-                const prov = broadcastProviderBadge(b.video_url || b.embed_url || '');
                 return (
                   <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
                     <Pressable className="bg-surface rounded-xl border border-line flex-row items-center active:opacity-80 overflow-hidden">
-                      <View
-                        style={{
-                          width: 112,
-                          aspectRatio: 16 / 9,
-                          backgroundColor: '#1c1c28',
-                          position: 'relative',
-                        }}>
-                        {thumb ? (
-                          <Image
-                            source={{ uri: thumb }}
-                            style={{ width: '100%', height: '100%' }}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View className="flex-1 items-center justify-center">
-                            <Ionicons name="film" size={24} color="#6B6B7B" />
-                          </View>
-                        )}
-                        <View
-                          style={{
-                            position: 'absolute',
-                            left: 4,
-                            top: 4,
-                            paddingHorizontal: 5,
-                            paddingVertical: 2,
-                            borderRadius: 4,
-                            backgroundColor: prov.color,
-                          }}>
-                          <Text className="text-text text-[8px] font-extrabold tracking-widest">
-                            {prov.label}
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                          <View
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 16,
-                              backgroundColor: 'rgba(0,0,0,0.55)',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                            <Ionicons name="play" size={16} color="#fff" />
-                          </View>
-                        </View>
-                      </View>
+                      <BroadcastThumb videoUrl={b.video_url} embedUrl={b.embed_url} />
                       <View className="flex-1 py-3 pl-3 pr-2">
                         <Text className="text-text font-bold" numberOfLines={1}>
                           {sessionLabel} · {race.name?.replace('Гран-при ', '')}
