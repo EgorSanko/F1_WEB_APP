@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -332,59 +333,7 @@ export default function RaceDetail() {
               {results.isLoading && <ActivityIndicator color="#E10600" />}
               {results.isError && <Text className="text-muted text-sm">Данных нет</Text>}
               {results.data?.results && (
-                <View
-                  style={{
-                    backgroundColor: CARD_BG,
-                    borderRadius: 18,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.05)',
-                    overflow: 'hidden',
-                  }}>
-                  {results.data.results.map((d: RaceResultDriver, i) => (
-                    <View
-                      key={d.driver_number}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        paddingHorizontal: 14,
-                        borderBottomWidth: i < results.data!.results.length - 1 ? 1 : 0,
-                        borderBottomColor: 'rgba(255,255,255,0.05)',
-                      }}>
-                      <Text
-                        style={{
-                          color: '#FAFAFA',
-                          fontWeight: '800',
-                          fontSize: 18,
-                          width: 28,
-                          textAlign: 'center',
-                        }}>
-                        {d.position}
-                      </Text>
-                      <View
-                        style={{
-                          width: 3,
-                          height: 36,
-                          borderRadius: 2,
-                          marginHorizontal: 10,
-                          backgroundColor: d.team_color || '#666',
-                        }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text className="text-text font-bold">{d.name}</Text>
-                        <Text className="text-muted text-xs mt-0.5">
-                          {d.team} · {d.code}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text className="text-text font-bold">{d.points} pts</Text>
-                        <Text className="text-muted text-xs">
-                          {d.is_dnf ? 'DNF' : d.gap || '—'}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                <ResultsView results={results.data.results} stats={stats} />
               )}
             </View>
           )}
@@ -454,51 +403,188 @@ export default function RaceDetail() {
           )}
 
           {tab === 'Записи' && (
-            <View style={{ paddingHorizontal: 16, marginTop: 18, gap: 10 }}>
-              {raceBroadcasts.map((b) => {
-                const sessionLabel = SESSION_SHORT[b.session_type] ?? b.session_type;
-                return (
-                  <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                    <Pressable
-                      style={{
-                        backgroundColor: CARD_BG,
-                        borderRadius: 16,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.05)',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                      }}>
-                      <BroadcastThumb videoUrl={b.video_url} embedUrl={b.embed_url} />
-                      <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 10 }}>
-                        <Text className="text-text font-bold" numberOfLines={1}>
-                          {sessionLabel} · {race.name?.replace('Гран-при ', '')}
-                        </Text>
-                        <Text className="text-muted text-xs mt-0.5" numberOfLines={1}>
-                          {SESSION_LABELS[b.session_type] ?? b.session_type}
-                        </Text>
-                      </View>
-                      {b.is_live ? (
-                        <View
-                          style={{
-                            backgroundColor: '#E10600',
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: 4,
-                            marginRight: 8,
-                          }}>
-                          <Text className="text-text text-[9px] font-extrabold tracking-widest">
-                            LIVE
-                          </Text>
+            <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
+              {/* Section header */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-end',
+                  justifyContent: 'space-between',
+                  marginBottom: 16,
+                }}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FAFAFA',
+                      fontSize: 22,
+                      fontWeight: '800',
+                      letterSpacing: -0.3,
+                      textTransform: 'uppercase',
+                      fontStyle: 'italic',
+                    }}>
+                    ЗАПИСИ
+                  </Text>
+                  <Text className="text-muted text-xs mt-1">
+                    Смотри ключевые моменты уикенда{race.locality ? ` в ${ruCity(race.locality)}е` : ''}
+                  </Text>
+                </View>
+                <View
+                  pointerEvents="none"
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginBottom: 8,
+                  }}>
+                  <View style={{ width: 20, height: 2, backgroundColor: '#3A3A4A', borderRadius: 1 }} />
+                  <View style={{ width: 28, height: 2, backgroundColor: '#E10600', borderRadius: 1 }} />
+                  <View
+                    style={{ width: 14, height: 2, backgroundColor: '#E10600', opacity: 0.5, borderRadius: 1 }}
+                  />
+                </View>
+              </View>
+
+              <View style={{ gap: 12 }}>
+                {raceBroadcasts.map((b) => {
+                  const badge = SESSION_SHORT[b.session_type] ?? b.session_type.toUpperCase();
+                  const titleRu = (SESSION_LABELS[b.session_type] ?? b.session_type).toUpperCase();
+                  const dateStr = b.started_at
+                    ? new Date(b.started_at).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })
+                    : null;
+                  return (
+                    <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                      <Pressable
+                        style={{
+                          backgroundColor: CARD_BG,
+                          borderRadius: 18,
+                          borderWidth: 1,
+                          borderColor: 'rgba(255,255,255,0.05)',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          overflow: 'hidden',
+                        }}>
+                        <View style={{ position: 'relative' }}>
+                          <BroadcastThumb
+                            videoUrl={b.video_url}
+                            embedUrl={b.embed_url}
+                            width={140}
+                          />
+                          <View
+                            style={{
+                              position: 'absolute',
+                              left: 8,
+                              top: 8,
+                              backgroundColor: '#E10600',
+                              paddingHorizontal: 7,
+                              paddingVertical: 3,
+                              borderRadius: 5,
+                            }}>
+                            <Text
+                              style={{
+                                color: '#FAFAFA',
+                                fontSize: 9,
+                                fontWeight: '800',
+                                letterSpacing: 1.3,
+                              }}>
+                              {badge}
+                            </Text>
+                          </View>
                         </View>
-                      ) : null}
-                      <View style={{ paddingRight: 12 }}>
-                        <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
-                      </View>
-                    </Pressable>
-                  </Link>
-                );
-              })}
+                        <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 14 }}>
+                          <Text
+                            style={{
+                              color: '#FAFAFA',
+                              fontSize: 15,
+                              fontWeight: '800',
+                              letterSpacing: 0.3,
+                            }}
+                            numberOfLines={1}>
+                            {titleRu}
+                          </Text>
+                          {dateStr ? (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginTop: 6,
+                              }}>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={11}
+                                color="#6B6B7B"
+                                style={{ marginRight: 5 }}
+                              />
+                              <Text
+                                style={{ color: '#6B6B7B', fontSize: 11, fontWeight: '600' }}>
+                                {dateStr}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {b.title && b.title !== titleRu ? (
+                            <Text className="text-muted text-xs mt-1.5" numberOfLines={1}>
+                              {b.title}
+                            </Text>
+                          ) : null}
+                          {b.is_live ? (
+                            <View
+                              style={{
+                                alignSelf: 'flex-start',
+                                marginTop: 6,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                              }}>
+                              <View
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 3,
+                                  backgroundColor: '#E10600',
+                                  marginRight: 5,
+                                }}
+                              />
+                              <Text
+                                style={{
+                                  color: '#E10600',
+                                  fontSize: 9,
+                                  fontWeight: '800',
+                                  letterSpacing: 1.5,
+                                }}>
+                                LIVE
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <View style={{ paddingRight: 14 }}>
+                          <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+                        </View>
+                      </Pressable>
+                    </Link>
+                  );
+                })}
+              </View>
+
+              {/* Footer info pill */}
+              <View
+                style={{
+                  marginTop: 18,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  backgroundColor: CARD_BG,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.05)',
+                }}>
+                <Ionicons name="information-circle-outline" size={16} color="#6B6B7B" />
+                <Text className="text-muted text-xs ml-2 flex-1" style={{ lineHeight: 16 }}>
+                  Для просмотра записей требуется стабильное интернет-соединение
+                </Text>
+              </View>
             </View>
           )}
         </ScrollView>
@@ -507,14 +593,13 @@ export default function RaceDetail() {
   );
 }
 
-// ============ HERO ============
+// ============ HERO (compact) ============
 
 function Hero({
   circuitId,
   country,
   countryCode,
   locality,
-  name,
   date,
 }: {
   circuitId?: string;
@@ -525,7 +610,6 @@ function Hero({
   date: string;
 }) {
   const cityUpper = (ruCity(locality) || locality || country || '').toUpperCase();
-  const eyebrow = name.toUpperCase();
   const dateStr = new Date(date).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
@@ -537,98 +621,51 @@ function Hero({
       style={{
         marginHorizontal: 16,
         marginTop: 4,
-        borderRadius: 24,
+        borderRadius: 20,
         overflow: 'hidden',
         backgroundColor: CARD_BG,
         borderWidth: 1,
         borderColor: 'rgba(225,6,0,0.18)',
-        aspectRatio: 4 / 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 18,
+        paddingHorizontal: 20,
+        height: 130,
         shadowColor: '#E10600',
-        shadowOpacity: 0.15,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 6,
+        shadowOpacity: 0.12,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 4,
       }}>
-      {/* Большое очертание трассы по центру — декоративный фон */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: -20,
-          top: 20,
-          opacity: 0.85,
-        }}>
-        <CircuitOutline
-          circuitId={circuitId}
-          width={300}
-          height={300}
-          color="#E10600"
-          strokeWidth={2.5}
-        />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ fontSize: 22, marginRight: 8 }}>{flagFor(countryCode)}</Text>
+        </View>
+        <Text
+          style={{
+            color: '#FAFAFA',
+            fontSize: 28,
+            lineHeight: 30,
+            fontWeight: '800',
+            letterSpacing: -1,
+            fontStyle: 'italic',
+          }}
+          numberOfLines={1}>
+          {cityUpper}
+        </Text>
+        <Text className="text-muted text-xs mt-1.5" numberOfLines={1}>
+          {dateStr}
+        </Text>
       </View>
 
-      {/* Subtle bottom darken so text is readable */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          top: '55%',
-          backgroundColor: 'rgba(10,10,18,0.7)',
-        }}
+      <CircuitOutline
+        circuitId={circuitId}
+        width={120}
+        height={100}
+        color="#E10600"
+        strokeWidth={2.2}
+        opacity={0.95}
       />
-
-      {/* Content */}
-      <View style={{ flex: 1, padding: 22, justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 32 }}>{flagFor(countryCode)}</Text>
-        </View>
-
-        <View>
-          <Text
-            style={{
-              color: '#E10600',
-              fontSize: 11,
-              fontWeight: '800',
-              letterSpacing: 2,
-            }}
-            numberOfLines={1}>
-            {eyebrow}
-          </Text>
-          <Text
-            style={{
-              color: '#FAFAFA',
-              fontSize: 46,
-              lineHeight: 46,
-              fontWeight: '800',
-              letterSpacing: -1.5,
-              fontStyle: 'italic',
-              marginTop: 6,
-            }}
-            numberOfLines={1}>
-            {cityUpper}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.08)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 10,
-              }}>
-              <Ionicons name="calendar-outline" size={14} color="#FAFAFA" />
-            </View>
-            <Text className="text-text text-sm font-semibold">{dateStr} г.</Text>
-          </View>
-        </View>
-      </View>
     </View>
   );
 }
@@ -719,6 +756,309 @@ function SessionRow({
         </View>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+    </View>
+  );
+}
+
+// ============ RESULTS VIEW (podium + table) ============
+
+function teamAbbr(team?: string): string {
+  if (!team) return '';
+  const words = team.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words.map((w) => w[0]).join('').toUpperCase().slice(0, 3);
+  }
+  return team.slice(0, 3).toUpperCase();
+}
+
+function ResultsView({
+  results,
+  stats,
+}: {
+  results: RaceResultDriver[];
+  stats: ReturnType<typeof getCircuitStats>;
+}) {
+  const top3 = results.slice(0, 3);
+  const rest = results.slice(3);
+  const podiumColors = { 1: '#FFCB05', 2: '#C0C0C0', 3: '#CD7F32' } as const;
+
+  return (
+    <View>
+      {/* Podium */}
+      {top3.length === 3 && (
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', marginBottom: 18 }}>
+          <PodiumCard driver={top3[1]} place={2} color={podiumColors[2]} />
+          <PodiumCard driver={top3[0]} place={1} color={podiumColors[1]} winner />
+          <PodiumCard driver={top3[2]} place={3} color={podiumColors[3]} />
+        </View>
+      )}
+
+      {/* Table header */}
+      {rest.length > 0 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            marginBottom: 6,
+          }}>
+          <Text style={tableHeaderStyle('left', 28)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 50 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('left', 50)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 50)}>Очки</Text>
+          <Text style={tableHeaderStyle('right', 70)}>Отставание</Text>
+        </View>
+      )}
+
+      {/* Rows 4+ */}
+      <View
+        style={{
+          backgroundColor: CARD_BG,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+        }}>
+        {rest.map((d, i) => (
+          <View
+            key={d.driver_number}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderBottomWidth: i < rest.length - 1 ? 1 : 0,
+              borderBottomColor: 'rgba(255,255,255,0.04)',
+            }}>
+            <Text
+              style={{
+                color: d.team_color || '#FAFAFA',
+                fontWeight: '800',
+                fontSize: 22,
+                width: 28,
+                textAlign: 'center',
+                letterSpacing: -0.5,
+              }}>
+              {d.position}
+            </Text>
+            {d.photo_url ? (
+              <Image
+                source={{ uri: d.photo_url }}
+                style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 12 }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  marginLeft: 12,
+                  backgroundColor: '#2A2A38',
+                }}
+              />
+            )}
+            <Text
+              style={{
+                flex: 1,
+                color: '#FAFAFA',
+                fontWeight: '700',
+                fontSize: 14,
+                marginLeft: 10,
+              }}
+              numberOfLines={1}>
+              {d.name}
+            </Text>
+            <View
+              style={{
+                width: 50,
+                alignItems: 'center',
+              }}>
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 3,
+                  borderRadius: 5,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderLeftWidth: 2,
+                  borderLeftColor: d.team_color || '#666',
+                }}>
+                <Text
+                  style={{
+                    color: d.team_color || '#A0A0B0',
+                    fontWeight: '800',
+                    fontSize: 9,
+                    letterSpacing: 1,
+                  }}>
+                  {teamAbbr(d.team)}
+                </Text>
+              </View>
+            </View>
+            <View style={{ width: 50, alignItems: 'flex-end' }}>
+              <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 13 }}>
+                {d.points}
+              </Text>
+              <Text style={{ color: '#6B6B7B', fontSize: 9, fontWeight: '700' }}>PTS</Text>
+            </View>
+            <Text
+              style={{
+                width: 70,
+                textAlign: 'right',
+                color: d.is_dnf ? '#A0A0B0' : '#E10600',
+                fontSize: 12,
+                fontWeight: '700',
+              }}>
+              {d.is_dnf ? 'DNF' : d.gap || '—'}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Stats footer below table */}
+      {stats && <StatsFooter stats={stats} />}
+    </View>
+  );
+}
+
+function tableHeaderStyle(
+  align: 'left' | 'right',
+  width: number,
+  extra: object = {},
+): object {
+  return {
+    color: '#6B6B7B',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase' as const,
+    width: width || undefined,
+    textAlign: align,
+    ...extra,
+  };
+}
+
+function PodiumCard({
+  driver,
+  place,
+  color,
+  winner = false,
+}: {
+  driver: RaceResultDriver;
+  place: 1 | 2 | 3;
+  color: string;
+  winner?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flex: winner ? 1.15 : 1,
+        backgroundColor: CARD_BG,
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderColor: color + (winner ? 'AA' : '55'),
+        paddingTop: winner ? 18 : 12,
+        paddingBottom: 14,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        shadowColor: color,
+        shadowOpacity: winner ? 0.45 : 0.2,
+        shadowRadius: winner ? 18 : 10,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: winner ? 8 : 4,
+        position: 'relative',
+      }}>
+      {winner && (
+        <Text style={{ fontSize: 22, position: 'absolute', top: -12 }}>🏆</Text>
+      )}
+      <Text
+        style={{
+          color,
+          fontWeight: '800',
+          fontSize: winner ? 28 : 22,
+          letterSpacing: -1,
+          lineHeight: winner ? 30 : 24,
+        }}>
+        {place}
+      </Text>
+      {driver.photo_url ? (
+        <Image
+          source={{ uri: driver.photo_url }}
+          style={{
+            width: winner ? 64 : 52,
+            height: winner ? 64 : 52,
+            borderRadius: winner ? 32 : 26,
+            marginTop: 4,
+            borderWidth: 1.5,
+            borderColor: color,
+          }}
+        />
+      ) : (
+        <View
+          style={{
+            width: winner ? 64 : 52,
+            height: winner ? 64 : 52,
+            borderRadius: winner ? 32 : 26,
+            marginTop: 4,
+            backgroundColor: '#2A2A38',
+          }}
+        />
+      )}
+      <Text
+        style={{
+          color: '#FAFAFA',
+          fontSize: 12,
+          fontWeight: '700',
+          marginTop: 8,
+          textAlign: 'center',
+        }}
+        numberOfLines={1}>
+        {driver.last_name || driver.name}
+      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 3,
+        }}>
+        <View
+          style={{
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: driver.team_color || '#666',
+            marginRight: 5,
+          }}
+        />
+        <Text
+          style={{
+            color: '#6B6B7B',
+            fontSize: 9,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+          }}
+          numberOfLines={1}>
+          {driver.team}
+        </Text>
+      </View>
+      <Text
+        style={{
+          color: '#FAFAFA',
+          fontWeight: '800',
+          fontSize: winner ? 16 : 14,
+          marginTop: 10,
+        }}>
+        {driver.points} PTS
+      </Text>
+      <Text
+        style={{
+          color: winner ? '#A0A0B0' : '#E10600',
+          fontSize: 10,
+          fontWeight: '700',
+          marginTop: 2,
+        }}
+        numberOfLines={1}>
+        {winner ? driver.time || '—' : driver.gap || '—'}
+      </Text>
     </View>
   );
 }
