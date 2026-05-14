@@ -4,10 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { WebView } from 'react-native-webview';
 
 import { api } from '@/lib/api';
 import { useSchedule, flagFor } from '@/lib/hooks';
+import { VideoPlayer } from '@/components/VideoPlayer';
 
 const SESSION_LABEL: Record<string, string> = {
   race: 'Гонка',
@@ -47,8 +47,6 @@ export default function BroadcastDetail() {
     );
   }
 
-  const embedHtml = buildEmbedHtml(b.embed_url || b.video_url);
-
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen options={{ headerShown: false }} />
@@ -64,18 +62,11 @@ export default function BroadcastDetail() {
           </Text>
         </View>
 
-        <View style={{ aspectRatio: 16 / 9, backgroundColor: '#000' }}>
-          <WebView
-            source={{ html: embedHtml, baseUrl: 'https://f1hub.lead-seek.ru' }}
-            style={{ flex: 1, backgroundColor: '#000' }}
-            javaScriptEnabled
-            domStorageEnabled
-            allowsFullscreenVideo
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            scrollEnabled={false}
-          />
-        </View>
+        <VideoPlayer
+          videoUrl={b.video_url}
+          embedUrl={b.embed_url}
+          title={b.title ?? SESSION_LABEL[b.session_type] ?? 'Трансляция'}
+        />
 
         <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
           <View className="px-5 pt-4">
@@ -146,28 +137,3 @@ function hostnameOf(url: string): string {
   }
 }
 
-function buildEmbedHtml(srcUrl: string): string {
-  // Wrap any embed URL (YouTube/VK/Rutube/HLS) in a full-bleed iframe
-  // so it fills the WebView and supports fullscreen + autoplay.
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<style>
-  html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
-  .wrap{position:fixed;inset:0;display:flex}
-  iframe{flex:1;border:0;background:#000}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <iframe
-    src="${srcUrl.replace(/"/g, '&quot;')}"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-    allowfullscreen
-    referrerpolicy="origin"></iframe>
-</div>
-</body>
-</html>`;
-}
