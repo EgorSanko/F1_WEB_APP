@@ -16,6 +16,7 @@ import type { Driver, RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
 import { videoThumbnail, type Broadcast } from '@/lib/api';
+import { useRutubeThumbnail } from '@/components/VideoPlayer';
 import { CircuitOutline } from '@/components/CircuitOutline';
 import { ruCity } from '@/lib/locale';
 import { getCircuitStats } from '@/lib/circuit-stats';
@@ -1237,6 +1238,11 @@ const SESSION_DESCRIPTIONS: Record<string, string> = {
   review: 'Обзор гран-при',
 };
 
+function extractRutubeIdFromUrl(url: string): string | null {
+  const m = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+  return m ? m[1] : null;
+}
+
 function RecordCard({ broadcast, raceName }: { broadcast: Broadcast; raceName: string }) {
   const color = SESSION_COLOR[broadcast.session_type] ?? '#E10600';
   const badge = SESSION_SHORT[broadcast.session_type] ?? broadcast.session_type.toUpperCase();
@@ -1252,7 +1258,11 @@ function RecordCard({ broadcast, raceName }: { broadcast: Broadcast; raceName: s
       })
     : null;
   const duration = computeDuration(broadcast.started_at, broadcast.ended_at);
-  const thumb = videoThumbnail(broadcast.video_url, broadcast.embed_url);
+  const url = broadcast.video_url || broadcast.embed_url || '';
+  const ytThumb = videoThumbnail(broadcast.video_url, broadcast.embed_url);
+  const rutubeId = !ytThumb ? extractRutubeIdFromUrl(url) : null;
+  const rutubeThumb = useRutubeThumbnail(rutubeId);
+  const thumb = ytThumb ?? rutubeThumb.data ?? null;
 
   return (
     <Link href={`/broadcast/${broadcast.id}` as never} asChild>

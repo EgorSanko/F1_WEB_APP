@@ -38,6 +38,14 @@ export default function StandingsScreen() {
   const h2h = useHeadToHead();
   const progression = usePointsProgression();
 
+  const teamLogoByName = useMemo(() => {
+    const m: Record<string, string> = {};
+    teams.data?.teams.forEach((t) => {
+      if (t.logo_url) m[t.name] = t.logo_url;
+    });
+    return m;
+  }, [teams.data]);
+
   const spoilerEnabled = useSpoiler((s) => s.enabled);
   const spoilerHidden = isSpoilerHidden(CURRENT_SEASON, spoilerEnabled);
   const [revealed, setRevealed] = useState(false);
@@ -126,11 +134,18 @@ export default function StandingsScreen() {
               onReveal={() => setRevealed(true)}
             />
           )}
-          {(!spoilerHidden || revealed) && tab === 'Пилоты' && <DriversTab data={drivers.data?.standings ?? []} loading={drivers.isLoading} />}
+          {(!spoilerHidden || revealed) && tab === 'Пилоты' && (
+            <DriversTab
+              data={drivers.data?.standings ?? []}
+              loading={drivers.isLoading}
+              teamLogos={teamLogoByName}
+            />
+          )}
           {(!spoilerHidden || revealed) && tab === 'Кубок' && (
             <ConstructorsTab
               data={constructors.data?.standings ?? []}
               loading={constructors.isLoading}
+              teamLogos={teamLogoByName}
               onPickDriver={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
@@ -169,63 +184,319 @@ export default function StandingsScreen() {
 }
 
 // ============ DRIVERS TAB ============
-function DriversTab({ data, loading }: { data: DriverStanding[]; loading: boolean }) {
+const PODIUM_METAL = ['#FFCB05', '#C0C0C0', '#CD7F32'] as const;
+
+function DriversTab({
+  data,
+  loading,
+  teamLogos,
+}: {
+  data: DriverStanding[];
+  loading: boolean;
+  teamLogos: Record<string, string>;
+}) {
   const router = useRouter();
-  if (loading) return <ActivityIndicator color="#E10600" className="mt-10" />;
+  if (loading) return <ActivityIndicator color="#E10600" style={{ marginTop: 40 }} />;
   if (!data.length) return <EmptyHint text="Стандинги недоступны" />;
   const top3 = data.slice(0, 3);
+  const rest = data.slice(3);
+  const leader = top3[0];
+
   return (
     <View>
+      {/* Podium */}
       {top3.length === 3 && (
-        <View className="px-4 mb-3">
-          <Text className="text-text text-base font-bold mb-3">Лидеры сезона</Text>
-          <View className="flex-row gap-2">
-            {top3.map((d, i) => (
-              <PodiumCard
-                key={d.driver_number}
-                d={d}
-                rank={i + 1}
-                onPress={() => router.push(`/driver/${d.driver_number}` as never)}
-              />
-            ))}
-          </View>
+        <View
+          style={{
+            flexDirection: 'row',
+            paddingHorizontal: 16,
+            gap: 8,
+            alignItems: 'flex-end',
+            marginTop: 6,
+            marginBottom: 22,
+          }}>
+          <StandingsPodium
+            d={top3[1]}
+            place={2}
+            color={PODIUM_METAL[1]}
+            teamLogo={top3[1].team ? teamLogos[top3[1].team] : undefined}
+            onPress={() => router.push(`/driver/${top3[1].driver_number}` as never)}
+          />
+          <StandingsPodium
+            d={top3[0]}
+            place={1}
+            color={PODIUM_METAL[0]}
+            winner
+            teamLogo={top3[0].team ? teamLogos[top3[0].team] : undefined}
+            onPress={() => router.push(`/driver/${top3[0].driver_number}` as never)}
+          />
+          <StandingsPodium
+            d={top3[2]}
+            place={3}
+            color={PODIUM_METAL[2]}
+            teamLogo={top3[2].team ? teamLogos[top3[2].team] : undefined}
+            onPress={() => router.push(`/driver/${top3[2].driver_number}` as never)}
+          />
         </View>
       )}
-      <View className="px-4 gap-2 mt-2">
-        {data.map((d, i) => (
-          <Pressable
-            key={d.driver_number}
-            onPress={() => router.push(`/driver/${d.driver_number}` as never)}
-            className="bg-surface rounded-xl p-3 border border-line flex-row items-center active:opacity-80">
-            <Text className="font-extrabold w-7 text-center" style={{ color: medalColor(i) }}>
-              {d.position ?? i + 1}
-            </Text>
-            <View
-              className="w-1 h-10 rounded-full mx-2"
-              style={{ backgroundColor: d.team_color || '#666' }}
-            />
-            {d.photo_url ? (
-              <Image
-                source={{ uri: d.photo_url }}
-                style={{ width: 36, height: 36, borderRadius: 18 }}
-              />
-            ) : null}
-            <View className="flex-1 ml-3">
-              <View className="flex-row items-center">
-                <Text className="text-text font-bold">{d.name}</Text>
-                <Text className="text-muted text-xs ml-2">{flagFor(d.country)}</Text>
+
+      {/* Table header */}
+      {rest.length > 0 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 24,
+            paddingVertical: 8,
+          }}>
+          <Text style={tableHeaderText({ width: 22, align: 'center' })}>ПОЗ</Text>
+          <Text style={tableHeaderText({ flex: 1, marginLeft: 56, align: 'left' })}>ПИЛОТ</Text>
+          <Text style={tableHeaderText({ width: 32, align: 'center' })}>КОМАНДА</Text>
+          <Text style={tableHeaderText({ width: 60, align: 'right', marginLeft: 6 })}>ОЧКИ</Text>
+        </View>
+      )}
+
+      {/* Table rows for positions 4+ */}
+      <View
+        style={{
+          marginHorizontal: 16,
+          backgroundColor: '#12121C',
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+        }}>
+        {rest.map((d, i) => {
+          const portrait = d.card_photo_url || d.photo_url;
+          const teamColor = d.team_color || '#666';
+          const logo = d.team ? teamLogos[d.team] : undefined;
+          const diff = leader ? (leader.points ?? 0) - (d.points ?? 0) : 0;
+          return (
+            <Pressable
+              key={d.driver_number}
+              onPress={() => router.push(`/driver/${d.driver_number}` as never)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 8,
+                paddingHorizontal: 14,
+                borderBottomWidth: i < rest.length - 1 ? 1 : 0,
+                borderBottomColor: 'rgba(255,255,255,0.04)',
+              }}>
+              <Text
+                style={{
+                  color: teamColor,
+                  fontWeight: '800',
+                  fontSize: 20,
+                  width: 22,
+                  textAlign: 'center',
+                  letterSpacing: -0.3,
+                }}>
+                {d.position ?? i + 4}
+              </Text>
+              {portrait ? (
+                <Image
+                  source={{ uri: portrait }}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 21,
+                    marginLeft: 8,
+                    backgroundColor: '#1A1A24',
+                  }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 21,
+                    marginLeft: 8,
+                    backgroundColor: '#1A1A24',
+                  }}
+                />
+              )}
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 14 }} numberOfLines={1}>
+                    {d.name}
+                  </Text>
+                  {d.country ? (
+                    <Text style={{ fontSize: 11, marginLeft: 5 }}>{flagFor(d.country)}</Text>
+                  ) : null}
+                </View>
+                <Text style={{ color: teamColor, fontSize: 11, fontWeight: '700', marginTop: 1 }}>
+                  {d.team}
+                </Text>
               </View>
-              <Text className="text-muted text-xs">{d.team}</Text>
-            </View>
-            <View className="items-end mr-1">
-              <Text className="text-text font-extrabold">{d.points}</Text>
-              <Text className="text-muted text-xs">очков</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#6B6B7B" />
-          </Pressable>
-        ))}
+              <View style={{ width: 32, alignItems: 'center' }}>
+                {logo ? (
+                  <Image
+                    source={{ uri: logo }}
+                    style={{ width: 26, height: 26 }}
+                    contentFit="contain"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 4,
+                      height: 20,
+                      borderRadius: 2,
+                      backgroundColor: teamColor,
+                    }}
+                  />
+                )}
+              </View>
+              <View style={{ width: 60, alignItems: 'flex-end', marginLeft: 6 }}>
+                <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 15 }}>
+                  {d.points}
+                </Text>
+                {diff > 0 && (
+                  <Text style={{ color: '#6B6B7B', fontSize: 10, marginTop: 1 }}>
+                    -{diff}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
+  );
+}
+
+function tableHeaderText({
+  width,
+  flex,
+  align,
+  marginLeft,
+}: {
+  width?: number;
+  flex?: number;
+  align: 'left' | 'right' | 'center';
+  marginLeft?: number;
+}): object {
+  return {
+    color: '#6B6B7B',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    width,
+    flex,
+    textAlign: align,
+    marginLeft,
+  };
+}
+
+// ============ STANDINGS PODIUM CARD ============
+
+function StandingsPodium({
+  d,
+  place,
+  color,
+  winner = false,
+  teamLogo,
+  onPress,
+}: {
+  d: DriverStanding;
+  place: 1 | 2 | 3;
+  color: string;
+  winner?: boolean;
+  teamLogo?: string;
+  onPress: () => void;
+}) {
+  const portrait = d.card_photo_url || d.photo_url;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flex: winner ? 1.18 : 1,
+        backgroundColor: winner ? '#1A1505' : '#12121C',
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: color + (winner ? 'CC' : '55'),
+        overflow: 'hidden',
+        shadowColor: color,
+        shadowOpacity: winner ? 0.5 : 0.22,
+        shadowRadius: winner ? 22 : 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: winner ? 10 : 4,
+      }}>
+      {/* Portrait */}
+      <View style={{ width: '100%', height: winner ? 125 : 110, backgroundColor: '#1A1A24' }}>
+        {portrait ? (
+          <Image source={{ uri: portrait }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        ) : null}
+        <Text
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: 10,
+            color: '#FAFAFA',
+            fontSize: winner ? 44 : 36,
+            fontWeight: '800',
+            letterSpacing: -1.5,
+            lineHeight: winner ? 48 : 40,
+            textShadowColor: 'rgba(0,0,0,0.75)',
+            textShadowOffset: { width: 0, height: 2 },
+            textShadowRadius: 8,
+          }}>
+          {place}
+        </Text>
+      </View>
+      {/* Info */}
+      <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, paddingRight: 4 }}>
+            <Text style={{ color: '#FAFAFA', fontSize: 12, fontWeight: '700', lineHeight: 14 }} numberOfLines={1}>
+              {d.first_name}
+            </Text>
+            <Text style={{ color: '#FAFAFA', fontSize: 12, fontWeight: '700', lineHeight: 14 }} numberOfLines={1}>
+              {d.last_name}
+            </Text>
+          </View>
+          {teamLogo ? (
+            <Image source={{ uri: teamLogo }} style={{ width: 22, height: 22 }} contentFit="contain" />
+          ) : (
+            <View
+              style={{
+                width: 4,
+                height: 18,
+                borderRadius: 2,
+                backgroundColor: d.team_color || '#666',
+              }}
+            />
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
+          <Text
+            style={{
+              color: winner ? '#FFCB05' : d.team_color || '#FAFAFA',
+              fontWeight: '800',
+              fontSize: winner ? 18 : 16,
+              letterSpacing: -0.3,
+            }}>
+            {d.points}
+          </Text>
+          <Text
+            style={{
+              color: winner ? '#FFCB05' : d.team_color || '#FAFAFA',
+              fontWeight: '700',
+              fontSize: 9,
+              marginLeft: 3,
+              letterSpacing: 0.8,
+            }}>
+            PTS
+          </Text>
+        </View>
+        {d.wins ? (
+          <Text style={{ color: '#A0A0B0', fontSize: 10, fontWeight: '700', marginTop: 2 }}>
+            {d.wins} побед{d.wins === 1 ? 'а' : ''}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -233,68 +504,153 @@ function DriversTab({ data, loading }: { data: DriverStanding[]; loading: boolea
 function ConstructorsTab({
   data,
   loading,
+  teamLogos,
   onPickDriver,
 }: {
   data: import('@/lib/api').ConstructorStanding[];
   loading: boolean;
+  teamLogos: Record<string, string>;
   onPickDriver: (n: number) => void;
 }) {
-  if (loading) return <ActivityIndicator color="#E10600" className="mt-10" />;
+  if (loading) return <ActivityIndicator color="#E10600" style={{ marginTop: 40 }} />;
   if (!data.length) return <EmptyHint text="Стандинги недоступны" />;
+  const leader = data[0];
   return (
-    <View className="px-4 gap-2">
-      {data.map((c, i) => (
-        <View key={c.team} className="bg-surface rounded-2xl border border-line overflow-hidden">
+    <View style={{ paddingHorizontal: 16, gap: 12 }}>
+      {data.map((c, i) => {
+        const teamColor = c.team_color || '#666';
+        const logo = teamLogos[c.team];
+        const pos = c.position ?? i + 1;
+        const isLeader = i === 0;
+        const diff = leader ? (leader.points ?? 0) - (c.points ?? 0) : 0;
+        return (
           <View
-            className="flex-row items-center p-4"
-            style={{ backgroundColor: (c.team_color || '#666') + '15' }}>
-            <Text
-              className="font-extrabold w-7 text-center text-lg"
-              style={{ color: medalColor(i) }}>
-              {c.position ?? i + 1}
-            </Text>
+            key={c.team}
+            style={{
+              backgroundColor: '#12121C',
+              borderRadius: 20,
+              borderWidth: 1.5,
+              borderColor: isLeader ? teamColor + 'AA' : teamColor + '44',
+              overflow: 'hidden',
+              shadowColor: isLeader ? teamColor : 'transparent',
+              shadowOpacity: isLeader ? 0.3 : 0,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: isLeader ? 6 : 0,
+            }}>
+            {/* Header row */}
             <View
-              className="w-1.5 h-10 rounded-full mx-2"
-              style={{ backgroundColor: c.team_color || '#666' }}
-            />
-            <View className="flex-1">
-              <Text className="text-text font-extrabold text-base">{c.team}</Text>
-              <Text className="text-muted text-xs">
-                {c.wins ? `${c.wins} побед` : 'Без побед'}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 16,
+                backgroundColor: teamColor + '12',
+              }}>
+              <Text
+                style={{
+                  color: pos <= 3 ? (PODIUM_METAL[pos - 1] ?? teamColor) : teamColor,
+                  fontWeight: '800',
+                  fontSize: 32,
+                  width: 40,
+                  textAlign: 'center',
+                  letterSpacing: -1,
+                }}>
+                {pos}
               </Text>
+              <View style={{ width: 4, height: 44, borderRadius: 2, backgroundColor: teamColor, marginHorizontal: 12 }} />
+              {logo ? (
+                <Image source={{ uri: logo }} style={{ width: 44, height: 44 }} contentFit="contain" />
+              ) : (
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    backgroundColor: teamColor + '22',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons name="car-sport" size={22} color={teamColor} />
+                </View>
+              )}
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 16 }} numberOfLines={1}>
+                  {c.team}
+                </Text>
+                <Text style={{ color: '#A0A0B0', fontSize: 11, marginTop: 2 }}>
+                  {c.wins ? `${c.wins} побед` : 'Без побед'}
+                  {diff > 0 ? ` · -${diff}` : ''}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ color: teamColor, fontWeight: '800', fontSize: 20, letterSpacing: -0.3 }}>
+                  {c.points}
+                </Text>
+                <Text style={{ color: '#6B6B7B', fontSize: 10, fontWeight: '700', letterSpacing: 0.8 }}>
+                  ОЧКОВ
+                </Text>
+              </View>
             </View>
-            <View className="items-end">
-              <Text className="text-text font-extrabold text-lg">{c.points}</Text>
-              <Text className="text-muted text-xs">очков</Text>
-            </View>
+            {/* Drivers row */}
+            {c.drivers && c.drivers.length > 0 && (
+              <View style={{ flexDirection: 'row' }}>
+                {c.drivers.map((dr, idx) => {
+                  const portrait = dr.card_photo_url || dr.photo_url;
+                  return (
+                    <Pressable
+                      key={dr.driver_number}
+                      onPress={() => onPickDriver(dr.driver_number)}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 12,
+                        borderRightWidth:
+                          idx === 0 && c.drivers!.length > 1 ? 1 : 0,
+                        borderRightColor: 'rgba(255,255,255,0.06)',
+                      }}>
+                      {portrait ? (
+                        <Image
+                          source={{ uri: portrait }}
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                            borderWidth: 1.5,
+                            borderColor: teamColor,
+                          }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                            backgroundColor: '#1A1A24',
+                            borderWidth: 1.5,
+                            borderColor: teamColor,
+                          }}
+                        />
+                      )}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text
+                          style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 13 }}
+                          numberOfLines={1}>
+                          {dr.last_name}
+                        </Text>
+                        <Text style={{ color: '#6B6B7B', fontSize: 10, fontWeight: '700', marginTop: 1 }}>
+                          #{dr.driver_number} · {dr.points ?? 0} pts
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
-          {c.drivers && c.drivers.length > 0 && (
-            <View className="flex-row border-t border-line">
-              {c.drivers.map((dr, idx) => (
-                <Pressable
-                  key={dr.driver_number}
-                  onPress={() => onPickDriver(dr.driver_number)}
-                  className={`flex-1 flex-row items-center p-3 active:opacity-80 ${
-                    idx === 0 && c.drivers!.length > 1 ? 'border-r border-line' : ''
-                  }`}>
-                  {dr.photo_url ? (
-                    <Image
-                      source={{ uri: dr.photo_url }}
-                      style={{ width: 32, height: 32, borderRadius: 16 }}
-                    />
-                  ) : null}
-                  <View className="flex-1 ml-2">
-                    <Text className="text-text text-sm font-bold" numberOfLines={1}>
-                      {dr.last_name}
-                    </Text>
-                    <Text className="text-muted text-[10px]">#{dr.driver_number}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
