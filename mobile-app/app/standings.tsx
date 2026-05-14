@@ -153,6 +153,7 @@ export default function StandingsScreen() {
             <DriverCardsTab
               data={drivers.data?.standings ?? []}
               loading={drivers.isLoading}
+              teamLogos={teamLogoByName}
               onPick={(n) => router.push(`/driver/${n}` as never)}
             />
           )}
@@ -655,67 +656,224 @@ function ConstructorsTab({
   );
 }
 
-// ============ DRIVER CARDS TAB (большие фото) ============
+// ============ DRIVER CARDS TAB (большие фото, горизонтальная компоновка) ============
 function DriverCardsTab({
   data,
   loading,
+  teamLogos,
   onPick,
 }: {
   data: DriverStanding[];
   loading: boolean;
+  teamLogos: Record<string, string>;
   onPick: (n: number) => void;
 }) {
-  if (loading) return <ActivityIndicator color="#E10600" className="mt-10" />;
+  if (loading) return <ActivityIndicator color="#E10600" style={{ marginTop: 40 }} />;
   if (!data.length) return <EmptyHint text="Карточки недоступны" />;
   return (
-    <View className="flex-row flex-wrap px-3 gap-y-3">
-      {data.map((d, i) => (
-        <View key={d.driver_number} className="w-1/2 px-1">
+    <View style={{ paddingHorizontal: 16, gap: 12 }}>
+      {data.map((d, i) => {
+        const teamColor = d.team_color || '#666';
+        const portrait = d.card_photo_url || d.photo_url;
+        const logo = d.team ? teamLogos[d.team] : undefined;
+        const pos = d.position ?? i + 1;
+        const isLeader = pos === 1;
+        return (
           <Pressable
+            key={d.driver_number}
             onPress={() => onPick(d.driver_number)}
-            className="rounded-2xl overflow-hidden border border-line active:opacity-80"
-            style={{ backgroundColor: (d.team_color || '#666') + '22' }}>
+            style={{
+              backgroundColor: '#12121C',
+              borderRadius: 22,
+              borderWidth: 1.5,
+              borderColor: teamColor + (isLeader ? 'CC' : '55'),
+              overflow: 'hidden',
+              shadowColor: teamColor,
+              shadowOpacity: isLeader ? 0.45 : 0.2,
+              shadowRadius: isLeader ? 18 : 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: isLeader ? 8 : 3,
+            }}>
+            {/* Tinted gradient layer */}
             <View
-              className="absolute top-0 left-0 right-0 h-1 z-10"
-              style={{ backgroundColor: d.team_color || '#666' }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: teamColor + '18',
+              }}
+              pointerEvents="none"
             />
-            <View className="p-3 flex-row items-start">
-              <View className="flex-1">
-                <Text className="text-text text-2xl font-extrabold" style={{ lineHeight: 26 }}>
-                  {i + 1}
+            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 130 }}>
+              {/* Position number + #N */}
+              <View style={{ width: 56, alignItems: 'center', paddingVertical: 14 }}>
+                <Text
+                  style={{
+                    color: teamColor,
+                    fontSize: 44,
+                    fontWeight: '800',
+                    letterSpacing: -2,
+                    lineHeight: 46,
+                  }}>
+                  {pos}
                 </Text>
-                <Text className="text-muted text-[10px] tracking-widest font-bold mt-1">
+                <Text
+                  style={{
+                    color: '#6B6B7B',
+                    fontSize: 10,
+                    fontWeight: '800',
+                    letterSpacing: 1.2,
+                    marginTop: 4,
+                  }}>
                   #{d.driver_number}
                 </Text>
               </View>
-              <Text className="text-text font-extrabold text-lg">{d.points}</Text>
-            </View>
-            <View className="px-3 items-center justify-end" style={{ height: 140 }}>
-              {d.card_photo_url || d.photo_url ? (
-                <Image
-                  source={{ uri: d.card_photo_url || d.photo_url }}
-                  style={{ width: 130, height: 140 }}
-                  contentFit="contain"
-                />
-              ) : null}
-            </View>
-            <View className="p-3 bg-bg/40">
-              <Text className="text-text font-light text-sm" numberOfLines={1}>
-                {d.first_name}
-              </Text>
-              <Text className="text-text font-extrabold text-base" numberOfLines={1}>
-                {d.last_name}
-              </Text>
-              <View className="flex-row items-center mt-1">
-                <Text className="text-xs mr-1">{flagFor(d.country)}</Text>
-                <Text className="text-muted text-[11px]" numberOfLines={1}>
-                  {d.team}
+
+              {/* Driver portrait */}
+              <View
+                style={{
+                  width: 110,
+                  height: 130,
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                }}>
+                {portrait ? (
+                  <Image
+                    source={{ uri: portrait }}
+                    style={{ width: 110, height: 130 }}
+                    contentFit="contain"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      backgroundColor: '#1A1A24',
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* Info column */}
+              <View style={{ flex: 1, paddingVertical: 12, paddingRight: 14, paddingLeft: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  {logo ? (
+                    <Image
+                      source={{ uri: logo }}
+                      style={{ width: 22, height: 22, marginRight: 6 }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 4,
+                        height: 18,
+                        borderRadius: 2,
+                        backgroundColor: teamColor,
+                        marginRight: 8,
+                      }}
+                    />
+                  )}
+                  <Text
+                    style={{ color: '#A0A0B0', fontSize: 11, fontWeight: '700', flex: 1 }}
+                    numberOfLines={1}>
+                    {d.team}
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    color: '#FAFAFA',
+                    fontSize: 14,
+                    fontWeight: '300',
+                    letterSpacing: -0.3,
+                  }}
+                  numberOfLines={1}>
+                  {d.first_name}
                 </Text>
+                <Text
+                  style={{
+                    color: '#FAFAFA',
+                    fontSize: 19,
+                    fontWeight: '800',
+                    letterSpacing: -0.5,
+                    lineHeight: 22,
+                  }}
+                  numberOfLines={1}>
+                  {d.last_name}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  {d.country ? (
+                    <Text style={{ fontSize: 12, marginRight: 4 }}>{flagFor(d.country)}</Text>
+                  ) : null}
+                  <Text style={{ color: '#6B6B7B', fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                    {d.country || ''}
+                  </Text>
+                </View>
+                {isLeader ? (
+                  <View
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 6,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: teamColor + '33',
+                      borderWidth: 1,
+                      borderColor: teamColor + '88',
+                    }}>
+                    <Text
+                      style={{
+                        color: teamColor,
+                        fontSize: 9,
+                        fontWeight: '800',
+                        letterSpacing: 0.6,
+                      }}>
+                      ЛИДЕР ЧЕМПИОНАТА
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Points + chevron */}
+              <View
+                style={{
+                  alignItems: 'flex-end',
+                  paddingRight: 14,
+                  paddingVertical: 14,
+                }}>
+                <Text
+                  style={{
+                    color: '#FAFAFA',
+                    fontSize: 24,
+                    fontWeight: '800',
+                    letterSpacing: -0.5,
+                  }}>
+                  {d.points}
+                </Text>
+                <Text
+                  style={{
+                    color: '#6B6B7B',
+                    fontSize: 9,
+                    fontWeight: '800',
+                    letterSpacing: 0.8,
+                    marginTop: 1,
+                  }}>
+                  ОЧКОВ
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color="#6B6B7B"
+                  style={{ marginTop: 8 }}
+                />
               </View>
             </View>
           </Pressable>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -730,65 +888,186 @@ function TeamsTab({
   loading: boolean;
   onPickDriver: (n: number) => void;
 }) {
-  if (loading) return <ActivityIndicator color="#E10600" className="mt-10" />;
+  if (loading) return <ActivityIndicator color="#E10600" style={{ marginTop: 40 }} />;
   if (!data.length) return <EmptyHint text="Команды недоступны" />;
   return (
-    <View className="px-4 gap-3">
-      {data.map((t) => (
-        <View
-          key={t.name}
-          className="rounded-2xl overflow-hidden border border-line"
-          style={{ backgroundColor: (t.color || '#666') + '15' }}>
-          <View className="flex-row items-center p-4">
-            {t.logo_url ? (
-              <Image
-                source={{ uri: t.logo_url }}
-                style={{ width: 48, height: 48 }}
-                contentFit="contain"
-              />
-            ) : null}
-            <View className="flex-1 ml-3">
-              <Text className="text-text font-extrabold text-lg">{t.name}</Text>
+    <View style={{ paddingHorizontal: 16, gap: 14 }}>
+      {data.map((t) => {
+        const teamColor = t.color || '#666';
+        return (
+          <View
+            key={t.name}
+            style={{
+              backgroundColor: '#12121C',
+              borderRadius: 22,
+              borderWidth: 1.5,
+              borderColor: teamColor + '55',
+              overflow: 'hidden',
+              shadowColor: teamColor,
+              shadowOpacity: 0.22,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 5,
+            }}>
+            {/* Tinted layer */}
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: teamColor + '12',
+              }}
+              pointerEvents="none"
+            />
+
+            {/* Header: logo + name + stripe */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingTop: 16,
+                paddingBottom: 12,
+              }}>
               <View
-                className="h-1 rounded-full mt-1"
-                style={{ width: 60, backgroundColor: t.color || '#666' }}
+                style={{
+                  width: 4,
+                  height: 40,
+                  borderRadius: 2,
+                  backgroundColor: teamColor,
+                  marginRight: 12,
+                }}
               />
+              {t.logo_url ? (
+                <Image
+                  source={{ uri: t.logo_url }}
+                  style={{ width: 44, height: 44 }}
+                  contentFit="contain"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    backgroundColor: teamColor + '22',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons name="car-sport" size={22} color={teamColor} />
+                </View>
+              )}
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text
+                  style={{ color: '#FAFAFA', fontWeight: '800', fontSize: 17, letterSpacing: -0.3 }}
+                  numberOfLines={1}>
+                  {t.name}
+                </Text>
+                <Text
+                  style={{ color: teamColor, fontSize: 11, fontWeight: '700', marginTop: 2, letterSpacing: 0.5 }}>
+                  СЕЗОН 2026
+                </Text>
+              </View>
             </View>
+
+            {/* Car image — bigger and centered */}
+            {t.car_url ? (
+              <View
+                style={{
+                  width: '100%',
+                  height: 130,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 12,
+                }}>
+                <Image
+                  source={{ uri: t.car_url }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="contain"
+                />
+              </View>
+            ) : null}
+
+            {/* Drivers */}
+            {t.drivers && t.drivers.length > 0 && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  borderTopWidth: 1,
+                  borderTopColor: 'rgba(255,255,255,0.06)',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                }}>
+                {t.drivers.map((dr, idx) => {
+                  const portrait = dr.card_photo_url || dr.photo_url;
+                  return (
+                    <Pressable
+                      key={dr.driver_number}
+                      onPress={() => onPickDriver(dr.driver_number)}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 12,
+                        borderRightWidth: idx === 0 && t.drivers!.length > 1 ? 1 : 0,
+                        borderRightColor: 'rgba(255,255,255,0.06)',
+                      }}>
+                      {portrait ? (
+                        <Image
+                          source={{ uri: portrait }}
+                          style={{
+                            width: 54,
+                            height: 54,
+                            borderRadius: 27,
+                            borderWidth: 2,
+                            borderColor: teamColor,
+                            backgroundColor: '#1A1A24',
+                          }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 54,
+                            height: 54,
+                            borderRadius: 27,
+                            backgroundColor: '#1A1A24',
+                            borderWidth: 2,
+                            borderColor: teamColor,
+                          }}
+                        />
+                      )}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text
+                          style={{ color: '#A0A0B0', fontSize: 11, fontWeight: '700' }}
+                          numberOfLines={1}>
+                          #{dr.driver_number}
+                        </Text>
+                        <Text
+                          style={{
+                            color: '#FAFAFA',
+                            fontWeight: '800',
+                            fontSize: 13,
+                            letterSpacing: -0.2,
+                            marginTop: 1,
+                          }}
+                          numberOfLines={1}>
+                          {dr.last_name}
+                        </Text>
+                        <Text
+                          style={{ color: teamColor, fontSize: 10, fontWeight: '700', marginTop: 1 }}>
+                          {dr.points ?? 0} очк.
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
-          {t.car_url ? (
-            <View className="items-center" style={{ height: 100 }}>
-              <Image
-                source={{ uri: t.car_url }}
-                style={{ width: '90%', height: '100%' }}
-                contentFit="contain"
-              />
-            </View>
-          ) : null}
-          {t.drivers && t.drivers.length > 0 && (
-            <View className="flex-row border-t border-line">
-              {t.drivers.map((dr, idx) => (
-                <Pressable
-                  key={dr.driver_number}
-                  onPress={() => onPickDriver(dr.driver_number)}
-                  className={`flex-1 p-3 items-center active:opacity-80 ${
-                    idx === 0 && t.drivers!.length > 1 ? 'border-r border-line' : ''
-                  }`}>
-                  {dr.photo_url ? (
-                    <Image
-                      source={{ uri: dr.photo_url }}
-                      style={{ width: 56, height: 56, borderRadius: 28 }}
-                    />
-                  ) : null}
-                  <Text className="text-text font-bold text-sm mt-2" numberOfLines={1}>
-                    {dr.last_name}
-                  </Text>
-                  <Text className="text-muted text-[10px]">#{dr.driver_number}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }

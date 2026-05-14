@@ -263,7 +263,7 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: DARK_BG }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header with F1 car decoration */}
+        {/* Header */}
         <View
           style={{
             paddingHorizontal: 20,
@@ -272,8 +272,6 @@ export default function ProfileScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            position: 'relative',
-            overflow: 'hidden',
             height: 60,
           }}>
           <Text style={{ color: '#FAFAFA', fontSize: 32, fontWeight: '800', letterSpacing: -0.5 }}>
@@ -291,7 +289,7 @@ export default function ProfileScreen() {
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.05)',
             }}
-            hitSlop={8}>
+            hitSlop={12}>
             <Ionicons name="notifications-outline" size={20} color="#FAFAFA" />
             <View
               style={{
@@ -305,21 +303,9 @@ export default function ProfileScreen() {
                 borderWidth: 1.5,
                 borderColor: DARK_BG,
               }}
+              pointerEvents="none"
             />
           </Pressable>
-          <Image
-            source={{ uri: CAR_OVERLAY }}
-            style={{
-              position: 'absolute',
-              right: -30,
-              top: -30,
-              width: 320,
-              height: 160,
-              opacity: 0.25,
-            }}
-            contentFit="contain"
-            pointerEvents="none"
-          />
         </View>
 
         <ScrollView
@@ -380,12 +366,12 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <View style={{ flex: 1, marginLeft: 18, justifyContent: 'center' }}>
-              <Text style={{ color: '#FAFAFA', fontSize: 26, fontWeight: '800' }}>
+            <View style={{ flex: 1, marginLeft: 18, justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+              <Text style={{ color: '#FAFAFA', fontSize: 26, fontWeight: '800' }} numberOfLines={1}>
                 {displayName}
               </Text>
               {handle ? (
-                <Text className="text-muted" style={{ fontSize: 13, marginTop: 2 }}>
+                <Text className="text-muted" style={{ fontSize: 13, marginTop: 2 }} numberOfLines={1}>
                   {handle}
                 </Text>
               ) : null}
@@ -404,6 +390,19 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               ) : null}
+              <Image
+                source={{ uri: CAR_OVERLAY }}
+                style={{
+                  position: 'absolute',
+                  right: -18,
+                  top: 8,
+                  width: 130,
+                  height: 70,
+                  opacity: 0.55,
+                }}
+                contentFit="contain"
+                pointerEvents="none"
+              />
             </View>
           </View>
 
