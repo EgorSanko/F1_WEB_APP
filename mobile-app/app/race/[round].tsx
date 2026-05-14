@@ -792,17 +792,15 @@ function ResultsView({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 10,
+            paddingHorizontal: 12,
             paddingVertical: 8,
             marginBottom: 4,
           }}>
-          {/* skip stripe */}
-          <View style={{ width: 11 }} />
-          <Text style={tableHeaderStyle('center', 24)}>Поз</Text>
-          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 60 })}>Пилот</Text>
-          <Text style={tableHeaderStyle('center', 36)}>Команда</Text>
-          <Text style={tableHeaderStyle('right', 64, { marginLeft: 8 })}>Очки</Text>
-          <Text style={tableHeaderStyle('right', 64, { marginLeft: 4 })}>Отставание</Text>
+          <Text style={tableHeaderStyle('center', 22)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 56 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('center', 30)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 56, { marginLeft: 8 })}>Очки</Text>
+          <Text style={tableHeaderStyle('right', 56, { marginLeft: 4 })}>Отставание</Text>
         </View>
       )}
 
@@ -920,7 +918,7 @@ function PodiumCard({
       )}
 
       {/* Portrait at top */}
-      <View style={{ width: '100%', height: winner ? 170 : 150, backgroundColor: '#1A1A24' }}>
+      <View style={{ width: '100%', height: winner ? 125 : 110, backgroundColor: '#1A1A24' }}>
         {portrait ? (
           <Image
             source={{ uri: portrait }}
@@ -932,14 +930,14 @@ function PodiumCard({
         <Text
           style={{
             position: 'absolute',
-            top: 4,
-            left: 12,
+            top: 2,
+            left: 10,
             color: '#FAFAFA',
-            fontSize: winner ? 56 : 46,
+            fontSize: winner ? 44 : 36,
             fontWeight: '800',
-            letterSpacing: -2,
-            lineHeight: winner ? 60 : 50,
-            textShadowColor: 'rgba(0,0,0,0.7)',
+            letterSpacing: -1.5,
+            lineHeight: winner ? 48 : 40,
+            textShadowColor: 'rgba(0,0,0,0.75)',
             textShadowOffset: { width: 0, height: 2 },
             textShadowRadius: 8,
           }}>
@@ -947,17 +945,17 @@ function PodiumCard({
         </Text>
       </View>
 
-      {/* Info section */}
-      <View style={{ paddingHorizontal: 12, paddingVertical: 12 }}>
+      {/* Info section — компактно */}
+      <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 4 }}>
             <Text
-              style={{ color: '#FAFAFA', fontSize: winner ? 14 : 12, fontWeight: '700' }}
+              style={{ color: '#FAFAFA', fontSize: 12, fontWeight: '700', lineHeight: 14 }}
               numberOfLines={1}>
               {firstName}
             </Text>
             <Text
-              style={{ color: '#FAFAFA', fontSize: winner ? 14 : 12, fontWeight: '700' }}
+              style={{ color: '#FAFAFA', fontSize: 12, fontWeight: '700', lineHeight: 14 }}
               numberOfLines={1}>
               {lastName}
             </Text>
@@ -965,28 +963,28 @@ function PodiumCard({
           {teamLogo ? (
             <Image
               source={{ uri: teamLogo }}
-              style={{ width: 26, height: 26 }}
+              style={{ width: 22, height: 22 }}
               contentFit="contain"
             />
           ) : (
             <View
               style={{
-                width: 5,
-                height: 22,
-                borderRadius: 3,
+                width: 4,
+                height: 18,
+                borderRadius: 2,
                 backgroundColor: driver.team_color || '#666',
               }}
             />
           )}
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
           <Text
             style={{
               color: primaryColor || driver.team_color || '#FAFAFA',
               fontWeight: '800',
-              fontSize: winner ? 22 : 19,
-              letterSpacing: -0.5,
+              fontSize: winner ? 18 : 16,
+              letterSpacing: -0.3,
             }}>
             {hasPts ? ptsValue : primary}
           </Text>
@@ -995,9 +993,9 @@ function PodiumCard({
               style={{
                 color: primaryColor || driver.team_color || '#FAFAFA',
                 fontWeight: '700',
-                fontSize: 11,
-                marginLeft: 4,
-                letterSpacing: 1,
+                fontSize: 9,
+                marginLeft: 3,
+                letterSpacing: 0.8,
               }}>
               PTS
             </Text>
@@ -1007,11 +1005,11 @@ function PodiumCard({
         {secondary ? (
           <Text
             style={{
-              color: secondaryColor ?? (winner ? '#A0A0B0' : '#A0A0B0'),
-              fontSize: 11,
+              color: secondaryColor ?? '#A0A0B0',
+              fontSize: 10,
               fontWeight: '700',
-              marginTop: 4,
-              letterSpacing: secondary === 'POLE' ? 2 : 0,
+              marginTop: 2,
+              letterSpacing: secondary === 'POLE' ? 1.5 : 0,
             }}
             numberOfLines={1}>
             {secondary}
@@ -1049,27 +1047,17 @@ function ResultRow({
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 10,
+        paddingVertical: 7,
+        paddingHorizontal: 12,
         borderBottomWidth: isLast ? 0 : 1,
         borderBottomColor: 'rgba(255,255,255,0.04)',
       }}>
-      {/* team-color vertical stripe */}
-      <View
-        style={{
-          width: 3,
-          height: 38,
-          backgroundColor: driver.team_color || '#666',
-          borderRadius: 2,
-          marginRight: 8,
-        }}
-      />
       <Text
         style={{
           color: driver.team_color || '#FAFAFA',
           fontWeight: '800',
-          fontSize: 22,
-          width: 24,
+          fontSize: 20,
+          width: 22,
           textAlign: 'center',
           letterSpacing: -0.5,
         }}>
@@ -1079,9 +1067,9 @@ function ResultRow({
         <Image
           source={{ uri: portrait }}
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
             marginLeft: 8,
             backgroundColor: '#1A1A24',
           }}
@@ -1090,9 +1078,9 @@ function ResultRow({
       ) : (
         <View
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
             marginLeft: 8,
             backgroundColor: '#1A1A24',
           }}
@@ -1103,35 +1091,33 @@ function ResultRow({
           flex: 1,
           color: '#FAFAFA',
           fontWeight: '700',
-          fontSize: 14,
+          fontSize: 13.5,
           marginLeft: 10,
         }}
         numberOfLines={1}>
         {driver.name}
       </Text>
-      <View style={{ width: 36, alignItems: 'center' }}>
+      <View style={{ width: 30, alignItems: 'center' }}>
         {teamLogo ? (
           <Image
             source={{ uri: teamLogo }}
-            style={{ width: 28, height: 28 }}
+            style={{ width: 24, height: 24 }}
             contentFit="contain"
           />
         ) : (
           <View
             style={{
-              paddingHorizontal: 5,
+              paddingHorizontal: 4,
               paddingVertical: 2,
               borderRadius: 4,
-              borderLeftWidth: 2,
-              borderLeftColor: driver.team_color || '#666',
-              backgroundColor: 'rgba(255,255,255,0.04)',
+              backgroundColor: driver.team_color ? driver.team_color + '22' : 'rgba(255,255,255,0.04)',
             }}>
             <Text
               style={{
                 color: driver.team_color || '#A0A0B0',
                 fontWeight: '800',
-                fontSize: 9,
-                letterSpacing: 0.8,
+                fontSize: 8.5,
+                letterSpacing: 0.6,
               }}>
               {teamAbbr(driver.team)}
             </Text>
@@ -1142,21 +1128,19 @@ function ResultRow({
         style={{
           flexDirection: 'row',
           alignItems: 'baseline',
-          width: 64,
+          width: 56,
           justifyContent: 'flex-end',
           marginLeft: 8,
         }}>
-        <Text style={{ color: perfColor, fontWeight: '800', fontSize: 14 }}>
-          {performance}
-        </Text>
+        <Text style={{ color: perfColor, fontWeight: '800', fontSize: 13 }}>{performance}</Text>
         {perfLabel ? (
           <Text
             style={{
               color: perfColor,
               fontWeight: '700',
-              fontSize: 9,
+              fontSize: 8.5,
               marginLeft: 3,
-              letterSpacing: 0.8,
+              letterSpacing: 0.7,
             }}>
             {perfLabel}
           </Text>
@@ -1164,10 +1148,10 @@ function ResultRow({
       </View>
       <Text
         style={{
-          width: 64,
+          width: 56,
           textAlign: 'right',
           color: gapColor,
-          fontSize: 12,
+          fontSize: 11.5,
           fontWeight: '700',
           marginLeft: 4,
         }}>
@@ -1253,16 +1237,15 @@ function QualifyingView({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 10,
+            paddingHorizontal: 12,
             paddingVertical: 8,
             marginBottom: 4,
           }}>
-          <View style={{ width: 11 }} />
-          <Text style={tableHeaderStyle('center', 24)}>Поз</Text>
-          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 60 })}>Пилот</Text>
-          <Text style={tableHeaderStyle('center', 36)}>Команда</Text>
-          <Text style={tableHeaderStyle('right', 64, { marginLeft: 8 })}>Лучшее</Text>
-          <Text style={tableHeaderStyle('right', 64, { marginLeft: 4 })}>Разрыв</Text>
+          <Text style={tableHeaderStyle('center', 22)}>Поз</Text>
+          <Text style={tableHeaderStyle('left', 0, { flex: 1, marginLeft: 56 })}>Пилот</Text>
+          <Text style={tableHeaderStyle('center', 30)}>Команда</Text>
+          <Text style={tableHeaderStyle('right', 56, { marginLeft: 8 })}>Лучшее</Text>
+          <Text style={tableHeaderStyle('right', 56, { marginLeft: 4 })}>Разрыв</Text>
         </View>
       )}
 
