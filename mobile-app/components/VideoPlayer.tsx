@@ -230,31 +230,76 @@ function RutubePlayer({ videoId, iframeSrc }: { videoId: string; iframeSrc: stri
 
 function HlsPlayer({ hlsUrl }: { hlsUrl: string }) {
   const safeUrl = hlsUrl.replace(/"/g, '&quot;').replace(/'/g, '%27');
+  // Plyr (MIT, sampotts/plyr) — full custom controls with quality picker,
+  // speed, captions, PiP. Same one used in TG webapp at /static/vendor/plyr.*
   const html = `<!doctype html>
 <html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="stylesheet" href="${API_BASE}/static/vendor/plyr.css">
 <script src="${API_BASE}/static/vendor/hls.min.js"></script>
+<script src="${API_BASE}/static/vendor/plyr.min.js"></script>
 <style>
-  html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
-  video{position:fixed;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+  html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;
+    --plyr-color-main:#E10600;--plyr-video-background:#000}
+  .wrap{position:fixed;inset:0;display:flex}
+  .plyr{flex:1;height:100%}
+  video{width:100%;height:100%;background:#000;display:block}
 </style>
 </head>
 <body>
-<video id="v" controls autoplay playsinline webkit-playsinline></video>
+<div class="wrap">
+  <video id="v" controls playsinline webkit-playsinline></video>
+</div>
 <script>
   (function(){
     var url = "${safeUrl}";
     var v = document.getElementById('v');
+    var plyrOpts = {
+      autoplay: true,
+      controls: ['play-large','play','progress','current-time','duration','mute','volume','settings','pip','airplay','fullscreen'],
+      settings: ['quality','speed'],
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+      i18n: {
+        play: 'Воспроизвести', pause: 'Пауза', mute: 'Без звука', unmute: 'Со звуком',
+        enterFullscreen: 'Полный экран', exitFullscreen: 'Свернуть',
+        settings: 'Настройки', speed: 'Скорость', normal: 'Обычная',
+        quality: 'Качество', qualityLabel: { 0: 'Авто' }
+      }
+    };
+
+    function initPlyr(){
+      var p = new Plyr(v, plyrOpts);
+      window.__plyr = p;
+      return p;
+    }
+
     if (window.Hls && window.Hls.isSupported()) {
-      var hls = new window.Hls({ enableWorker: true });
+      var hls = new window.Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
       hls.loadSource(url);
       hls.attachMedia(v);
+      hls.on(window.Hls.Events.MANIFEST_PARSED, function(){
+        var lvls = hls.levels.map(function(l){ return l.height; });
+        plyrOpts.quality = {
+          default: 0,
+          options: [0].concat(lvls),
+          forced: true,
+          onChange: function(q){
+            if (q === 0) { hls.currentLevel = -1; }
+            else { hls.currentLevel = hls.levels.findIndex(function(l){ return l.height === q; }); }
+          }
+        };
+        initPlyr();
+      });
       hls.on(window.Hls.Events.ERROR, function(_, d){
-        if (d.fatal) console.log('hls fatal', d.type);
+        if (d.fatal) {
+          if (d.type === window.Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          else if (d.type === window.Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        }
       });
     } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
       v.src = url;
+      initPlyr();
     } else {
       document.body.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;">HLS не поддерживается</div>';
     }
