@@ -97,6 +97,27 @@ export const usePointsProgression = (season = 2026) =>
     staleTime: 5 * 60_000,
   });
 
+export const useBroadcasts = () =>
+  useQuery({
+    queryKey: ['broadcasts'],
+    queryFn: api.broadcasts,
+    staleTime: 60_000,
+  });
+
+export const useLiveBroadcasts = () =>
+  useQuery({
+    queryKey: ['broadcasts', 'live'],
+    queryFn: api.broadcastsLive,
+    refetchInterval: 30_000,
+  });
+
+export const useAdminBroadcasts = (enabled = true) =>
+  useQuery({
+    queryKey: ['broadcasts', 'admin'],
+    queryFn: api.adminBroadcasts,
+    enabled,
+  });
+
 /** Country code to flag emoji (works on iOS/Android, fails on Windows). */
 export function flagFor(countryCode?: string): string {
   if (!countryCode || countryCode.length !== 2) return '🏁';

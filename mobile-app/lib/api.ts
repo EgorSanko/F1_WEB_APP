@@ -268,6 +268,21 @@ export type PointsProgression = {
   season: number;
 };
 
+export type Broadcast = {
+  id: number;
+  race_round: number;
+  season: number;
+  session_type: string; // race | qualifying | sprint | sprint_qualifying | fp1 | fp2 | fp3
+  title?: string;
+  video_url: string;
+  embed_url?: string;
+  is_live: 0 | 1 | boolean;
+  started_at?: string;
+  ended_at?: string | null;
+  created_by?: number | null;
+  created_at?: string;
+};
+
 export type LeaderboardEntry = {
   user_id: number;
   username?: string;
@@ -354,7 +369,10 @@ export const api = {
       `/api/standings/points-progression?season=${season}`,
       { auth: false },
     ),
-  broadcasts: () => apiFetch('/api/broadcasts', { auth: false }),
+  broadcasts: () =>
+    apiFetch<{ broadcasts: Broadcast[] }>('/api/broadcasts', { auth: false }),
+  broadcastsLive: () =>
+    apiFetch<{ broadcasts: Broadcast[] }>('/api/broadcasts/live', { auth: false }),
 
   // Auth
   authWidget: (authData: string) =>
@@ -407,7 +425,8 @@ export const api = {
     }),
 
   // Admin
-  adminBroadcasts: () => apiFetch('/api/admin/broadcasts'),
+  adminBroadcasts: () =>
+    apiFetch<{ broadcasts: Broadcast[] }>('/api/admin/broadcasts'),
   adminBroadcastCreate: (payload: {
     race_round: number;
     session_type: string;
