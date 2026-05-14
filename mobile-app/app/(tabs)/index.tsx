@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 
 import { useHome, useNews, useSchedule, flagFor, countdownParts } from '@/lib/hooks';
+import { ruPlace } from '@/lib/locale';
 
 const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
 
@@ -474,74 +475,6 @@ function HeroCard({
 }
 
 // ============ HELPERS ============
-
-const CITY_RU: Record<string, string> = {
-  Sakhir: 'Сахир',
-  Jeddah: 'Джидда',
-  Melbourne: 'Мельбурн',
-  Suzuka: 'Судзука',
-  Shanghai: 'Шанхай',
-  Miami: 'Майами',
-  Imola: 'Имола',
-  Monaco: 'Монако',
-  'Monte Carlo': 'Монте-Карло',
-  Montréal: 'Монреаль',
-  Montreal: 'Монреаль',
-  Barcelona: 'Барселона',
-  Spielberg: 'Шпильберг',
-  Silverstone: 'Сильверстоун',
-  Spa: 'Спа',
-  'Spa-Francorchamps': 'Спа',
-  Budapest: 'Будапешт',
-  Mogyoród: 'Будапешт',
-  Zandvoort: 'Зандворт',
-  Monza: 'Монца',
-  Baku: 'Баку',
-  Singapore: 'Сингапур',
-  Austin: 'Остин',
-  'Mexico City': 'Мехико',
-  'São Paulo': 'Сан-Паулу',
-  'Sao Paulo': 'Сан-Паулу',
-  'Las Vegas': 'Лас-Вегас',
-  Lusail: 'Лусаил',
-  'Yas Marina': 'Абу-Даби',
-  'Abu Dhabi': 'Абу-Даби',
-};
-
-const COUNTRY_RU: Record<string, string> = {
-  Bahrain: 'Бахрейн',
-  'Saudi Arabia': 'Саудовская Аравия',
-  Australia: 'Австралия',
-  Japan: 'Япония',
-  China: 'Китай',
-  USA: 'США',
-  'United States': 'США',
-  Italy: 'Италия',
-  Monaco: 'Монако',
-  Canada: 'Канада',
-  Spain: 'Испания',
-  Austria: 'Австрия',
-  UK: 'Великобритания',
-  'United Kingdom': 'Великобритания',
-  'Great Britain': 'Великобритания',
-  Belgium: 'Бельгия',
-  Hungary: 'Венгрия',
-  Netherlands: 'Нидерланды',
-  Azerbaijan: 'Азербайджан',
-  Singapore: 'Сингапур',
-  Mexico: 'Мексика',
-  Brazil: 'Бразилия',
-  Qatar: 'Катар',
-  UAE: 'ОАЭ',
-  'United Arab Emirates': 'ОАЭ',
-};
-
-function ruPlace(locality?: string, country?: string): string {
-  const l = locality ? CITY_RU[locality] ?? locality : undefined;
-  const c = country ? COUNTRY_RU[country] ?? country : undefined;
-  if (l && c) return `${l}, ${c}`;
-  return l || c || '';
-}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
