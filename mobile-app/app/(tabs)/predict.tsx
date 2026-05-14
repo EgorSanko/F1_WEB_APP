@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,13 +18,18 @@ import { router } from 'expo-router';
 import { usePredictionsAvailable, countdownParts, flagFor } from '@/lib/hooks';
 import { api, type Driver, type PredictionType, type PredictionTypeInfo } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { ruRaceTitle } from '@/lib/locale';
+
+const DARK_BG = '#0A0A12';
+const CARD_BG = '#12121C';
+const CAR_OVERLAY = 'https://f1hub.lead-seek.ru/static/car-drift.webp';
 
 const TYPE_ICON: Record<PredictionType, keyof typeof import('@expo/vector-icons/Ionicons').default.glyphMap> = {
   winner: 'trophy',
   podium: 'medal',
   fastest_lap: 'flash',
-  dnf_count: 'warning',
-  safety_car: 'car-sport',
+  dnf_count: 'flag',
+  safety_car: 'shield-checkmark',
 };
 
 export default function PredictScreen() {
@@ -35,12 +40,16 @@ export default function PredictScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 bg-bg">
-        <SafeAreaView edges={['top']} className="flex-1">
-          <View className="px-5 pt-2 pb-3">
-            <Text className="text-text text-3xl font-extrabold">Прогнозы</Text>
-          </View>
-          <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line items-center">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <Header subtitle="Войдите, чтобы делать прогнозы" />
+          <View
+            className="mx-4 mt-4 rounded-2xl p-6 items-center"
+            style={{
+              backgroundColor: CARD_BG,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}>
             <Ionicons name="lock-closed" size={32} color="#A0A0B0" />
             <Text className="text-text text-base font-bold mt-3 text-center">
               Войдите, чтобы делать прогнозы
@@ -58,7 +67,7 @@ export default function PredictScreen() {
 
   if (data.isLoading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View style={{ flex: 1, backgroundColor: DARK_BG, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#E10600" />
       </View>
     );
@@ -66,12 +75,16 @@ export default function PredictScreen() {
 
   if (!data.data || data.data.available === false) {
     return (
-      <View className="flex-1 bg-bg">
-        <SafeAreaView edges={['top']} className="flex-1">
-          <View className="px-5 pt-2 pb-3">
-            <Text className="text-text text-3xl font-extrabold">Прогнозы</Text>
-          </View>
-          <View className="mx-4 mt-4 bg-surface rounded-2xl p-6 border border-line">
+      <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <Header subtitle="Нет доступных гонок" />
+          <View
+            className="mx-4 mt-4 rounded-2xl p-6"
+            style={{
+              backgroundColor: CARD_BG,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}>
             <Text className="text-text font-bold">Нет доступных гонок</Text>
             <Text className="text-muted text-sm mt-1">
               Прогнозы открываются за неделю до старта Гран-при.
@@ -83,82 +96,156 @@ export default function PredictScreen() {
   }
 
   const { race, predictions, drivers } = data.data;
+  const raceTitleRu = `Гран-при ${ruRaceTitle(race.country, race.name)}`;
 
   return (
-    <View className="flex-1 bg-bg">
-      <SafeAreaView edges={['top']} className="flex-1">
-        <View className="px-5 pt-2 pb-3 flex-row items-end justify-between">
-          <View>
-            <Text className="text-text text-3xl font-extrabold">Прогнозы</Text>
-            <Text className="text-muted text-sm mt-0.5">{race.name}</Text>
-          </View>
-          <Pressable
-            onPress={() => router.push('/my-predictions' as never)}
-            className="flex-row items-center bg-surface rounded-full px-3 py-1.5 border border-line">
-            <Ionicons name="list" size={14} color="#A0A0B0" />
-            <Text className="text-text text-xs font-semibold ml-1.5">Мои</Text>
-          </Pressable>
-        </View>
+    <View style={{ flex: 1, backgroundColor: DARK_BG }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <Header subtitle={raceTitleRu} showMine />
 
         <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
-          {/* Race meta + countdown */}
-          <View className="mx-4 bg-surface rounded-2xl border border-line p-4">
-            <View className="flex-row items-center mb-3">
-              <Text className="text-xl mr-2">{flagFor(race.country_code)}</Text>
-              <View className="flex-1">
-                <Text className="text-text font-bold">{race.locality || race.country}</Text>
-                <Text className="text-muted text-xs">
-                  {new Date(race.date).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </Text>
-              </View>
+          {/* Race info card with car + countdown */}
+          <RaceInfoCard race={race} />
+
+          {/* Section header */}
+          <View className="px-5 mt-7 mb-4 flex-row items-end justify-between">
+            <View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: '800',
+                  color: '#FAFAFA',
+                  textTransform: 'uppercase',
+                  letterSpacing: -0.3,
+                  fontStyle: 'italic',
+                }}>
+                СДЕЛАЙ ПРОГНОЗЫ
+              </Text>
+              <Text className="text-muted text-sm mt-1">До закрытия — старт гонки</Text>
             </View>
-            <CountdownInline iso={race.race_datetime} />
+            <View
+              pointerEvents="none"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                marginBottom: 6,
+              }}>
+              <View style={{ width: 22, height: 2, backgroundColor: '#3A3A4A', borderRadius: 1 }} />
+              <View style={{ width: 30, height: 2, backgroundColor: '#E10600', borderRadius: 1 }} />
+              <View style={{ width: 14, height: 2, backgroundColor: '#E10600', opacity: 0.5, borderRadius: 1 }} />
+            </View>
           </View>
 
-          <View className="px-5 mt-6 mb-3">
-            <Text className="text-text text-lg font-extrabold">Сделай прогнозы</Text>
-            <Text className="text-muted text-sm mt-0.5">До закрытия — старт гонки</Text>
-          </View>
-
-          <View className="px-4 gap-2">
+          {/* Prediction type cards */}
+          <View className="px-4" style={{ gap: 10 }}>
             {predictions.map((p) => (
               <Pressable
                 key={p.type}
                 disabled={p.already_predicted}
                 onPress={() => setActiveType(p)}
-                className={`bg-surface rounded-xl p-4 border border-line flex-row items-center ${
-                  p.already_predicted ? 'opacity-60' : 'active:opacity-80'
-                }`}>
-                <View className="w-11 h-11 rounded-full bg-surface-2 items-center justify-center">
-                  <Ionicons name={TYPE_ICON[p.type]} size={20} color="#E10600" />
+                style={{
+                  backgroundColor: CARD_BG,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: p.already_predicted
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'rgba(225,6,0,0.18)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 16,
+                  opacity: p.already_predicted ? 0.55 : 1,
+                }}>
+                <View
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 27,
+                    backgroundColor: 'rgba(225,6,0,0.18)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(225,6,0,0.35)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons name={TYPE_ICON[p.type]} size={22} color="#E10600" />
                 </View>
-                <View className="flex-1 ml-3">
-                  <Text className="text-text font-bold">{p.label}</Text>
-                  <Text className="text-muted text-xs mt-0.5">{p.description}</Text>
+                <View className="flex-1 ml-4">
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '800',
+                      color: '#FAFAFA',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}>
+                    {p.label}
+                  </Text>
+                  <Text className="text-muted text-xs mt-1.5">{p.description}</Text>
                 </View>
-                <View className="items-end">
+                <View style={{ alignItems: 'flex-end', marginRight: 6 }}>
                   {p.already_predicted ? (
-                    <View className="bg-surface-2 px-2 py-1 rounded">
-                      <Text className="text-muted text-[10px] font-bold tracking-widest">
+                    <View
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                      }}>
+                      <Text className="text-muted text-[10px] font-extrabold tracking-widest">
                         СДЕЛАН
                       </Text>
                     </View>
                   ) : (
-                    <Text className="text-red font-extrabold text-sm">+{p.max_points} оч.</Text>
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 24,
+                          fontWeight: '800',
+                          color: '#E10600',
+                          lineHeight: 26,
+                        }}>
+                        +{p.max_points}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: '#A0A0B0',
+                          fontWeight: '700',
+                          letterSpacing: 1.5,
+                          marginTop: 2,
+                        }}>
+                        ОЧ.
+                      </Text>
+                    </>
                   )}
                 </View>
+                <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
               </Pressable>
             ))}
           </View>
 
-          <View className="mx-4 mt-6 mb-2 bg-surface rounded-xl p-4 border border-line flex-row items-center">
-            <Ionicons name="information-circle-outline" size={20} color="#A0A0B0" />
-            <Text className="text-muted text-xs ml-2 flex-1 leading-5">
-              Очки начисляются после расчёта результатов гонки. Один прогноз на каждый тип.
+          {/* Info footer */}
+          <View
+            className="mx-4 mt-6 rounded-2xl p-4 flex-row items-center"
+            style={{
+              backgroundColor: CARD_BG,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+            }}>
+            <View
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Ionicons name="information" size={16} color="#A0A0B0" />
+            </View>
+            <Text className="text-muted text-xs ml-3 flex-1" style={{ lineHeight: 18 }}>
+              Очки начисляются после расчёта результатов гонки. Один прогноз — один способ
+              заработать больше очков!
             </Text>
           </View>
         </ScrollView>
@@ -180,22 +267,172 @@ export default function PredictScreen() {
   );
 }
 
-function CountdownInline({ iso }: { iso: string }) {
-  const { d, h, m, s } = countdownParts(iso);
+// ============ HEADER ============
+
+function Header({ subtitle, showMine = false }: { subtitle?: string; showMine?: boolean }) {
   return (
-    <View className="flex-row gap-2">
-      {[
-        { v: d, l: 'ДН' },
-        { v: h, l: 'Ч' },
-        { v: m, l: 'МИН' },
-        { v: s, l: 'СЕК' },
-      ].map((c) => (
-        <View
-          key={c.l}
-          className="flex-1 bg-surface-2 rounded-lg py-2 items-center">
-          <Text className="text-text text-lg font-extrabold">{c.v}</Text>
-          <Text className="text-muted text-[9px] tracking-widest">{c.l}</Text>
+    <View className="px-5 pt-2 pb-4 flex-row items-start justify-between">
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: 34,
+            fontWeight: '800',
+            color: '#FAFAFA',
+            letterSpacing: -0.5,
+            textTransform: 'uppercase',
+            fontStyle: 'italic',
+          }}>
+          ПРОГНОЗЫ
+        </Text>
+        {subtitle ? (
+          <Text className="text-muted text-sm mt-1" numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {showMine && (
+        <Pressable
+          onPress={() => router.push('/my-predictions' as never)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: CARD_BG,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}>
+          <Ionicons name="list" size={14} color="#A0A0B0" />
+          <Text className="text-text text-sm font-bold ml-2">Мои</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+// ============ RACE INFO CARD ============
+
+function RaceInfoCard({
+  race,
+}: {
+  race: { country_code?: string; locality?: string; country?: string; date: string; race_datetime: string };
+}) {
+  return (
+    <View
+      style={{
+        marginHorizontal: 16,
+        borderRadius: 22,
+        backgroundColor: CARD_BG,
+        borderWidth: 1,
+        borderColor: 'rgba(225,6,0,0.22)',
+        overflow: 'hidden',
+        shadowColor: '#E10600',
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 5,
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, paddingBottom: 12 }}>
+        <Text style={{ fontSize: 28, marginRight: 12 }}>{flagFor(race.country_code)}</Text>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '800',
+              color: '#FAFAFA',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+            }}>
+            {(race.locality || race.country || '').toUpperCase()}
+          </Text>
+          <Text className="text-muted text-xs mt-1">
+            {new Date(race.date).toLocaleDateString('ru-RU', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}{' '}
+            г.
+          </Text>
         </View>
+        <Image
+          source={{ uri: CAR_OVERLAY }}
+          style={{
+            width: 180,
+            height: 80,
+            position: 'absolute',
+            right: -20,
+            top: 8,
+          }}
+          contentFit="contain"
+        />
+      </View>
+
+      {/* Divider with subtle red glow */}
+      <View
+        style={{
+          height: 1,
+          backgroundColor: 'rgba(225,6,0,0.18)',
+          marginHorizontal: 14,
+        }}
+      />
+
+      <CountdownInline iso={race.race_datetime} />
+    </View>
+  );
+}
+
+// ============ COUNTDOWN ============
+
+function CountdownInline({ iso }: { iso: string }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const { d, h, m, s } = countdownParts(iso, now);
+  const cells = [
+    { v: d, l: 'ДНЕЙ', highlight: true },
+    { v: h, l: 'ЧАСОВ', highlight: false },
+    { v: m, l: 'МИНУТ', highlight: false },
+    { v: s, l: 'СЕКУНД', highlight: false },
+  ];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8 }}>
+      {cells.map((c, i) => (
+        <Fragment key={c.l}>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text
+              style={{
+                fontSize: 30,
+                lineHeight: 32,
+                fontWeight: '800',
+                color: c.highlight ? '#E10600' : '#FAFAFA',
+                letterSpacing: -0.5,
+              }}>
+              {c.v}
+            </Text>
+            <Text
+              style={{
+                fontSize: 9,
+                color: '#A0A0B0',
+                marginTop: 4,
+                letterSpacing: 1.8,
+                fontWeight: '700',
+              }}>
+              {c.l}
+            </Text>
+          </View>
+          {i < cells.length - 1 && (
+            <View
+              style={{
+                width: 1,
+                height: 30,
+                backgroundColor: 'rgba(225,6,0,0.35)',
+              }}
+            />
+          )}
+        </Fragment>
       ))}
     </View>
   );
