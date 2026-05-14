@@ -118,6 +118,24 @@ export const useAdminBroadcasts = (enabled = true) =>
     enabled,
   });
 
+export const useRutubeStream = (videoId: string | null) =>
+  useQuery({
+    queryKey: ['rutube-stream', videoId],
+    queryFn: () => api.rutubeStream(videoId!),
+    enabled: !!videoId,
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+
+export const useYoutubeStream = (videoId: string | null) =>
+  useQuery({
+    queryKey: ['youtube-stream', videoId],
+    queryFn: () => api.youtubeStream(videoId!),
+    enabled: !!videoId,
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+
 export const useAchievements = (enabled = true) =>
   useQuery({
     queryKey: ['achievements'],

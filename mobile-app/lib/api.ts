@@ -401,6 +401,21 @@ export const api = {
     apiFetch<{ broadcasts: Broadcast[] }>('/api/broadcasts', { auth: false }),
   broadcastsLive: () =>
     apiFetch<{ broadcasts: Broadcast[] }>('/api/broadcasts/live', { auth: false }),
+  rutubeStream: (videoId: string) =>
+    apiFetch<{
+      hls_url: string;
+      title?: string;
+      duration?: number;
+      thumbnail?: string;
+    }>(`/api/rutube-stream/${videoId}`, { auth: false }),
+  youtubeStream: (videoId: string) =>
+    apiFetch<{
+      title?: string;
+      duration?: number;
+      thumbnail?: string;
+      formats: { url: string; height: number; label: string }[];
+      best_url: string | null;
+    }>(`/api/youtube-stream/${videoId}`, { auth: false }),
 
   // Auth
   authWidget: (authData: string) =>

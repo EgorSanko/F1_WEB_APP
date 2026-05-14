@@ -26,9 +26,14 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserNotificationsUsageDescription": "Уведомления о начале гонки и закрытии прогнозов",
-        "LSApplicationQueriesSchemes": ["tg", "telegram"]
+        "LSApplicationQueriesSchemes": [
+          "tg",
+          "telegram"
+        ]
       },
-      "associatedDomains": ["applinks:f1hub.lead-seek.ru"]
+      "associatedDomains": [
+        "applinks:f1hub.lead-seek.ru"
+      ]
     },
     "android": {
       "package": "ru.leadseek.f1hub",
@@ -39,13 +44,22 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["NOTIFICATIONS", "VIBRATE", "INTERNET"],
+      "permissions": [
+        "NOTIFICATIONS",
+        "VIBRATE",
+        "INTERNET"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["DEFAULT", "BROWSABLE"],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
           "data": [
-            { "scheme": "f1hub" },
+            {
+              "scheme": "f1hub"
+            },
             {
               "scheme": "https",
               "host": "f1hub.lead-seek.ru",
@@ -71,7 +85,10 @@
           "defaultChannel": "default"
         }
       ],
-      ["expo-apple-authentication"]
+      [
+        "expo-apple-authentication"
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
