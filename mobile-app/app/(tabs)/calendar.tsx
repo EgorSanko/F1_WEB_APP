@@ -8,12 +8,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 
 import { useSchedule, flagFor } from '@/lib/hooks';
 import { ruCity, ruRaceTitle } from '@/lib/locale';
+import { CircuitOutline } from '@/components/CircuitOutline';
 
 const DARK_BG = '#0A0A12';
 const CARD_BG = '#12121C';
@@ -259,19 +259,15 @@ export default function CalendarScreen() {
                     ) : null}
                   </View>
 
-                  {/* Right: circuit thumb (low opacity, monochrome feel) */}
-                  {race.circuit_image ? (
-                    <Image
-                      source={{ uri: race.circuit_image }}
-                      style={{
-                        width: 64,
-                        height: 56,
-                        opacity: 0.35,
-                        marginRight: 6,
-                      }}
-                      contentFit="contain"
-                    />
-                  ) : null}
+                  {/* Right: drawn circuit outline (красная обводка) */}
+                  <CircuitOutline
+                    circuitId={race.circuit_id}
+                    width={70}
+                    height={56}
+                    color={isNext ? '#E10600' : '#5A5A6E'}
+                    strokeWidth={2}
+                    opacity={isNext ? 1 : 0.85}
+                  />
 
                   <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
                 </Pressable>

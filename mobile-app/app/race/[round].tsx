@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  ImageBackground,
   Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -17,6 +15,7 @@ import type { RaceResultDriver, QualifyingDriver } from '@/lib/api';
 import { useSpoiler, CURRENT_SEASON, isSpoilerHidden } from '@/lib/spoiler';
 import { SpoilerCard } from '@/components/SpoilerCard';
 import { BroadcastThumb } from '@/components/VideoPlayer';
+import { CircuitOutline } from '@/components/CircuitOutline';
 import { ruCity } from '@/lib/locale';
 import { getCircuitStats } from '@/lib/circuit-stats';
 
@@ -193,7 +192,7 @@ export default function RaceDetail() {
           showsVerticalScrollIndicator={false}>
           {/* HERO */}
           <Hero
-            circuitImage={race.circuit_image}
+            circuitId={race.circuit_id}
             country={race.country}
             countryCode={race.country_code}
             locality={race.locality}
@@ -511,14 +510,14 @@ export default function RaceDetail() {
 // ============ HERO ============
 
 function Hero({
-  circuitImage,
+  circuitId,
   country,
   countryCode,
   locality,
   name,
   date,
 }: {
-  circuitImage?: string;
+  circuitId?: string;
   country?: string;
   countryCode?: string;
   locality?: string;
@@ -542,83 +541,94 @@ function Hero({
         overflow: 'hidden',
         backgroundColor: CARD_BG,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(225,6,0,0.18)',
+        aspectRatio: 4 / 5,
+        shadowColor: '#E10600',
+        shadowOpacity: 0.15,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 6,
       }}>
-      <ImageBackground
-        source={circuitImage ? { uri: circuitImage } : undefined}
-        style={{ aspectRatio: 4 / 5 }}
-        imageStyle={{ opacity: 0.78 }}>
-        {/* Bottom-up dark gradient */}
-        <View
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: 'rgba(10,10,18,0.25)',
-          }}
+      {/* Большое очертание трассы по центру — декоративный фон */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: -20,
+          top: 20,
+          opacity: 0.85,
+        }}>
+        <CircuitOutline
+          circuitId={circuitId}
+          width={300}
+          height={300}
+          color="#E10600"
+          strokeWidth={2.5}
         />
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            top: '35%',
-            backgroundColor: 'rgba(10,10,18,0.78)',
-          }}
-        />
+      </View>
 
-        {/* Content */}
-        <View style={{ flex: 1, padding: 20, justifyContent: 'space-between' }}>
-          {/* top: flag */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 30 }}>{flagFor(countryCode)}</Text>
-          </View>
+      {/* Subtle bottom darken so text is readable */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          top: '55%',
+          backgroundColor: 'rgba(10,10,18,0.7)',
+        }}
+      />
 
-          {/* bottom: race text */}
-          <View>
-            <Text
+      {/* Content */}
+      <View style={{ flex: 1, padding: 22, justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize: 32 }}>{flagFor(countryCode)}</Text>
+        </View>
+
+        <View>
+          <Text
+            style={{
+              color: '#E10600',
+              fontSize: 11,
+              fontWeight: '800',
+              letterSpacing: 2,
+            }}
+            numberOfLines={1}>
+            {eyebrow}
+          </Text>
+          <Text
+            style={{
+              color: '#FAFAFA',
+              fontSize: 46,
+              lineHeight: 46,
+              fontWeight: '800',
+              letterSpacing: -1.5,
+              fontStyle: 'italic',
+              marginTop: 6,
+            }}
+            numberOfLines={1}>
+            {cityUpper}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+            <View
               style={{
-                color: '#E10600',
-                fontSize: 11,
-                fontWeight: '800',
-                letterSpacing: 2,
-              }}
-              numberOfLines={1}>
-              {eyebrow}
-            </Text>
-            <Text
-              style={{
-                color: '#FAFAFA',
-                fontSize: 46,
-                lineHeight: 46,
-                fontWeight: '800',
-                letterSpacing: -1.5,
-                fontStyle: 'italic',
-                marginTop: 6,
-              }}
-              numberOfLines={1}>
-              {cityUpper}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(255,255,255,0.08)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.08)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10,
-                }}>
-                <Ionicons name="calendar-outline" size={14} color="#FAFAFA" />
-              </View>
-              <Text className="text-text text-sm font-semibold">{dateStr} г.</Text>
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+              }}>
+              <Ionicons name="calendar-outline" size={14} color="#FAFAFA" />
             </View>
+            <Text className="text-text text-sm font-semibold">{dateStr} г.</Text>
           </View>
         </View>
-      </ImageBackground>
+      </View>
     </View>
   );
 }
