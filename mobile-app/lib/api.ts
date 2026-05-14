@@ -14,6 +14,19 @@ const API_BASE =
 
 const AUTH_KEY = 'f1hub.tg_auth';
 
+/** Extract a thumbnail URL from a broadcast's video_url / embed_url. YouTube
+ * exposes one via i.ytimg.com; for VK/Rutube/etc. we don't have a stable
+ * thumbnail pattern, so return null and the UI shows a placeholder. */
+export function videoThumbnail(
+  videoUrl?: string | null,
+  embedUrl?: string | null,
+): string | null {
+  const u = videoUrl || embedUrl || '';
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
+  if (yt) return `https://i.ytimg.com/vi/${yt[1]}/hqdefault.jpg`;
+  return null;
+}
+
 /** Convert a possibly-relative URL to absolute (prepend API_BASE if starts with /). */
 export function absUrl(url?: string | null): string | undefined {
   if (!url) return undefined;

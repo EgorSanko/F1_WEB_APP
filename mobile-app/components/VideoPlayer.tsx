@@ -241,10 +241,22 @@ function HlsPlayer({ hlsUrl }: { hlsUrl: string }) {
 <script src="${API_BASE}/static/vendor/plyr.min.js"></script>
 <style>
   html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;
-    --plyr-color-main:#E10600;--plyr-video-background:#000}
+    --plyr-color-main:#E10600;--plyr-video-background:#000;
+    /* wider progress + bigger thumb */
+    --plyr-range-track-height:8px;
+    --plyr-range-thumb-height:18px;
+    --plyr-range-thumb-background:#E10600;
+    --plyr-range-thumb-shadow:0 1px 3px rgba(0,0,0,.4);
+    --plyr-range-fill-background:#E10600;
+    --plyr-tooltip-background:rgba(0,0,0,.75);
+  }
   .wrap{position:fixed;inset:0;display:flex}
   .plyr{flex:1;height:100%}
   video{width:100%;height:100%;background:#000;display:block}
+
+  /* Progress bar appears beefier */
+  .plyr--video .plyr__progress input[type=range]{height:24px}
+  .plyr__progress{padding:0 8px}
 </style>
 </head>
 <body>
@@ -257,11 +269,13 @@ function HlsPlayer({ hlsUrl }: { hlsUrl: string }) {
     var v = document.getElementById('v');
     var plyrOpts = {
       autoplay: true,
-      controls: ['play-large','play','progress','current-time','duration','mute','volume','settings','pip','airplay','fullscreen'],
+      volume: 1,
+      muted: false,
+      controls: ['play-large','play','progress','current-time','duration','settings','pip','airplay','fullscreen'],
       settings: ['quality','speed'],
       speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
       i18n: {
-        play: 'Воспроизвести', pause: 'Пауза', mute: 'Без звука', unmute: 'Со звуком',
+        play: 'Воспроизвести', pause: 'Пауза',
         enterFullscreen: 'Полный экран', exitFullscreen: 'Свернуть',
         settings: 'Настройки', speed: 'Скорость', normal: 'Обычная',
         quality: 'Качество', qualityLabel: { 0: 'Авто' }
@@ -271,6 +285,7 @@ function HlsPlayer({ hlsUrl }: { hlsUrl: string }) {
     function initPlyr(){
       var p = new Plyr(v, plyrOpts);
       window.__plyr = p;
+      try { v.volume = 1; v.muted = false; } catch (e) {}
       return p;
     }
 

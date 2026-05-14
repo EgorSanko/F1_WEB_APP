@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 
@@ -11,6 +12,7 @@ import {
   flagFor,
 } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
+import { videoThumbnail } from '@/lib/api';
 import type { Broadcast } from '@/lib/api';
 
 const CURRENT_SEASON = 2026;
@@ -63,6 +65,14 @@ const SESSION_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
 function sessionIndex(type: string): number {
   const i = SESSION_ORDER.indexOf(type as (typeof SESSION_ORDER)[number]);
   return i === -1 ? 99 : i;
+}
+
+function providerBadge(url: string): { label: string; color: string } {
+  const u = url.toLowerCase();
+  if (u.includes('youtu')) return { label: 'YT', color: '#FF0000' };
+  if (u.includes('rutube')) return { label: 'RT', color: '#000000' };
+  if (u.includes('vk.com') || u.includes('vkvideo')) return { label: 'VK', color: '#0077FF' };
+  return { label: 'VIDEO', color: '#E10600' };
 }
 
 export default function VideosScreen() {
@@ -175,38 +185,93 @@ export default function VideosScreen() {
 
                 {/* Sessions in canonical order */}
                 <View className="px-4 gap-2">
-                  {items.map((b) => (
-                    <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
-                      <Pressable className="bg-surface rounded-xl p-3.5 border border-line flex-row items-center active:opacity-80">
-                        <View className="w-11 h-11 rounded-full bg-red/15 items-center justify-center">
-                          <Ionicons
-                            name={SESSION_ICON[b.session_type] ?? 'film'}
-                            size={20}
-                            color="#E10600"
-                          />
-                        </View>
-                        <View className="flex-1 ml-3">
-                          <View className="flex-row items-center">
-                            <Text className="text-text font-bold flex-1" numberOfLines={1}>
-                              {SESSION_SHORT[b.session_type] ?? b.session_type} ·{' '}
-                              {race?.name?.replace('Гран-при ', '')}
-                            </Text>
-                            {b.is_live ? (
-                              <View className="bg-red px-1.5 py-0.5 rounded ml-2">
-                                <Text className="text-text text-[9px] font-extrabold tracking-widest">
-                                  LIVE
-                                </Text>
+                  {items.map((b) => {
+                    const thumb = videoThumbnail(b.video_url, b.embed_url);
+                    const prov = providerBadge(b.video_url || b.embed_url || '');
+                    return (
+                      <Link key={b.id} href={`/broadcast/${b.id}` as never} asChild>
+                        <Pressable className="bg-surface rounded-xl border border-line flex-row items-center active:opacity-80 overflow-hidden">
+                          <View
+                            style={{
+                              width: 112,
+                              aspectRatio: 16 / 9,
+                              backgroundColor: '#1c1c28',
+                              position: 'relative',
+                            }}>
+                            {thumb ? (
+                              <Image
+                                source={{ uri: thumb }}
+                                style={{ width: '100%', height: '100%' }}
+                                contentFit="cover"
+                              />
+                            ) : (
+                              <View className="flex-1 items-center justify-center">
+                                <Ionicons
+                                  name={SESSION_ICON[b.session_type] ?? 'film'}
+                                  size={24}
+                                  color="#6B6B7B"
+                                />
                               </View>
-                            ) : null}
+                            )}
+                            <View
+                              style={{
+                                position: 'absolute',
+                                left: 4,
+                                top: 4,
+                                paddingHorizontal: 5,
+                                paddingVertical: 2,
+                                borderRadius: 4,
+                                backgroundColor: prov.color,
+                              }}>
+                              <Text className="text-text text-[8px] font-extrabold tracking-widest">
+                                {prov.label}
+                              </Text>
+                            </View>
+                            <View
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}>
+                              <View
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 16,
+                                  backgroundColor: 'rgba(0,0,0,0.55)',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}>
+                                <Ionicons name="play" size={16} color="#fff" />
+                              </View>
+                            </View>
                           </View>
-                          <Text className="text-muted text-xs mt-0.5">
-                            {SESSION_LABEL[b.session_type]}
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
-                      </Pressable>
-                    </Link>
-                  ))}
+                          <View className="flex-1 py-3 pl-3 pr-3">
+                            <View className="flex-row items-center">
+                              <Text className="text-text font-bold flex-1" numberOfLines={1}>
+                                {SESSION_SHORT[b.session_type] ?? b.session_type} ·{' '}
+                                {race?.name?.replace('Гран-при ', '')}
+                              </Text>
+                              {b.is_live ? (
+                                <View className="bg-red px-1.5 py-0.5 rounded ml-2">
+                                  <Text className="text-text text-[9px] font-extrabold tracking-widest">
+                                    LIVE
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                            <Text className="text-muted text-xs mt-0.5" numberOfLines={1}>
+                              {SESSION_LABEL[b.session_type]}
+                            </Text>
+                          </View>
+                          <View className="pr-3">
+                            <Ionicons name="chevron-forward" size={18} color="#6B6B7B" />
+                          </View>
+                        </Pressable>
+                      </Link>
+                    );
+                  })}
                 </View>
               </View>
             );
