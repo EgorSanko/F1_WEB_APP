@@ -247,12 +247,12 @@ function DriversTab({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 24,
+            paddingHorizontal: 30,
             paddingVertical: 8,
           }}>
-          <Text style={tableHeaderText({ width: 22, align: 'center' })}>ПОЗ</Text>
-          <Text style={tableHeaderText({ flex: 1, marginLeft: 56, align: 'left' })}>ПИЛОТ</Text>
-          <Text style={tableHeaderText({ width: 32, align: 'center' })}>КОМАНДА</Text>
+          <Text style={tableHeaderText({ width: 30, align: 'center' })}>ПОЗ</Text>
+          <Text style={tableHeaderText({ flex: 1, marginLeft: 60, align: 'left' })}>ПИЛОТ</Text>
+          <View style={{ width: 32 }} />
           <Text style={tableHeaderText({ width: 60, align: 'right', marginLeft: 6 })}>ОЧКИ</Text>
         </View>
       )}
@@ -288,10 +288,11 @@ function DriversTab({
                 style={{
                   color: teamColor,
                   fontWeight: '800',
-                  fontSize: 20,
-                  width: 22,
+                  fontSize: 22,
+                  width: 30,
                   textAlign: 'center',
-                  letterSpacing: -0.3,
+                  letterSpacing: -0.8,
+                  fontVariant: ['tabular-nums'],
                 }}>
                 {d.position ?? i + 4}
               </Text>
@@ -706,16 +707,17 @@ function DriverCardsTab({
               }}
               pointerEvents="none"
             />
-            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 130 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 160 }}>
               {/* Position number + #N */}
-              <View style={{ width: 56, alignItems: 'center', paddingVertical: 14 }}>
+              <View style={{ width: 48, alignItems: 'center', paddingVertical: 14 }}>
                 <Text
                   style={{
                     color: teamColor,
-                    fontSize: 44,
+                    fontSize: 42,
                     fontWeight: '800',
                     letterSpacing: -2,
-                    lineHeight: 46,
+                    lineHeight: 44,
+                    fontVariant: ['tabular-nums'],
                   }}>
                   {pos}
                 </Text>
@@ -731,26 +733,26 @@ function DriverCardsTab({
                 </Text>
               </View>
 
-              {/* Driver portrait */}
+              {/* Driver portrait — bigger */}
               <View
                 style={{
-                  width: 110,
-                  height: 130,
+                  width: 132,
+                  height: 160,
                   justifyContent: 'flex-end',
                   alignItems: 'center',
                 }}>
                 {portrait ? (
                   <Image
                     source={{ uri: portrait }}
-                    style={{ width: 110, height: 130 }}
+                    style={{ width: 132, height: 168, marginBottom: -4 }}
                     contentFit="contain"
                   />
                 ) : (
                   <View
                     style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: 40,
+                      width: 100,
+                      height: 100,
+                      borderRadius: 50,
                       backgroundColor: '#1A1A24',
                     }}
                   />
@@ -758,7 +760,7 @@ function DriverCardsTab({
               </View>
 
               {/* Info column */}
-              <View style={{ flex: 1, paddingVertical: 12, paddingRight: 14, paddingLeft: 4 }}>
+              <View style={{ flex: 1, paddingVertical: 12, paddingRight: 10, paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                   {logo ? (
                     <Image
