@@ -494,7 +494,7 @@ function PredictionForm({
   return (
     <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: DARK_BG }}>
-        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
           {/* Header with back arrow */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 }}>
             <Pressable
