@@ -382,33 +382,18 @@ function HeroCard({
           }}
         />
 
-        {/* Car — top-right, doesn't overlap the city skyline visible at very top */}
+        {/* Car — компактнее, прижата к верхнему-правому углу, не лезет на заголовок */}
         <Image
           source={{ uri: CAR_OVERLAY }}
           style={{
             position: 'absolute',
-            right: -50,
-            top: '14%',
-            width: 420,
-            height: 280,
+            right: -20,
+            top: 16,
+            width: 250,
+            height: 160,
           }}
           contentFit="contain"
         />
-
-        {/* Decorative red speed lines at bottom-right */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            right: 24,
-            bottom: 18,
-            flexDirection: 'row',
-            gap: 4,
-          }}>
-          <View style={{ width: 24, height: 3, backgroundColor: '#3A3A4A', borderRadius: 2 }} />
-          <View style={{ width: 36, height: 3, backgroundColor: '#E10600', borderRadius: 2 }} />
-          <View style={{ width: 18, height: 3, backgroundColor: '#E10600', opacity: 0.6, borderRadius: 2 }} />
-        </View>
 
         {/* Content */}
         <View style={{ flex: 1, padding: 20, justifyContent: 'space-between' }}>
