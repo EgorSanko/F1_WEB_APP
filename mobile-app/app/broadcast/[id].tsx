@@ -53,7 +53,7 @@ export default function BroadcastDetail() {
   const router = useRouter();
   const broadcastId = Number(id);
   const schedule = useSchedule();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
 
   const list = useQuery({
@@ -315,6 +315,7 @@ export default function BroadcastDetail() {
                     <CommentRow
                       key={c.id}
                       comment={c}
+                      isAdmin={isAdmin}
                       onLike={async () => {
                         if (!user) {
                           Alert.alert('Нужен вход', 'Войди чтобы лайкать');
@@ -563,14 +564,27 @@ function CommentInput({
 
 function CommentRow({
   comment,
+  isAdmin,
   onLike,
   onDelete,
 }: {
   comment: BroadcastComment;
+  isAdmin: boolean;
   onLike: () => void;
   onDelete: () => void;
 }) {
-  const [showMenu, setShowMenu] = useState(false);
+  const canDelete = comment.is_mine || isAdmin;
+  const deleteLabel = comment.is_mine
+    ? 'Удалить свой комментарий?'
+    : 'Удалить комментарий (модератор)?';
+
+  const confirmDelete = () => {
+    Alert.alert(deleteLabel, comment.text.slice(0, 120), [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: onDelete },
+    ]);
+  };
+
   return (
     <View style={{ flexDirection: 'row' }}>
       {comment.user_photo_url ? (
@@ -592,10 +606,24 @@ function CommentRow({
         </View>
       )}
       <View style={{ flex: 1, marginLeft: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
           <Text style={{ color: '#FAFAFA', fontSize: 13, fontWeight: '800' }}>
             {comment.user_name}
           </Text>
+          {comment.is_mine ? (
+            <View
+              style={{
+                marginLeft: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 1,
+                borderRadius: 4,
+                backgroundColor: 'rgba(225,6,0,0.15)',
+              }}>
+              <Text style={{ color: '#E10600', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>
+                ВЫ
+              </Text>
+            </View>
+          ) : null}
           <Text style={{ color: '#6B6B7B', fontSize: 11, marginLeft: 8 }}>
             {relativeTime(comment.created_at)}
           </Text>
@@ -603,68 +631,37 @@ function CommentRow({
         <Text style={{ color: '#FAFAFA', fontSize: 13.5, marginTop: 4, lineHeight: 18 }}>
           {comment.text}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 14 }}>
           <Pressable
-            onPress={() => {
-              /* reply UI not implemented */
-            }}>
-            <Text style={{ color: '#6B6B7B', fontSize: 11, fontWeight: '600' }}>
-              ответить
-            </Text>
+            onPress={onLike}
+            hitSlop={6}
+            style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons
+              name={comment.my_liked ? 'heart' : 'heart-outline'}
+              size={14}
+              color={comment.my_liked ? '#E10600' : '#6B6B7B'}
+            />
+            {comment.likes_count > 0 ? (
+              <Text
+                style={{
+                  color: comment.my_liked ? '#E10600' : '#6B6B7B',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  marginLeft: 4,
+                }}>
+                {comment.likes_count}
+              </Text>
+            ) : null}
           </Pressable>
-        </View>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Pressable
-          onPress={onLike}
-          style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons
-            name={comment.my_liked ? 'heart' : 'heart-outline'}
-            size={16}
-            color={comment.my_liked ? '#E10600' : '#A0A0B0'}
-          />
-          {comment.likes_count > 0 ? (
-            <Text
-              style={{
-                color: comment.my_liked ? '#E10600' : '#A0A0B0',
-                fontSize: 12,
-                fontWeight: '700',
-                marginLeft: 4,
-              }}>
-              {comment.likes_count}
-            </Text>
+
+          {canDelete ? (
+            <Pressable onPress={confirmDelete} hitSlop={6}>
+              <Text style={{ color: '#E10600', fontSize: 11, fontWeight: '700' }}>
+                {comment.is_mine ? 'Удалить' : 'Удалить (модер.)'}
+              </Text>
+            </Pressable>
           ) : null}
-        </Pressable>
-        {comment.is_mine ? (
-          <Pressable
-            onPress={() => setShowMenu((v) => !v)}
-            style={{ marginTop: 4, padding: 4 }}>
-            <Ionicons name="ellipsis-horizontal" size={14} color="#6B6B7B" />
-          </Pressable>
-        ) : null}
-        {showMenu ? (
-          <Pressable
-            onPress={() => {
-              setShowMenu(false);
-              Alert.alert('Удалить комментарий?', '', [
-                { text: 'Отмена', style: 'cancel' },
-                { text: 'Удалить', style: 'destructive', onPress: onDelete },
-              ]);
-            }}
-            style={{
-              marginTop: 4,
-              backgroundColor: CARD_BG,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.06)',
-            }}>
-            <Text style={{ color: '#E10600', fontSize: 11, fontWeight: '700' }}>
-              Удалить
-            </Text>
-          </Pressable>
-        ) : null}
+        </View>
       </View>
     </View>
   );

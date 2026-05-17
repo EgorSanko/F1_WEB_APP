@@ -2,7 +2,7 @@
   "expo": {
     "name": "F1 Hub",
     "slug": "f1hub-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "f1hub",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ru.leadseek.f1hub",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -28,16 +28,19 @@
         "NSUserNotificationsUsageDescription": "Уведомления о начале гонки и закрытии прогнозов",
         "LSApplicationQueriesSchemes": [
           "tg",
+          "telegram",
+          "tg",
           "telegram"
         ]
       },
       "associatedDomains": [
+        "applinks:f1hub.lead-seek.ru",
         "applinks:f1hub.lead-seek.ru"
       ]
     },
     "android": {
       "package": "ru.leadseek.f1hub",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#15151E"
@@ -47,9 +50,29 @@
       "permissions": [
         "NOTIFICATIONS",
         "VIBRATE",
+        "INTERNET",
+        "NOTIFICATIONS",
+        "VIBRATE",
         "INTERNET"
       ],
       "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
+          "data": [
+            {
+              "scheme": "f1hub"
+            },
+            {
+              "scheme": "https",
+              "host": "f1hub.lead-seek.ru",
+              "pathPrefix": "/app"
+            }
+          ]
+        },
         {
           "action": "VIEW",
           "category": [
@@ -95,11 +118,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": ""
+        "projectId": "1242267c-64b8-4678-992e-9ea42efd6eb2"
       },
       "apiBaseUrl": "https://f1hub.lead-seek.ru",
       "tgBotUsername": "F1_egor_bot",
       "tgBotId": "8471280241"
+    },
+    "owner": "papiros007",
+    "updates": {
+      "url": "https://u.expo.dev/1242267c-64b8-4678-992e-9ea42efd6eb2"
     }
   }
 }
