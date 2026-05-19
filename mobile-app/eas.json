@@ -14,6 +14,7 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "autoIncrement": true,
       "ios": {
         "simulator": false
       }
@@ -31,11 +32,6 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
       "android": {
         "serviceAccountKeyPath": "./google-play-key.json",
         "track": "internal"
