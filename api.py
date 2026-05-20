@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -110,14 +110,18 @@ os.makedirs(os.path.join(_static_base, "vendor"), exist_ok=True)
 os.makedirs(os.path.join(_static_base, "fonts"), exist_ok=True)
 app.mount("/static", StaticFiles(directory=_static_base), name="static_files")
 
+_avatars_dir = os.path.join(os.path.dirname(__file__), "data", "avatars")
+os.makedirs(_avatars_dir, exist_ok=True)
+app.mount("/avatars", StaticFiles(directory=_avatars_dir), name="avatars")
+
 
 # ============ RATE LIMITING ============
 from collections import defaultdict
 
 _rate_buckets: Dict[str, list] = defaultdict(list)
-RATE_LIMIT = 60          # requests per window
+RATE_LIMIT = 300          # requests per window
 RATE_WINDOW = 60          # seconds
-RATE_LIMIT_AUTH = 120     # higher limit for authenticated users
+RATE_LIMIT_AUTH = 600     # higher limit for authenticated users
 
 
 def _check_rate_limit(ip: str, authenticated: bool = False) -> bool:
@@ -317,6 +321,57 @@ async def fetch_telegram_avatar(user_id: int) -> Optional[str]:
 
 # ============ HEALTH ============
 
+@app.get("/app/auth-callback", response_class=HTMLResponse)
+async def app_auth_callback(request: Request):
+    """OAuth callback bridge for the native mobile app.
+
+    Telegram OAuth Login Widget only redirects to HTTPS URLs (registered as
+    bot domain via @BotFather /setdomain). This page receives the signed
+    payload and bounces it to whatever scheme the app currently uses
+    (passed as ?back= param: exp://... in Expo Go, f1hub://... in dev/prod build).
+    Falls back to f1hub://auth if `back` is missing.
+    """
+    import urllib.parse as _u
+    params = dict(request.query_params)
+    back_raw = params.pop("back", None)
+    payload = _u.urlencode(params, safe=":/")
+    if back_raw:
+        # back already URL-encoded by client when assembling return_to
+        sep = "&" if "?" in back_raw else "?"
+        deep_link = f"{back_raw}{sep}{payload}" if payload else back_raw
+    else:
+        deep_link = f"f1hub://auth?{payload}" if payload else "f1hub://auth"
+    html = """<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>F1 HUB — Возврат в приложение</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html,body{margin:0;background:#15151E;color:#FAFAFA;font-family:system-ui,sans-serif;
+    height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+  .c{max-width:340px}
+  h1{font-size:22px;margin:0 0 12px;font-weight:800}
+  p{color:#A0A0B0;font-size:14px;line-height:1.5;margin:0 0 20px}
+  a.btn{display:inline-block;background:#E10600;color:#fff;padding:14px 24px;
+    border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>Возвращаемся в приложение…</h1>
+  <p>Если это не произошло автоматически, нажми кнопку ниже.</p>
+  <a class="btn" href="__DEEPLINK__">Открыть F1 HUB</a>
+</div>
+<script>
+  // Auto-redirect to the mobile app
+  setTimeout(function(){ window.location = "__DEEPLINK__"; }, 50);
+</script>
+</body>
+</html>"""
+    return HTMLResponse(html.replace("__DEEPLINK__", deep_link))
+
+
 @app.get("/api/health")
 async def health():
     cache = f1_data.cache_stats()
@@ -332,11 +387,11 @@ async def health():
 
 @app.get("/")
 async def serve_index(request: Request):
-    """Serve webapp.html for TG WebApp (f1.lead-seek.ru), public.html for public site (f1hub.lead-seek.ru)."""
+    """Serve webapp.html for TG WebApp (f1.lead-seek.ru), public-v2.html for public site (f1hub.lead-seek.ru)."""
     host = request.headers.get("host", "")
     no_cache = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
     if "f1hub" in host:
-        return FileResponse("public.html", headers=no_cache)
+        return FileResponse("public-v2.html", headers=no_cache)
     return FileResponse("webapp.html", headers=no_cache)
 
 
@@ -349,7 +404,121 @@ async def serve_html(filename: str):
     raise HTTPException(status_code=404)
 
 
+
+
+# ============ NEW SPA ROUTES (post-swap) ============
+@app.get("/home-embed")
+async def serve_home_embed_new():
+    import os
+    if os.path.exists("redesign-v2-embed.html"):
+        return FileResponse("redesign-v2-embed.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    raise HTTPException(status_code=404)
+
+@app.get("/calendar-embed")
+async def serve_calendar_embed_new():
+    import os
+    if os.path.exists("redesign-calendar-embed.html"):
+        return FileResponse("redesign-calendar-embed.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    raise HTTPException(status_code=404)
+
+# Top-level SPA pages (calendar, standings, predict, profile, games, news, highlights, race/N, article)
+@app.get("/calendar")
+@app.get("/standings")
+@app.get("/predict")
+@app.get("/profile")
+@app.get("/games")
+@app.get("/news")
+@app.get("/highlights")
+@app.get("/article")
+@app.get("/race/{rest:path}")
+@app.get("/standings/{rest:path}")
+async def serve_spa_pages(request: Request, rest: str = ""):
+    host = request.headers.get("host", "")
+    if "f1hub" not in host:
+        # f1.lead-seek.ru webapp doesn't have these pages
+        raise HTTPException(status_code=404)
+    return FileResponse("public-v2.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# 301 redirects from old /redesign/v2/* to root
+from fastapi.responses import RedirectResponse as _RR
+@app.get("/redesign/v2/home-embed-old")
+async def _r1(): return _RR("/home-embed", status_code=301)
+@app.get("/redesign/v2/calendar-embed-old")
+async def _r2(): return _RR("/calendar-embed", status_code=301)
+
+@app.get("/redesign")
+async def serve_redesign():
+    import os
+    if os.path.exists("redesign.html"):
+        return FileResponse("redesign.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    raise HTTPException(status_code=404)
+
+
+@app.get("/redesign/calendar")
+async def serve_redesign_calendar():
+    import os
+    if os.path.exists("redesign-calendar.html"):
+        return FileResponse("redesign-calendar.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    raise HTTPException(status_code=404)
+
+
+@app.get("/redesign/v2/preview")
+async def serve_redesign_v2_preview():
+    import os
+    if os.path.exists("redesign-v2.html"):
+        return FileResponse("redesign-v2.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    raise HTTPException(status_code=404)
+
+
+@app.get("/redesign/v2")
+@app.get("/redesign/v2/{rest:path}")
+async def serve_public_v2(rest: str = ""):
+    """Backward-compat: 301 redirect old /redesign/v2/* to new root paths."""
+    from fastapi.responses import RedirectResponse
+    target = "/" + rest if rest else "/"
+    # Fix legacy embed paths
+    if target == "/home-embed-legacy": target = "/home-embed"
+    if target == "/calendar-embed-legacy": target = "/calendar-embed"
+    return RedirectResponse(url=target, status_code=301)
+
+
 # ============ USER ============
+
+async def _fetch_tg_photo(user_id: int) -> str | None:
+    """Fetch user profile photo from Telegram Bot API, save locally, return static URL."""
+    try:
+        import httpx, os
+        avatar_dir = os.path.join(os.path.dirname(__file__), "data", "avatars")
+        os.makedirs(avatar_dir, exist_ok=True)
+        local_path = os.path.join(avatar_dir, f"{user_id}.jpg")
+        # If already cached locally and < 7 days old, return
+        if os.path.exists(local_path):
+            import time
+            if time.time() - os.path.getmtime(local_path) < 7 * 86400:
+                return f"/avatars/{user_id}.jpg"
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUserProfilePhotos",
+                                 params={"user_id": user_id, "limit": 1})
+            data = r.json()
+            photos = data.get("result", {}).get("photos", [])
+            if not photos:
+                return None
+            file_id = photos[0][-1]["file_id"]
+            r2 = await client.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile",
+                                  params={"file_id": file_id})
+            file_path = r2.json().get("result", {}).get("file_path")
+            if not file_path:
+                return None
+            r3 = await client.get(f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}")
+            if r3.status_code == 200:
+                with open(local_path, "wb") as f:
+                    f.write(r3.content)
+                return f"/avatars/{user_id}.jpg"
+    except Exception:
+        pass
+    return None
+
 
 @app.get("/api/user/me")
 async def user_me(request: Request):
@@ -367,6 +536,13 @@ async def user_me(request: Request):
     if tg_photo and tg_photo != user.get("photo_url"):
         user["photo_url"] = tg_photo
         db.execute_write("UPDATE users SET photo_url = ? WHERE user_id = ?", (tg_photo, tg_user["id"]))
+
+    # If still no photo (e.g. Login Widget doesn't send it), fetch from Bot API
+    if not user.get("photo_url"):
+        bot_photo = await _fetch_tg_photo(tg_user["id"])
+        if bot_photo:
+            user["photo_url"] = bot_photo
+            db.execute_write("UPDATE users SET photo_url = ? WHERE user_id = ?", (bot_photo, tg_user["id"]))
 
     rank = db.get_user_rank(user["user_id"])
     achievements = db.get_user_achievements(user["user_id"])
@@ -401,6 +577,127 @@ async def auth_widget(request: Request):
     return {"ok": True, "user": user}
 
 
+@app.post("/api/auth/code")
+async def auth_code(request: Request):
+    """Validate a one-time login code from /code bot command.
+    Body: { "code": "123456" }
+    Returns auth token (query string) if valid.
+    """
+    body = await request.json()
+    code = str(body.get("code", "")).strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing code")
+    user_id = db.verify_auth_code(code)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired code")
+    user = db.get_or_create_user(user_id=user_id)
+    import time, urllib.parse
+    params = {
+        "id": str(user["user_id"]),
+        "first_name": user.get("first_name") or "",
+        "username": user.get("username") or "",
+        "auth_date": str(int(time.time())),
+    }
+    # Build a Login-Widget-compatible query string with HMAC hash
+    data_check_string = "\n".join(f"{k}={params[k]}" for k in sorted(params))
+    secret_key = hashlib.sha256(TELEGRAM_TOKEN.encode()).digest()
+    h = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    params["hash"] = h
+    token = urllib.parse.urlencode(params)
+    return {"ok": True, "token": token, "user": user}
+
+# ============ MOBILE PUSH ============
+
+@app.post("/push/register")
+async def push_register(request: Request):
+    """Register an Expo push token for the current authenticated user."""
+    tg_user = get_current_user(request)
+    body = await request.json()
+    token = (body.get("token") or "").strip()
+    platform = (body.get("platform") or "android").strip()
+    if not token.startswith("ExponentPushToken[") and not token.startswith("ExpoPushToken["):
+        raise HTTPException(status_code=400, detail="Invalid Expo push token")
+    db.execute_write(
+        """CREATE TABLE IF NOT EXISTS push_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            expo_token TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, expo_token)
+        )"""
+    )
+    db.execute_write(
+        "INSERT OR IGNORE INTO push_tokens (user_id, expo_token, platform) VALUES (?, ?, ?)",
+        (tg_user["id"], token, platform),
+    )
+    return {"ok": True}
+
+
+@app.delete("/push/register")
+async def push_unregister(request: Request):
+    """Remove a push token (called on logout)."""
+    tg_user = get_current_user(request)
+    body = await request.json() if int(request.headers.get("content-length", "0")) else {}
+    token = (body.get("token") if isinstance(body, dict) else None) or ""
+    if token:
+        db.execute_write(
+            "DELETE FROM push_tokens WHERE user_id = ? AND expo_token = ?",
+            (tg_user["id"], token),
+        )
+    else:
+        db.execute_write("DELETE FROM push_tokens WHERE user_id = ?", (tg_user["id"],))
+    return {"ok": True}
+
+@app.get("/push/prefs")
+async def push_prefs_get(request: Request):
+    """Return current user's push preferences (default: all on)."""
+    tg_user = get_current_user(request)
+    db.execute_write(
+        """CREATE TABLE IF NOT EXISTS push_prefs (
+            user_id INTEGER PRIMARY KEY,
+            notify_race INTEGER DEFAULT 1,
+            notify_review INTEGER DEFAULT 1,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    rows = db.execute("SELECT notify_race, notify_review FROM push_prefs WHERE user_id = ?", (tg_user["id"],))
+    if rows:
+        r = rows[0]
+        return {"notify_race": bool(r["notify_race"]), "notify_review": bool(r["notify_review"])}
+    return {"notify_race": True, "notify_review": True}
+
+
+@app.post("/push/prefs")
+async def push_prefs_set(request: Request):
+    """Update current user's push preferences."""
+    tg_user = get_current_user(request)
+    body = await request.json()
+    notify_race = 1 if body.get("notify_race", True) else 0
+    notify_review = 1 if body.get("notify_review", True) else 0
+    db.execute_write(
+        """CREATE TABLE IF NOT EXISTS push_prefs (
+            user_id INTEGER PRIMARY KEY,
+            notify_race INTEGER DEFAULT 1,
+            notify_review INTEGER DEFAULT 1,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    db.execute_write(
+        """INSERT INTO push_prefs (user_id, notify_race, notify_review, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(user_id) DO UPDATE SET
+               notify_race=excluded.notify_race,
+               notify_review=excluded.notify_review,
+               updated_at=CURRENT_TIMESTAMP""",
+        (tg_user["id"], notify_race, notify_review),
+    )
+    return {"notify_race": bool(notify_race), "notify_review": bool(notify_review)}
+
+
+
+
+
 class BroadcastRequest(BaseModel):
     race_round: int
     session_type: str  # race, qualifying, sprint, sprint_qualifying
@@ -423,7 +720,20 @@ async def set_favorite(body: FavoriteRequest, request: Request):
 @app.get("/api/user/predictions")
 async def user_predictions(request: Request):
     tg_user = get_current_user(request)
-    return {"predictions": db.get_user_predictions(tg_user["id"])}
+    preds = db.get_user_predictions(tg_user["id"])
+    # Enrich with race_name from schedule
+    seasons_needed = {p["season"] for p in preds}
+    race_names = {}
+    for s in seasons_needed:
+        try:
+            sched = await f1_data.get_schedule(season=s)
+            for r in sched.get("races", []):
+                race_names[(s, r["round"])] = r["name"]
+        except Exception:
+            pass
+    for p in preds:
+        p["race_name"] = race_names.get((p["season"], p["race_round"]), "")
+    return {"predictions": preds}
 
 
 @app.get("/api/user/achievements")
@@ -684,6 +994,188 @@ class PredictionRequest(BaseModel):
     points_bet: int = 0
 
 
+
+
+# ============ CAREER STATS (Ergast/Jolpica) ============
+import sqlite3, os, json as _json, time
+_career_cache = {}  # in-memory: { key: (expires_at, data) }
+_CAREER_TTL = 86400  # 7 days — career rarely changes
+_CAREER_DB = os.path.join(os.path.dirname(__file__), "data", "career_cache.db")
+
+def _career_db():
+    conn = sqlite3.connect(_CAREER_DB)
+    conn.execute("CREATE TABLE IF NOT EXISTS career_cache (key TEXT PRIMARY KEY, data TEXT, updated_at INTEGER)")
+    return conn
+
+def _career_get(key):
+    """Try in-memory then SQLite."""
+    now = time.time()
+    if key in _career_cache:
+        exp, data = _career_cache[key]
+        if exp > now:
+            return data
+    try:
+        conn = _career_db()
+        row = conn.execute("SELECT data, updated_at FROM career_cache WHERE key=?", (key,)).fetchone()
+        conn.close()
+        if row and row[1] + _CAREER_TTL > now:
+            data = _json.loads(row[0])
+            _career_cache[key] = (row[1] + _CAREER_TTL, data)
+            return data
+    except Exception:
+        pass
+    return None
+
+def _career_set(key, data):
+    now = time.time()
+    _career_cache[key] = (now + _CAREER_TTL, data)
+    try:
+        conn = _career_db()
+        conn.execute("INSERT OR REPLACE INTO career_cache (key, data, updated_at) VALUES (?, ?, ?)",
+                     (key, _json.dumps(data), int(now)))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"career cache write failed: {e}")
+
+async def _cached(key, fetcher):
+    cached = _career_get(key)
+    if cached is not None:
+        return cached
+    data = await fetcher()
+    if data is not None:
+        career = data.get("career") if isinstance(data, dict) else None
+        # Only cache if data looks complete (seasons_count > 0 indicates seasons fetch succeeded)
+        if career and career.get("seasons_count", 0) > 0:
+            _career_set(key, data)
+    return data
+
+
+@app.get("/api/driver/career/{driver_id}")
+async def get_driver_career(driver_id: str):
+    """Career stats for a driver via Jolpica/Ergast (championships, wins, podiums, poles, races)."""
+    async def _fetch():
+        from f1_data import fetch_ergast
+        # 1) Basic profile
+        prof = await fetch_ergast(f"drivers/{driver_id}")
+        drivers = (prof or {}).get("DriverTable", {}).get("Drivers", []) if prof else []
+        if not drivers:
+            return None
+        d = drivers[0]
+        import asyncio
+        # Chunked to respect Ergast rate limit (4/s)
+        calls = [
+            fetch_ergast(f"drivers/{driver_id}/results/1", limit=1),
+            fetch_ergast(f"drivers/{driver_id}/results", limit=1),
+            fetch_ergast(f"drivers/{driver_id}/qualifying/1", limit=1),
+            fetch_ergast(f"drivers/{driver_id}/results/2", limit=1),
+            fetch_ergast(f"drivers/{driver_id}/results/3", limit=1),
+            fetch_ergast(f"drivers/{driver_id}/seasons", limit=100),
+        ]
+        results = []
+        for i in range(0, len(calls), 3):
+            results.extend(await asyncio.gather(*calls[i:i+3]))
+        wins, races, poles, p2, p3, seasons_data = results
+        # Driver championships — historical facts, hardcoded for reliability
+        DRIVER_CHAMPS = {
+            "hamilton": 7, "max_verstappen": 4, "alonso": 2,
+            "schumacher": 7, "fangio": 5, "vettel": 4, "prost": 4,
+            "lauda": 3, "stewart": 3, "piquet": 3, "brabham": 3, "senna": 3,
+            "rosberg": 1, "raikkonen": 1, "button": 1, "hakkinen": 2,
+            "damon_hill": 1, "villeneuve": 1, "mansell": 1, "andretti": 1,
+            "hunt": 1, "fittipaldi": 2, "rindt": 1, "stewart": 3,
+            "graham_hill": 2, "clark": 2, "hill": 1, "ascari": 2,
+            "farina": 1, "n_rosberg": 1, "scheckter": 1, "jones": 1,
+            "kjones": 1, "surtees": 1,
+        }
+        championships = DRIVER_CHAMPS.get(driver_id, 0)
+        seasons = (seasons_data or {}).get("SeasonTable", {}).get("Seasons", []) if seasons_data else []
+        career_wins = int(wins.get("total", 0)) if wins else 0
+        total_races = int(races.get("total", 0)) if races else 0
+        career_poles = int(poles.get("total", 0)) if poles else 0
+        podiums = career_wins + (int(p2.get("total", 0)) if p2 else 0) + (int(p3.get("total", 0)) if p3 else 0)
+        debut = int(seasons[0]["season"]) if seasons else None
+        return {
+            "driver_id": driver_id,
+            "given_name": d.get("givenName"),
+            "family_name": d.get("familyName"),
+            "date_of_birth": d.get("dateOfBirth"),
+            "nationality": d.get("nationality"),
+            "permanent_number": d.get("permanentNumber"),
+            "code": d.get("code"),
+            "wiki_url": d.get("url"),
+            "career": {
+                "championships": championships,
+                "wins": career_wins,
+                "podiums": podiums,
+                "poles": career_poles,
+                "races": total_races,
+                "debut_season": debut,
+                "seasons_count": len(seasons),
+            },
+        }
+    data = await _cached(f"drv_career_{driver_id}", _fetch)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Driver {driver_id} not found in Ergast")
+    return data
+
+
+@app.get("/api/team/career/{constructor_id}")
+async def get_team_career(constructor_id: str):
+    """Career stats for a constructor via Jolpica/Ergast."""
+    async def _fetch():
+        from f1_data import fetch_ergast
+        prof = await fetch_ergast(f"constructors/{constructor_id}")
+        teams = (prof or {}).get("ConstructorTable", {}).get("Constructors", []) if prof else []
+        if not teams:
+            return None
+        t = teams[0]
+        import asyncio
+        # Team championships also need per-season counting since Jolpica requires season_year
+        t_calls = [
+            fetch_ergast(f"constructors/{constructor_id}/results/1", limit=1),
+            fetch_ergast(f"constructors/{constructor_id}/results", limit=1),
+            fetch_ergast(f"constructors/{constructor_id}/qualifying/1", limit=1),
+            fetch_ergast(f"constructors/{constructor_id}/seasons", limit=100),
+        ]
+        t_results = []
+        for i in range(0, len(t_calls), 3):
+            t_results.extend(await asyncio.gather(*t_calls[i:i+3]))
+        wins, races, poles, seasons_data = t_results
+        # Constructor championships — hardcoded historical facts
+        TEAM_CHAMPS = {
+            "ferrari": 16, "williams": 9, "mclaren": 9, "mercedes": 8,
+            "lotus_f1": 0, "lotus": 7, "team_lotus": 7, "red_bull": 6, "cooper": 2,
+            "brabham": 2, "tyrrell": 1, "matra": 1, "brawn": 1,
+            "renault": 2, "alpine": 2, "vanwall": 1, "bmw_sauber": 0,
+            "benetton": 1,
+        }
+        championships = TEAM_CHAMPS.get(constructor_id, 0)
+        seasons = (seasons_data or {}).get("SeasonTable", {}).get("Seasons", []) if seasons_data else []
+        career_wins = int(wins.get("total", 0)) if wins else 0
+        total_races = int(races.get("total", 0)) if races else 0
+        career_poles = int(poles.get("total", 0)) if poles else 0
+        debut = int(seasons[0]["season"]) if seasons else None
+        return {
+            "constructor_id": constructor_id,
+            "name": t.get("name"),
+            "nationality": t.get("nationality"),
+            "wiki_url": t.get("url"),
+            "career": {
+                "championships": championships,
+                "wins": career_wins,
+                "poles": career_poles,
+                "races": total_races,
+                "debut_season": debut,
+                "seasons_count": len(seasons),
+            },
+        }
+    data = await _cached(f"team_career_{constructor_id}", _fetch)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Constructor {constructor_id} not found in Ergast")
+    return data
+
+
 @app.get("/api/predictions/available")
 async def predictions_available(request: Request):
     tg_user = get_current_user(request)
@@ -798,6 +1290,49 @@ async def submit_game_result(body: GameResultRequest, request: Request):
             new_achievements.append("reaction_god")
 
     return {"status": "ok", "points_earned": points, "new_achievements": new_achievements}
+
+
+@app.get("/api/games/leaderboard")
+async def games_leaderboard(request: Request, game_type: str = "reaction"):
+    """Leaderboard of best scores (personal records) for a game type.
+    For reaction/pit_stop: lower is better."""
+    valid = {"reaction", "pit_stop"}
+    if game_type not in valid:
+        raise HTTPException(status_code=400, detail="Invalid game type")
+    # Best score per user (MIN for reaction & pit_stop = lower is better)
+    rows = db.execute("""
+        SELECT g.user_id, MIN(g.score) as best_score, COUNT(*) as attempts,
+               u.first_name, u.last_name, u.username, u.photo_url
+        FROM games g
+        JOIN users u ON u.user_id = g.user_id
+        WHERE g.game_type = ? AND g.score > 0
+        GROUP BY g.user_id
+        ORDER BY best_score ASC
+        LIMIT 50
+    """, (game_type,))
+    # Current user's personal best
+    my_best = None
+    try:
+        tg_user = get_current_user(request)
+        my = db.execute_one(
+            "SELECT MIN(score) as best FROM games WHERE user_id = ? AND game_type = ? AND score > 0",
+            (tg_user["id"], game_type)
+        )
+        my_best = my["best"] if my else None
+    except Exception:
+        pass
+    return {
+        "leaderboard": [{
+            "rank": i + 1,
+            "user_id": r["user_id"],
+            "first_name": r["first_name"],
+            "last_name": r.get("last_name"),
+            "photo_url": r["photo_url"],
+            "best_score": r["best_score"],
+            "attempts": r["attempts"],
+        } for i, r in enumerate(rows)],
+        "my_best": my_best,
+    }
 
 
 def _calc_game_points(game_type: str, score: int) -> int:
@@ -1518,6 +2053,34 @@ async def admin_upsert_broadcast(req: BroadcastRequest, request: Request):
         is_live=req.is_live,
         created_by=tg_user["id"],
     )
+
+    # Push "обзор выложен" only for review-type broadcasts (and non-live)
+    if req.session_type == "review" and not req.is_live:
+        try:
+            race_name = req.title
+            if not race_name:
+                schedule = await f1_data.get_schedule(CURRENT_SEASON)
+                race = next((r for r in (schedule.get("races") if isinstance(schedule, dict) else schedule) or [] if r.get("round") == req.race_round), None)
+                race_name = race.get("name") if race else f"раунд {req.race_round}"
+            review_key = f"expo_review_{req.race_round}_{bid}"
+            if not _push_was_sent(review_key):
+                rows = db.execute("""
+                    SELECT pt.expo_token FROM push_tokens pt
+                    LEFT JOIN push_prefs pp ON pp.user_id = pt.user_id
+                    WHERE COALESCE(pp.notify_review, 1) = 1
+                """)
+                tokens = [r["expo_token"] for r in rows]
+                sent = await _expo_push_send(
+                    tokens,
+                    "🎬 Обзор выложен",
+                    f"Обзор: {race_name}",
+                    {"type": "review_uploaded", "race_round": req.race_round, "broadcast_id": bid},
+                )
+                _push_mark_sent(review_key, sent)
+        except Exception as e:
+            import logging as _l
+            _l.getLogger("expo_push").error(f"Review push failed: {e}")
+
     return {"id": bid, "embed_url": embed_url}
 
 
@@ -1914,3 +2477,376 @@ async def admin_cache_clear(request: Request):
         raise HTTPException(status_code=403)
     f1_data.cache_clear()
     return {"status": "ok", "message": "Cache cleared"}
+
+# ============ EXPO PUSH BACKGROUND SENDER ============
+import asyncio as _asyncio
+import os as _os
+import logging as _logging
+_push_log = _logging.getLogger("expo_push")
+
+_PUSH_MARK_DIR = "/app/data/notifications"
+
+def _push_was_sent(key: str) -> bool:
+    return _os.path.exists(_os.path.join(_PUSH_MARK_DIR, f"{key}.sent"))
+
+def _push_mark_sent(key: str, count: int):
+    _os.makedirs(_PUSH_MARK_DIR, exist_ok=True)
+    with open(_os.path.join(_PUSH_MARK_DIR, f"{key}.sent"), "w") as f:
+        f.write(f"sent={count}")
+
+
+async def _expo_push_send(tokens: list, title: str, body: str, data: dict = None):
+    """POST to Expo Push API in batches of 100."""
+    if not tokens:
+        return 0
+    import httpx as _httpx
+    sent = 0
+    async with _httpx.AsyncClient(timeout=10) as client:
+        for i in range(0, len(tokens), 100):
+            chunk = tokens[i : i + 100]
+            messages = [
+                {
+                    "to": tok,
+                    "title": title,
+                    "body": body,
+                    "sound": "default",
+                    "priority": "high",
+                    "data": data or {},
+                }
+                for tok in chunk
+            ]
+            try:
+                resp = await client.post(
+                    "https://exp.host/--/api/v2/push/send",
+                    json=messages,
+                    headers={"Accept": "application/json", "Content-Type": "application/json"},
+                )
+                if resp.status_code == 200:
+                    sent += len(chunk)
+                else:
+                    _push_log.warning(f"Expo push HTTP {resp.status_code}: {resp.text[:200]}")
+            except Exception as e:
+                _push_log.error(f"Expo push send error: {e}")
+    return sent
+
+
+async def _push_loop():
+    """Background loop: every 60s, check next race for 2h / 5min windows."""
+    await _asyncio.sleep(30)  # warmup
+    while True:
+        try:
+            next_race = await f1_data.get_next_race()
+            if next_race and "round" in next_race:
+                race_date = next_race.get("date", "")
+                race_time = next_race.get("time", "14:00:00Z")
+                race_name = next_race.get("name") or next_race.get("raceName") or "Гран-при"
+                race_round = next_race["round"]
+                if race_date:
+                    dt_str = f"{race_date}T{race_time}"
+                    if not dt_str.endswith("Z") and "+" not in dt_str:
+                        dt_str += "Z"
+                    try:
+                        race_dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                        now = datetime.now(timezone.utc)
+                        seconds = (race_dt - now).total_seconds()
+
+                        windows = [
+                            # (low, high seconds, marker_key, title, body)
+                            (7080, 7320, f"expo_2h_{race_round}",
+                             f"🏁 {race_name}",
+                             "Старт через 2 часа. Успей сделать прогноз!"),
+                            (240, 360, f"expo_5m_{race_round}",
+                             f"🔴 {race_name} — 5 минут!",
+                             "Lights out скоро. Открой Live."),
+                        ]
+
+                        for low, high, key, title, body in windows:
+                            if low < seconds < high and not _push_was_sent(key):
+                                rows = db.execute("""
+                                    SELECT pt.expo_token FROM push_tokens pt
+                                    LEFT JOIN push_prefs pp ON pp.user_id = pt.user_id
+                                    WHERE COALESCE(pp.notify_race, 1) = 1
+                                """)
+                                tokens = [r["expo_token"] for r in rows]
+                                sent = await _expo_push_send(
+                                    tokens, title, body,
+                                    {"type": "race_reminder", "race_round": race_round},
+                                )
+                                _push_mark_sent(key, sent)
+                                _push_log.info(f"Sent {sent} push for {key}")
+                    except Exception as e:
+                        _push_log.error(f"Push window check error: {e}")
+        except Exception as e:
+            _push_log.error(f"Push loop error: {e}")
+        await _asyncio.sleep(60)
+
+
+@app.on_event("startup")
+async def _start_push_loop():
+    _asyncio.create_task(_push_loop())
+
+
+
+
+# ============ BROADCAST SOCIAL: likes, comments ============
+# Appended to /opt/f1-hub/api.py — добавляет лайки/комментарии к трансляциям.
+
+from pydantic import BaseModel as _SocialBaseModel
+from typing import Optional as _SocialOpt
+
+
+class CommentRequest(_SocialBaseModel):
+    text: str
+    parent_id: _SocialOpt[int] = None
+
+
+def _social_db():
+    import sqlite3
+    conn = sqlite3.connect("/app/data/f1hub.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _social_user_id(request: "Request") -> _SocialOpt[int]:
+    try:
+        u = get_current_user(request)
+        return int(u["id"])
+    except Exception:
+        return None
+
+
+def _serialize_comment(r, my_user_id: _SocialOpt[int]) -> dict:
+    return {
+        "id": r["id"],
+        "broadcast_id": r["broadcast_id"],
+        "user_id": r["user_id"],
+        "parent_id": r["parent_id"],
+        "text": r["text"],
+        "created_at": r["created_at"],
+        "user_name": r["first_name"] or r["username"] or f"User{r['user_id']}",
+        "user_username": r["username"],
+        "user_photo_url": r["photo_url"],
+        "likes_count": r["likes_count"] if "likes_count" in r.keys() else 0,
+        "my_liked": bool(r["my_liked"]) if "my_liked" in r.keys() else False,
+        "is_mine": (my_user_id == r["user_id"]) if my_user_id else False,
+    }
+
+
+@app.get("/api/broadcast/{broadcast_id}/social")
+async def broadcast_social_get(broadcast_id: int, request: Request):
+    user_id = _social_user_id(request)
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS c FROM broadcast_likes WHERE broadcast_id=?", (broadcast_id,))
+    likes_count = cur.fetchone()["c"]
+    cur.execute(
+        "SELECT COUNT(*) AS c FROM broadcast_comments WHERE broadcast_id=? AND is_deleted=0",
+        (broadcast_id,),
+    )
+    comments_count = cur.fetchone()["c"]
+    my_liked = False
+    if user_id:
+        cur.execute(
+            "SELECT 1 FROM broadcast_likes WHERE broadcast_id=? AND user_id=?",
+            (broadcast_id, user_id),
+        )
+        my_liked = cur.fetchone() is not None
+    conn.close()
+    return {"likes_count": likes_count, "comments_count": comments_count, "my_liked": my_liked}
+
+
+@app.post("/api/broadcast/{broadcast_id}/like")
+async def broadcast_like_toggle(broadcast_id: int, request: Request):
+    user = get_current_user(request)
+    user_id = int(user["id"])
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM broadcast_likes WHERE broadcast_id=? AND user_id=?",
+        (broadcast_id, user_id),
+    )
+    if cur.fetchone():
+        cur.execute(
+            "DELETE FROM broadcast_likes WHERE broadcast_id=? AND user_id=?",
+            (broadcast_id, user_id),
+        )
+        my_liked = False
+    else:
+        cur.execute(
+            "INSERT INTO broadcast_likes(broadcast_id, user_id) VALUES(?,?)",
+            (broadcast_id, user_id),
+        )
+        my_liked = True
+    conn.commit()
+    cur.execute("SELECT COUNT(*) AS c FROM broadcast_likes WHERE broadcast_id=?", (broadcast_id,))
+    likes_count = cur.fetchone()["c"]
+    conn.close()
+    return {"my_liked": my_liked, "likes_count": likes_count}
+
+
+@app.get("/api/broadcast/{broadcast_id}/comments")
+async def broadcast_get_comments(
+    broadcast_id: int,
+    request: Request,
+    sort: str = "new",
+    offset: int = 0,
+    limit: int = 20,
+):
+    user_id = _social_user_id(request)
+    limit = max(1, min(100, limit))
+    offset = max(0, offset)
+    order = "c.created_at DESC" if sort == "new" else "c.created_at ASC"
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        SELECT c.id, c.broadcast_id, c.user_id, c.parent_id, c.text, c.created_at,
+               u.first_name, u.username, u.photo_url,
+               (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id=c.id) AS likes_count,
+               EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) AS my_liked
+        FROM broadcast_comments c
+        LEFT JOIN users u ON u.user_id = c.user_id
+        WHERE c.broadcast_id=? AND c.is_deleted=0
+        ORDER BY {order}
+        LIMIT ? OFFSET ?
+        """,
+        (user_id or 0, broadcast_id, limit, offset),
+    )
+    rows = cur.fetchall()
+    cur.execute(
+        "SELECT COUNT(*) AS c FROM broadcast_comments WHERE broadcast_id=? AND is_deleted=0",
+        (broadcast_id,),
+    )
+    total = cur.fetchone()["c"]
+    conn.close()
+    return {
+        "comments": [_serialize_comment(r, user_id) for r in rows],
+        "total": total,
+    }
+
+
+@app.post("/api/broadcast/{broadcast_id}/comment")
+async def broadcast_post_comment(
+    broadcast_id: int, req: CommentRequest, request: Request
+):
+    user = get_current_user(request)
+    user_id = int(user["id"])
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty comment")
+    if len(text) > 1000:
+        raise HTTPException(status_code=400, detail="Comment too long (max 1000)")
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO broadcast_comments(broadcast_id, user_id, parent_id, text) VALUES(?,?,?,?)",
+        (broadcast_id, user_id, req.parent_id, text),
+    )
+    cid = cur.lastrowid
+    conn.commit()
+    cur.execute(
+        """
+        SELECT c.id, c.broadcast_id, c.user_id, c.parent_id, c.text, c.created_at,
+               u.first_name, u.username, u.photo_url,
+               0 AS likes_count, 0 AS my_liked
+        FROM broadcast_comments c
+        LEFT JOIN users u ON u.user_id = c.user_id
+        WHERE c.id=?
+        """,
+        (cid,),
+    )
+    r = cur.fetchone()
+    conn.close()
+    return _serialize_comment(r, user_id)
+
+
+@app.post("/api/comment/{comment_id}/like")
+async def comment_like_toggle(comment_id: int, request: Request):
+    user = get_current_user(request)
+    user_id = int(user["id"])
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM comment_likes WHERE comment_id=? AND user_id=?",
+        (comment_id, user_id),
+    )
+    if cur.fetchone():
+        cur.execute(
+            "DELETE FROM comment_likes WHERE comment_id=? AND user_id=?",
+            (comment_id, user_id),
+        )
+        my_liked = False
+    else:
+        cur.execute(
+            "INSERT INTO comment_likes(comment_id, user_id) VALUES(?,?)",
+            (comment_id, user_id),
+        )
+        my_liked = True
+    conn.commit()
+    cur.execute(
+        "SELECT COUNT(*) AS c FROM comment_likes WHERE comment_id=?", (comment_id,)
+    )
+    likes_count = cur.fetchone()["c"]
+    conn.close()
+    return {"my_liked": my_liked, "likes_count": likes_count}
+
+
+@app.delete("/api/comment/{comment_id}")
+async def comment_delete(comment_id: int, request: Request):
+    user = get_current_user(request)
+    user_id = int(user["id"])
+    conn = _social_db()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM broadcast_comments WHERE id=?", (comment_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Not found")
+    is_owner = row["user_id"] == user_id
+    is_admin = user_id in (ADMIN_IDS if "ADMIN_IDS" in globals() else set())
+    if not (is_owner or is_admin):
+        conn.close()
+        raise HTTPException(status_code=403, detail="Forbidden")
+    cur.execute("UPDATE broadcast_comments SET is_deleted=1 WHERE id=?", (comment_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+# Patch to add /api/drivers/career/batch and /api/teams/career/batch
+# Inserted at end of api.py
+
+# ============ BATCH CAREER ENDPOINTS ============
+
+@app.get("/api/drivers/career/batch")
+async def get_drivers_career_batch(ids: str):
+    """Batch career stats for multiple drivers. ids = comma-separated driver_ids.
+    Returns {drivers: {id: data, ...}, missing: [ids without cache]}.
+    Cache-only — cold misses are NOT auto-filled (cron prewarmer handles that)."""
+    driver_ids = [x.strip() for x in ids.split(",") if x.strip()]
+    if not driver_ids or len(driver_ids) > 30:
+        raise HTTPException(status_code=400, detail="1-30 ids required")
+    out = {}
+    missing = []
+    for did in driver_ids:
+        data = _career_get(f"drv_career_{did}")
+        if data:
+            out[did] = data
+        else:
+            missing.append(did)
+    return {"drivers": out, "missing": missing}
+
+
+@app.get("/api/teams/career/batch")
+async def get_teams_career_batch(ids: str):
+    """Batch career stats for multiple constructors. ids = comma-separated constructor_ids."""
+    constructor_ids = [x.strip() for x in ids.split(",") if x.strip()]
+    if not constructor_ids or len(constructor_ids) > 15:
+        raise HTTPException(status_code=400, detail="1-15 ids required")
+    out = {}
+    missing = []
+    for cid in constructor_ids:
+        data = _career_get(f"team_career_{cid}")
+        if data:
+            out[cid] = data
+        else:
+            missing.append(cid)
+    return {"teams": out, "missing": missing}
