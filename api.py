@@ -2850,3 +2850,193 @@ async def get_teams_career_batch(ids: str):
         else:
             missing.append(cid)
     return {"teams": out, "missing": missing}
+
+# ============ AUTO-SETTLE LOOP ============
+
+async def _settle_round_impl(race_round: int, season: int = None) -> dict:
+    """Internal settle logic, callable from admin endpoint or background loop."""
+    s = season or CURRENT_SEASON
+    results = await f1_data.get_race_results(race_round, season=s)
+    if "error" in results:
+        return {"error": results["error"], "settled": 0}
+    race_results = results.get("results", [])
+    if not race_results:
+        return {"error": "No results", "settled": 0}
+
+    winner = race_results[0]["driver_number"]
+    podium = [r["driver_number"] for r in race_results[:3]]
+    dnf_count = results.get("dnf_count", 0)
+    fastest_lap_driver = results.get("fastest_lap_driver")
+    rc_data = await f1_data.get_live_race_control()
+    had_safety_car = any(
+        msg.get("category") in ("SafetyCar", "VirtualSafetyCar")
+        for msg in rc_data.get("messages", [])
+    )
+
+    predictions = db.get_pending_predictions(race_round, s)
+    if not predictions and s != 2025:
+        predictions = db.get_pending_predictions(race_round, 2025)
+    settled = 0
+
+    for pred in predictions:
+        points = 0
+        status = "incorrect"
+        ptype = pred["prediction_type"]
+        try:
+            pvalue = json.loads(pred["prediction_value"]) if isinstance(pred["prediction_value"], str) else pred["prediction_value"]
+        except (json.JSONDecodeError, TypeError):
+            pvalue = pred["prediction_value"]
+
+        if ptype == "winner" and pvalue == winner:
+            points, status = PREDICTION_POINTS["winner"]["correct"], "correct"
+        elif ptype == "podium" and isinstance(pvalue, list):
+            matches = len(set(pvalue) & set(podium))
+            if matches == 3:
+                points, status = PREDICTION_POINTS["podium"]["all_3"], "correct"
+            elif matches == 2:
+                points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
+            elif matches == 1:
+                points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
+        elif ptype == "fastest_lap" and pvalue == fastest_lap_driver:
+            points, status = PREDICTION_POINTS["fastest_lap"]["correct"], "correct"
+        elif ptype == "dnf_count":
+            try:
+                diff = abs(int(pvalue) - dnf_count)
+                if diff == 0:
+                    points, status = PREDICTION_POINTS["dnf_count"]["exact"], "correct"
+                elif diff == 1:
+                    points, status = PREDICTION_POINTS["dnf_count"]["off_by_1"], "partial"
+            except (ValueError, TypeError):
+                pass
+        elif ptype == "safety_car":
+            predicted_yes = pvalue in (True, "yes", "true")
+            if predicted_yes == had_safety_car:
+                points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
+
+        db.resolve_prediction(pred["id"], status, points)
+        if points > 0:
+            db.add_user_points(pred["user_id"], points)
+        if status == "correct":
+            db.execute_write(
+                "UPDATE users SET predictions_correct=predictions_correct+1, streak=streak+1, max_streak=MAX(max_streak,streak+1) WHERE user_id=?",
+                (pred["user_id"],)
+            )
+        elif status == "incorrect":
+            db.execute_write("UPDATE users SET streak=0 WHERE user_id=?", (pred["user_id"],))
+
+        db.check_and_award_achievements(pred["user_id"])
+        settled += 1
+
+    f1_data.cache_clear("leaderboard")
+    db.update_leaderboard()
+    return {"settled": settled, "race_round": race_round, "season": s}
+
+
+async def _auto_settle_loop():
+    """Background loop: every 10 min, settle predictions for races that finished 3+ hours ago."""
+    await _asyncio.sleep(60)  # warmup
+    while True:
+        try:
+            schedule = await f1_data.get_schedule(CURRENT_SEASON)
+            now = datetime.utcnow()
+            for race in schedule.get("races", []):
+                if not race.get("race_datetime"):
+                    continue
+                try:
+                    race_dt = datetime.fromisoformat(race["race_datetime"].replace("Z", ""))
+                except (ValueError, TypeError):
+                    continue
+                hours_past = (now - race_dt).total_seconds() / 3600
+                # Settle window: race finished 3h-72h ago (so we don't churn forever)
+                if not (3 < hours_past < 72):
+                    continue
+                race_round = race.get("round")
+                if not race_round:
+                    continue
+                # Check if any pending predictions for this round/season
+                pending = db.get_pending_predictions(race_round, CURRENT_SEASON)
+                if not pending:
+                    continue
+                _push_log.info(f"auto-settle: round {race_round} has {len(pending)} pending, settling...")
+                try:
+                    result = await _settle_round_impl(race_round, CURRENT_SEASON)
+                    _push_log.info(f"auto-settle round {race_round}: {result}")
+                except Exception as e:
+                    _push_log.error(f"auto-settle error for round {race_round}: {e}")
+        except Exception as e:
+            _push_log.error(f"auto-settle loop error: {e}")
+        await _asyncio.sleep(600)  # every 10 min
+
+
+@app.on_event("startup")
+async def _start_auto_settle_loop():
+    _asyncio.create_task(_auto_settle_loop())
+
+# ============ BROADCAST THUMBNAIL HELPER ============
+
+async def _resolve_thumbnail_url(video_url: str, embed_url: str = None) -> str | None:
+    """Extract thumbnail URL for a video. Supports YouTube (direct), Rutube (API),
+    falls back to None for unsupported providers. Server-side — bypasses CORS/UA issues."""
+    import re, httpx
+    url = video_url or embed_url or ""
+    # YouTube
+    m = re.search(r'(?:youtube\.com/(?:watch\?v=|embed/|shorts/)|youtu\.be/)([\w-]{6,})', url)
+    if m:
+        return f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg"
+    # Rutube
+    m = re.search(r'rutube\.ru/(?:video|play/embed)/([a-f0-9]+)', url)
+    if m:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(
+                    f"https://rutube.ru/api/video/{m.group(1)}/",
+                    headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+                )
+                if r.status_code == 200:
+                    return (r.json() or {}).get("thumbnail_url")
+        except Exception:
+            pass
+    return None
+
+
+async def _backfill_broadcast_thumbnails():
+    """One-time task: populate thumbnail_url for all broadcasts that don't have one."""
+    import sqlite3
+    conn = sqlite3.connect("/app/data/f1hub.db")
+    conn.row_factory = sqlite3.Row
+    # Ensure column exists
+    try:
+        conn.execute("ALTER TABLE broadcasts ADD COLUMN thumbnail_url TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    rows = conn.execute(
+        "SELECT id, video_url, embed_url FROM broadcasts WHERE thumbnail_url IS NULL OR thumbnail_url = ''"
+    ).fetchall()
+    updated = 0
+    for row in rows:
+        thumb = await _resolve_thumbnail_url(row["video_url"], row["embed_url"])
+        if thumb:
+            conn.execute("UPDATE broadcasts SET thumbnail_url=? WHERE id=?", (thumb, row["id"]))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return updated
+
+
+async def _thumbnail_backfill_loop():
+    """Background loop: every hour, backfill broadcast thumbnails."""
+    await _asyncio.sleep(45)  # warmup
+    while True:
+        try:
+            n = await _backfill_broadcast_thumbnails()
+            if n > 0:
+                _push_log.info(f"broadcast thumbnail backfill: {n} updated")
+        except Exception as e:
+            _push_log.error(f"thumbnail backfill error: {e}")
+        await _asyncio.sleep(3600)  # 1 hour
+
+
+@app.on_event("startup")
+async def _start_thumbnail_backfill():
+    _asyncio.create_task(_thumbnail_backfill_loop())

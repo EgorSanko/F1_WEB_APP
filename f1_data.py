@@ -719,7 +719,7 @@ async def get_next_race(season: int = None) -> Dict[str, Any]:
     """Get the next upcoming race with full details."""
     s = season or CURRENT_SEASON
     nrc_key = f"next_race:{s}"
-    cached = cache_get(nrc_key, ttl_override=1800)
+    cached = cache_get(nrc_key, ttl_override=300)
     if cached:
         return cached
 
@@ -731,7 +731,7 @@ async def get_next_race(season: int = None) -> Dict[str, Any]:
             try:
                 race_dt = datetime.fromisoformat(race["race_datetime"].replace("Z", ""))
                 # Include races up to 6 hours after start (still might be going)
-                if race_dt + timedelta(hours=6) > now:
+                if race_dt + timedelta(hours=3) > now:
                     cache_set(nrc_key, race)
                     return race
             except (ValueError, TypeError):
@@ -791,7 +791,7 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
             "fastest_lap_rank": fl_rank,
             "fastest_lap_lap": int(r.get("FastestLap", {}).get("lap", 0) or 0),
             "avg_speed": r.get("FastestLap", {}).get("AverageSpeed", {}).get("speed", ""),
-        })
+        }, season=s)
         results.append(entry)
 
     response = {
@@ -837,7 +837,7 @@ async def get_last_race(season: int = None) -> Dict[str, Any]:
             "status": r.get("status", ""),
             "grid": int(r.get("grid", 0)),
             "fastest_lap_rank": int(r.get("FastestLap", {}).get("rank", 0) or 0),
-        }))
+        }, season=s))
 
     response = {
         "round": int(race["round"]),
@@ -3305,7 +3305,7 @@ async def get_points_progression(season: int = None) -> Dict[str, Any]:
     """Get cumulative points per driver across all rounds of a season."""
     s = season or CURRENT_SEASON
     cache_key = f"points_progression:{s}"
-    cached = cache_get(cache_key, ttl_override=1800)
+    cached = cache_get(cache_key, ttl_override=300)
     if cached:
         return cached
 
