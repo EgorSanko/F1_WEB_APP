@@ -103,6 +103,70 @@ def cache_get(key: str, ttl_override: int = None) -> Optional[Any]:
 def cache_set(key: str, data: Any):
     """Set cache value."""
     _cache[key] = {"data": data, "time": time.time()}
+    try:
+        if "_should_snapshot" in globals() and _should_snapshot(key):
+            cache_snapshot_save()
+    except Exception:
+        pass
+
+
+def cache_get_stale(key: str) -> Optional[Any]:
+    """Return cached data ignoring TTL — fallback when upstream is down.
+    Refreshes the entry timestamp so subsequent reads are served fast from
+    cache_get instead of repeatedly hitting the dead upstream."""
+    entry = _cache.get(key)
+    if entry:
+        entry["time"] = time.time()
+        return entry["data"]
+    return None
+
+
+# Disk-persisted snapshot for outage resilience. Only "expensive"/critical keys
+# are snapshotted so the site keeps showing last-known-good data after a restart
+# even while Ergast/Jolpica is down.
+import os as _os
+import json as _json
+
+_SNAPSHOT_PATH = "/app/data/cache_snapshot.json"
+_SNAPSHOT_PREFIXES = (
+    "schedule", "standings_drivers", "standings_constructors",
+    "race_results", "qualifying_results",
+)
+
+
+def _should_snapshot(key: str) -> bool:
+    return key.split(":")[0] in _SNAPSHOT_PREFIXES
+
+
+def cache_snapshot_save():
+    """Persist snapshot-eligible cache entries to disk (best-effort)."""
+    try:
+        snap = {k: v for k, v in _cache.items() if _should_snapshot(k)}
+        tmp = _SNAPSHOT_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            _json.dump(snap, f, ensure_ascii=False)
+        _os.replace(tmp, _SNAPSHOT_PATH)
+    except Exception as e:
+        logger.warning(f"cache snapshot save failed: {e}")
+
+
+def cache_snapshot_load():
+    """Load snapshot from disk into _cache on startup (best-effort)."""
+    try:
+        if not _os.path.exists(_SNAPSHOT_PATH):
+            return 0
+        with open(_SNAPSHOT_PATH, encoding="utf-8") as f:
+            snap = _json.load(f)
+        n = 0
+        for k, v in snap.items():
+            if k not in _cache and isinstance(v, dict) and "data" in v:
+                _cache[k] = v
+                n += 1
+        logger.info(f"cache snapshot loaded: {n} keys")
+        return n
+    except Exception as e:
+        logger.warning(f"cache snapshot load failed: {e}")
+        return 0
 
 
 # Negative cache: remember 404s to avoid hammering upstream on non-existent resources
@@ -317,6 +381,14 @@ def ergast_season(season: int) -> str:
     return "current" if season == datetime.now().year else str(season)
 
 
+# Circuit breaker for Ergast/Jolpica: when upstream is down, fail fast instead
+# of hanging 48s per request (3 retries x 15s timeout).
+_ergast_fail_count = 0
+_ergast_breaker_until = 0.0
+_ERGAST_FAIL_THRESHOLD = 3      # consecutive failures to trip the breaker
+_ERGAST_BREAKER_COOLDOWN = 180  # seconds to stay "open" before a probe
+
+
 async def fetch_ergast(
     endpoint: str,
     retries: int = 2,
@@ -328,6 +400,15 @@ async def fetch_ergast(
     Fetch from Ergast/Jolpica API with rate limiting and retry.
     Returns MRData dict or None on failure.
     """
+    global _ergast_fail_count, _ergast_breaker_until
+    # Circuit breaker: if upstream recently failed repeatedly, fail fast.
+    if time.time() < _ergast_breaker_until:
+        return None
+    # While upstream is known-bad, probe cheaply (1 attempt, no retries/backoff)
+    # so the periodic probe request doesn't hang ~48s.
+    if _ergast_fail_count >= _ERGAST_FAIL_THRESHOLD:
+        retries = 0
+
     await _ergast_limiter.acquire()
     client = get_client()
     url = f"{ERGAST_API}/{endpoint}.json"
@@ -343,6 +424,8 @@ async def fetch_ergast(
         try:
             resp = await client.get(url)
             if resp.status_code == 200:
+                _ergast_fail_count = 0
+                _ergast_breaker_until = 0.0
                 return resp.json().get("MRData", {})
             elif resp.status_code == 429:
                 wait = min(retry_delay * (2 ** attempt), 10)
@@ -362,6 +445,14 @@ async def fetch_ergast(
                 await asyncio.sleep(retry_delay * (attempt + 1))
             continue
 
+    # All attempts failed — trip the circuit breaker.
+    _ergast_fail_count += 1
+    if _ergast_fail_count >= _ERGAST_FAIL_THRESHOLD:
+        _ergast_breaker_until = time.time() + _ERGAST_BREAKER_COOLDOWN
+        logger.warning(
+            f"Ergast circuit breaker OPEN for {_ERGAST_BREAKER_COOLDOWN}s "
+            f"after {_ergast_fail_count} failures"
+        )
     return None
 
 
@@ -633,6 +724,9 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
     endpoint = ergast_season(s)
     data = await fetch_ergast(endpoint)
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"season": str(s), "races": [], "error": "Failed to fetch schedule"}
 
     races = data.get("RaceTable", {}).get("Races", [])
@@ -756,6 +850,9 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/results")
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"error": "Failed to fetch results", "round": round_num}
 
     races = data.get("RaceTable", {}).get("Races", [])
@@ -820,6 +917,9 @@ async def get_last_race(season: int = None) -> Dict[str, Any]:
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/last/results")
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"error": "Failed to fetch last race"}
 
     races = data.get("RaceTable", {}).get("Races", [])
@@ -865,6 +965,9 @@ async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/qualifying")
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"error": "Failed to fetch qualifying", "round": round_num}
 
     races = data.get("RaceTable", {}).get("Races", [])
@@ -906,6 +1009,9 @@ async def get_driver_standings(season: int = None) -> Dict[str, Any]:
     endpoint = f"{ergast_season(s)}/driverStandings"
     data = await fetch_ergast(endpoint)
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"standings": [], "error": "Failed to fetch standings"}
 
     standings_lists = data.get("StandingsTable", {}).get("StandingsLists", [])
@@ -982,6 +1088,9 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
     endpoint = f"{ergast_season(s)}/constructorStandings"
     data = await fetch_ergast(endpoint)
     if not data:
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale
         return {"standings": [], "error": "Failed to fetch constructor standings"}
 
     drivers_dict = get_drivers(s)
@@ -1764,9 +1873,19 @@ async def get_home_data(season: int = None) -> Dict[str, Any]:
     This is the 'heavy' Stage 2 load.
     """
     s = season or CURRENT_SEASON
+
+    async def _last_race_bounded():
+        # last_race has no snapshot fallback; bound it so a dead upstream never
+        # makes the home screen hang. Stale/cached returns instantly anyway.
+        try:
+            return await asyncio.wait_for(get_last_race(s), timeout=1.5)
+        except (asyncio.TimeoutError, Exception):
+            stale = cache_get_stale(f"race_results:last:{s}")
+            return stale if stale is not None else {"error": "unavailable"}
+
     next_race, last_race, standings = await asyncio.gather(
         get_next_race(s),
-        get_last_race(s),
+        _last_race_bounded(),
         get_driver_standings(s),
     )
 

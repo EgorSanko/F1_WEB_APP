@@ -23,6 +23,11 @@ from pydantic import BaseModel
 import re
 import database as db
 import f1_data
+try:
+    _snap_n = f1_data.cache_snapshot_load()
+    print(f"[startup] cache snapshot loaded: {_snap_n} keys")
+except Exception as _e:
+    print(f"[startup] cache snapshot load failed: {_e}")
 from config import (
     normalize_team_name,
     TELEGRAM_TOKEN, WEBAPP_URL, ADMIN_IDS,
@@ -3040,3 +3045,37 @@ async def _thumbnail_backfill_loop():
 @app.on_event("startup")
 async def _start_thumbnail_backfill():
     _asyncio.create_task(_thumbnail_backfill_loop())
+
+# ============ BACKGROUND DATA REFRESHER ============
+# Periodically force-refresh critical keys so the BACKGROUND task (not users)
+# absorbs upstream fetch latency, and so real data auto-recovers when
+# Ergast/Jolpica returns (re-populating the disk snapshot via cache_set).
+# Between refreshes, cache_get_stale keeps user requests fast even if upstream
+# is down (it refreshes the entry timestamp on serve).
+
+async def _force_refresh_loop():
+    await _asyncio.sleep(40)  # warmup
+    while True:
+        try:
+            for key in (f"schedule:{CURRENT_SEASON}",
+                        f"standings_drivers:{CURRENT_SEASON}",
+                        f"standings_constructors:{CURRENT_SEASON}",
+                        f"race_results:last:{CURRENT_SEASON}"):
+                ent = f1_data._cache.get(key)
+                if ent:
+                    ent["time"] = 0  # expire so the get_* below does a real fetch
+            await f1_data.get_schedule(CURRENT_SEASON)
+            await _asyncio.sleep(2)
+            await f1_data.get_driver_standings(CURRENT_SEASON)
+            await _asyncio.sleep(2)
+            await f1_data.get_constructor_standings(CURRENT_SEASON)
+            await _asyncio.sleep(2)
+            await f1_data.get_last_race(CURRENT_SEASON)
+        except Exception as e:
+            _push_log.error(f"force refresh: {e}")
+        await _asyncio.sleep(600)  # every 10 min
+
+
+@app.on_event("startup")
+async def _start_data_refresh():
+    _asyncio.create_task(_force_refresh_loop())
