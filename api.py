@@ -991,6 +991,48 @@ async def get_teams_list(season: int = CURRENT_SEASON):
 
 # ============ PREDICTIONS ============
 
+async def _get_race_by_round(round_num: int, season: int):
+    """Return the schedule entry for a given round, or None."""
+    sched = await f1_data.get_schedule(season)
+    for r in sched.get("races", []):
+        if r.get("round") == round_num:
+            return r
+    return None
+
+
+def _predictions_locked(race: dict) -> bool:
+    """True if predictions for this race are closed (the race has started).
+    Deadline = race start time (lights out)."""
+    if not race:
+        return True
+    dt = race.get("race_datetime")
+    if not dt:
+        # No known start time — be safe and lock if marked past.
+        return bool(race.get("is_past"))
+    try:
+        race_dt = datetime.fromisoformat(dt.replace("Z", ""))
+        return datetime.utcnow() >= race_dt
+    except (ValueError, TypeError):
+        return bool(race.get("is_past"))
+
+
+async def _next_open_race(season: int):
+    """First race whose start is strictly in the future — the only race that
+    accepts predictions. Ignores the +3h 'still live' buffer used elsewhere."""
+    sched = await f1_data.get_schedule(season)
+    now = datetime.utcnow()
+    for r in sched.get("races", []):
+        dt = r.get("race_datetime")
+        if not dt:
+            continue
+        try:
+            if datetime.fromisoformat(dt.replace("Z", "")) > now:
+                return r
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
 class PredictionRequest(BaseModel):
     race_round: int
     season: int = 2026
@@ -1184,9 +1226,9 @@ async def get_team_career(constructor_id: str):
 @app.get("/api/predictions/available")
 async def predictions_available(request: Request):
     tg_user = get_current_user(request)
-    next_race = await f1_data.get_next_race()
+    next_race = await _next_open_race(CURRENT_SEASON)
 
-    if "round" not in next_race:
+    if not next_race or "round" not in next_race:
         return {"available": False, "message": "No upcoming race"}
 
     existing = db.get_user_predictions(tg_user["id"], next_race["round"], CURRENT_SEASON)
@@ -1215,6 +1257,14 @@ async def make_prediction(body: PredictionRequest, request: Request):
     valid_types = {"winner", "podium", "fastest_lap", "dnf_count", "safety_car"}
     if body.prediction_type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Invalid type: {body.prediction_type}")
+
+    # Anti-fraud: predictions close at race start. Reject bets on a race that
+    # has already started or finished (validated server-side, not just in UI).
+    race = await _get_race_by_round(body.race_round, body.season)
+    if race is None:
+        raise HTTPException(status_code=404, detail="Гонка не найдена")
+    if _predictions_locked(race):
+        raise HTTPException(status_code=403, detail="Прогнозы на эту гонку закрыты — гонка уже началась")
 
     val = body.prediction_value
     if body.prediction_type == "winner" and not isinstance(val, int):
