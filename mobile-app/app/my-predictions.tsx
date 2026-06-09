@@ -349,7 +349,8 @@ function Header({ onBack, title }: { onBack: () => void; title: string }) {
 
 function formatValue(type: PredictionType, value: unknown): string {
   if (value == null) return '—';
-  if (type === 'safety_car') return value === true || value === 'yes' ? 'Да' : 'Нет';
+  if (type === 'safety_car')
+    return [true, 'yes', 'true', 1, '1'].includes(value as never) ? 'Да' : 'Нет';
   if (type === 'dnf_count') return `${value} сходов`;
   if (type === 'podium' && Array.isArray(value)) {
     return value.map((n) => `#${n}`).join(' → ');
