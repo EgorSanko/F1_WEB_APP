@@ -2435,6 +2435,57 @@ async def proxy_stream(request: Request, url: str):
         raise HTTPException(status_code=502, detail=str(e))
 
 
+async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
+    """Determine if a (finished) race had a Safety Car, using that race's own
+    OpenF1 session race-control history. Robust post-race, unlike live data."""
+    import httpx as _hx
+    try:
+        race = await _get_race_by_round(race_round, season)
+        if not race:
+            return False
+        # Match the OpenF1 Race session by date.
+        race_dt = (race.get("race_datetime") or "")[:10]  # YYYY-MM-DD
+        country = race.get("country", "")
+        async with _hx.AsyncClient(timeout=15) as c:
+            sessions = (await c.get(
+                "https://api.openf1.org/v1/sessions",
+                params={"year": season, "session_name": "Race"},
+            )).json()
+        session_key = None
+        for s in sessions:
+            if (s.get("date_start", "") or "")[:10] == race_dt:
+                session_key = s.get("session_key"); break
+        if session_key is None and country:
+            for s in sessions:
+                if s.get("country_name") == country:
+                    session_key = s.get("session_key"); break
+        if session_key is None:
+            return False
+        rc = None
+        for _attempt in range(3):
+            async with _hx.AsyncClient(timeout=15) as c:
+                resp = await c.get(
+                    "https://api.openf1.org/v1/race_control",
+                    params={"session_key": session_key},
+                )
+            if resp.status_code == 200:
+                rc = resp.json()
+                break
+            await _aio.sleep(2 * (_attempt + 1))  # back off on 429/5xx
+        if not isinstance(rc, list):
+            logger.warning(f"SC detection round {race_round}: race_control unavailable")
+            return False
+        for m in rc:
+            cat = m.get("category", "")
+            msg = (m.get("message", "") or "").upper()
+            if cat in ("SafetyCar", "VirtualSafetyCar") or "SAFETY CAR DEPLOYED" in msg or "VIRTUAL SAFETY CAR" in msg:
+                return True
+        return False
+    except Exception as e:
+        logger.warning(f"SC detection for round {race_round} failed: {e}")
+        return False
+
+
 # ============ ADMIN ============
 
 @app.post("/api/admin/settle/{race_round}")
@@ -2457,12 +2508,8 @@ async def admin_settle(race_round: int, request: Request, season: int = 0):
     dnf_count = results.get("dnf_count", 0)
     fastest_lap_driver = results.get("fastest_lap_driver")
 
-    # Determine safety car from OpenF1 race control data
-    rc_data = await f1_data.get_live_race_control()
-    had_safety_car = any(
-        msg.get("category") in ("SafetyCar", "VirtualSafetyCar")
-        for msg in rc_data.get("messages", [])
-    )
+    # Determine safety car from the race's own session history (robust post-race).
+    had_safety_car = await _had_safety_car_for_round(race_round, CURRENT_SEASON)
 
     pred_season = season if season > 0 else CURRENT_SEASON
     # Also try 2025 season for old predictions
@@ -2922,11 +2969,8 @@ async def _settle_round_impl(race_round: int, season: int = None) -> dict:
     podium = [r["driver_number"] for r in race_results[:3]]
     dnf_count = results.get("dnf_count", 0)
     fastest_lap_driver = results.get("fastest_lap_driver")
-    rc_data = await f1_data.get_live_race_control()
-    had_safety_car = any(
-        msg.get("category") in ("SafetyCar", "VirtualSafetyCar")
-        for msg in rc_data.get("messages", [])
-    )
+    # SC from the race's own session history (robust post-race, works in auto-settle).
+    had_safety_car = await _had_safety_car_for_round(race_round, s)
 
     predictions = db.get_pending_predictions(race_round, s)
     if not predictions and s != 2025:
