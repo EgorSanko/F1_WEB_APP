@@ -33,6 +33,43 @@ def api_get(path):
         return None
 
 
+def _openf1(url):
+    try:
+        r = urllib.request.urlopen(url, timeout=20)
+        return json.loads(r.read())
+    except Exception as e:
+        log.error(f"openf1 error {url}: {e}")
+        return None
+
+
+def had_safety_car_openf1(season, race_date, country):
+    """SC from the race's OWN OpenF1 session race-control history.
+    Returns True/False if determinable, None if OpenF1 has no data yet
+    (so we keep predictions pending and retry on the next run)."""
+    sessions = _openf1(f"https://api.openf1.org/v1/sessions?year={season}&session_name=Race")
+    if not isinstance(sessions, list):
+        return None
+    key = None
+    for s in sessions:
+        if (s.get("date_start") or "")[:10] == (race_date or "")[:10]:
+            key = s.get("session_key"); break
+    if key is None and country:
+        for s in sessions:
+            if s.get("country_name") == country:
+                key = s.get("session_key"); break
+    if key is None:
+        return None
+    rc = _openf1(f"https://api.openf1.org/v1/race_control?session_key={key}")
+    if not isinstance(rc, list) or not rc:
+        return None
+    for m in rc:
+        cat = m.get("category", "")
+        msg = (m.get("message", "") or "").upper()
+        if cat in ("SafetyCar", "VirtualSafetyCar") or "SAFETY CAR DEPLOYED" in msg or "VIRTUAL SAFETY CAR" in msg:
+            return True
+    return False
+
+
 def main():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -68,29 +105,14 @@ def main():
         dnf_count = results.get("dnf_count", 0)
         fastest_lap_driver = results.get("fastest_lap_driver")
 
-        # Safety car - check live_race_control DB table first, fallback to API
-        had_safety_car = True  # Default to True
-        sc_from_db = conn.execute(
-            """SELECT COUNT(*) as cnt FROM live_race_control rc
-               JOIN live_sessions s ON rc.session_id = s.id
-               WHERE rc.category IN ('SafetyCar', 'VirtualSafetyCar')
-               AND s.session_type = 'Race'
-               ORDER BY s.ended_at DESC LIMIT 1"""
-        ).fetchone()
-        if sc_from_db and sc_from_db["cnt"] is not None:
-            # We have DB data — use it
-            had_safety_car = sc_from_db["cnt"] > 0
-        else:
-            # Fallback: try API
-            rc_data = api_get("/api/live/dashboard")
-            if rc_data and rc_data.get("race_control", {}).get("messages"):
-                msgs = rc_data["race_control"]["messages"]
-                has_sc = any(
-                    m.get("category") in ("SafetyCar", "VirtualSafetyCar")
-                    for m in msgs
-                )
-                if msgs:
-                    had_safety_car = has_sc
+        # Safety car detection from the race's own OpenF1 session history (authoritative).
+        # None => OpenF1 has no data yet; safety_car preds stay pending and retry next run.
+        _sched = api_get(f"/api/schedule?season={season}") or {}
+        _race = next((x for x in _sched.get("races", []) if x.get("round") == race_round), {})
+        had_safety_car = had_safety_car_openf1(
+            season, (_race.get("race_datetime") or "")[:10], _race.get("country", "")
+        )
+        log.info(f"  R{race_round} safety_car={had_safety_car}")
 
         predictions = conn.execute(
             "SELECT * FROM predictions WHERE race_round = ? AND season = ? AND status = 'pending'",
@@ -132,6 +154,9 @@ def main():
                 except (ValueError, TypeError):
                     pass
             elif ptype == "safety_car":
+                if had_safety_car is None:
+                    # Skip — keep as pending until manually resolved
+                    continue
                 predicted_yes = pvalue in (True, "yes", "true")
                 if predicted_yes == had_safety_car:
                     points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
