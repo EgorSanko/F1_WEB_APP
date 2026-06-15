@@ -63,9 +63,10 @@ def had_safety_car_openf1(season, race_date, country):
     if not isinstance(rc, list) or not rc:
         return None
     for m in rc:
-        cat = m.get("category", "")
         msg = (m.get("message", "") or "").upper()
-        if cat in ("SafetyCar", "VirtualSafetyCar") or "SAFETY CAR DEPLOYED" in msg or "VIRTUAL SAFETY CAR" in msg:
+        # FULL Safety Car only — exclude Virtual SC (VSC). OpenF1 tags VSC under
+        # category "SafetyCar" with message "VSC DEPLOYED"; match on message text.
+        if "SAFETY CAR DEPLOYED" in msg and "VIRTUAL" not in msg and "VSC" not in msg:
             return True
     return False
 

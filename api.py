@@ -2476,9 +2476,11 @@ async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
             logger.warning(f"SC detection round {race_round}: race_control unavailable")
             return False
         for m in rc:
-            cat = m.get("category", "")
             msg = (m.get("message", "") or "").upper()
-            if cat in ("SafetyCar", "VirtualSafetyCar") or "SAFETY CAR DEPLOYED" in msg or "VIRTUAL SAFETY CAR" in msg:
+            # FULL Safety Car only — exclude Virtual SC (VSC). OpenF1 tags VSC
+            # under category "SafetyCar" with message "VSC DEPLOYED", so we match
+            # on the message text, not the category.
+            if "SAFETY CAR DEPLOYED" in msg and "VIRTUAL" not in msg and "VSC" not in msg:
                 return True
         return False
     except Exception as e:
