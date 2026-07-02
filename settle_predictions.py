@@ -162,10 +162,15 @@ def main():
                 if predicted_yes == had_safety_car:
                     points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
 
-            conn.execute(
-                "UPDATE predictions SET status=?, points_won=?, resolved_at=CURRENT_TIMESTAMP WHERE id=?",
+            # Atomic guard: resolve only if still pending. The in-app
+            # _auto_settle_loop may have already settled it — skip to avoid
+            # double-awarding points across the two settle processes.
+            cur = conn.execute(
+                "UPDATE predictions SET status=?, points_won=?, resolved_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'",
                 (status, points, pred["id"])
             )
+            if cur.rowcount != 1:
+                continue
             if points > 0:
                 conn.execute(
                     "UPDATE users SET points=points+? WHERE user_id=?",

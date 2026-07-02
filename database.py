@@ -212,6 +212,14 @@ CREATE TABLE IF NOT EXISTS live_timing_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_live_timing_session ON live_timing_snapshots(session_id);
 CREATE INDEX IF NOT EXISTS idx_live_timing_driver ON live_timing_snapshots(session_id, driver_number);
+
+CREATE TABLE IF NOT EXISTS auth_codes (
+    code TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
 """.format(initial_points=INITIAL_USER_POINTS)
 
 
@@ -220,6 +228,31 @@ def init_db():
     with get_db() as conn:
         conn.executescript(SCHEMA)
     print(f"[DB] Database initialized at {DATABASE_PATH}")
+
+
+# ============ AUTH CODES ============
+
+def create_auth_code(user_id: int) -> str:
+    """Generate a 6-char auth code for user, valid 5 min. Removes old codes."""
+    import random, string
+    execute_write("DELETE FROM auth_codes WHERE user_id = ?", (user_id,))
+    code = ''.join(random.choices(string.digits, k=6))
+    execute_write("INSERT INTO auth_codes (code, user_id) VALUES (?, ?)", (code, user_id))
+    return code
+
+
+def verify_auth_code(code: str):
+    """Verify code, return user_id if valid (unused, <5 min old). Marks as used."""
+    row = execute_one(
+        "SELECT user_id, created_at, used FROM auth_codes WHERE code = ?", (code,)
+    )
+    if not row or row["used"]:
+        return None
+    created = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S")
+    if (datetime.utcnow() - created).total_seconds() > 300:
+        return None
+    execute_write("UPDATE auth_codes SET used = 1 WHERE code = ?", (code,))
+    return row["user_id"]
 
 
 # ============ USER OPERATIONS ============
@@ -319,13 +352,21 @@ def get_pending_predictions(race_round: int, season: int) -> List[Dict[str, Any]
     )
 
 
-def resolve_prediction(prediction_id: int, status: str, points_won: int):
-    """Resolve a prediction with result."""
-    execute_write(
-        """UPDATE predictions SET status = ?, points_won = ?, resolved_at = CURRENT_TIMESTAMP
-           WHERE id = ?""",
-        (status, points_won, prediction_id)
-    )
+def resolve_prediction(prediction_id: int, status: str, points_won: int) -> bool:
+    """Resolve a prediction ONLY if it is still pending (atomic guard).
+
+    Two settle paths run in parallel — the Cronicle cron (settle_predictions.py,
+    every 30 min) and the in-app _auto_settle_loop (every 10 min). Without this
+    guard both could resolve the same prediction and double-award points.
+    Returns True only if THIS call actually resolved it, so the caller awards
+    points exactly once."""
+    with get_db() as conn:
+        cur = conn.execute(
+            """UPDATE predictions SET status = ?, points_won = ?, resolved_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND status = 'pending'""",
+            (status, points_won, prediction_id)
+        )
+        return cur.rowcount == 1
 
 
 # ============ GAME OPERATIONS ============

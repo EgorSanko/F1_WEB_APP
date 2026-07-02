@@ -2510,10 +2510,9 @@ async def admin_settle(race_round: int, request: Request, season: int = 0):
     dnf_count = results.get("dnf_count", 0)
     fastest_lap_driver = results.get("fastest_lap_driver")
 
-    # Determine safety car from the race's own session history (robust post-race).
-    had_safety_car = await _had_safety_car_for_round(race_round, CURRENT_SEASON)
-
     pred_season = season if season > 0 else CURRENT_SEASON
+    # Determine safety car from the race's own session history (robust post-race).
+    had_safety_car = await _had_safety_car_for_round(race_round, pred_season)
     # Also try 2025 season for old predictions
     predictions = db.get_pending_predictions(race_round, pred_season)
     if not predictions and pred_season != 2025:
@@ -2555,7 +2554,10 @@ async def admin_settle(race_round: int, request: Request, season: int = 0):
             if predicted_yes == had_safety_car:
                 points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
 
-        db.resolve_prediction(pred["id"], status, points)
+        # Atomic: resolve only if still pending. If the other settle path
+        # already handled it, skip — never double-award points.
+        if not db.resolve_prediction(pred["id"], status, points):
+            continue
         if points > 0:
             db.add_user_points(pred["user_id"], points)
         if status == "correct":
@@ -3014,7 +3016,10 @@ async def _settle_round_impl(race_round: int, season: int = None) -> dict:
             if predicted_yes == had_safety_car:
                 points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
 
-        db.resolve_prediction(pred["id"], status, points)
+        # Atomic: resolve only if still pending. If the other settle path
+        # already handled it, skip — never double-award points.
+        if not db.resolve_prediction(pred["id"], status, points):
+            continue
         if points > 0:
             db.add_user_points(pred["user_id"], points)
         if status == "correct":
@@ -3030,6 +3035,7 @@ async def _settle_round_impl(race_round: int, season: int = None) -> dict:
 
     f1_data.cache_clear("leaderboard")
     db.update_leaderboard()
+    logger.info(f"settle round={race_round} season={s} settled={settled} had_safety_car={had_safety_car}")
     return {"settled": settled, "race_round": race_round, "season": s}
 
 
