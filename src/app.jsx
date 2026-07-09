@@ -3045,6 +3045,9 @@ const F1VideoPlayer = ({src, title, poster, streamType}) => {
                     document.body.appendChild(plyrEl);
                     document.body.style.overflow = 'hidden';
                     try { tgApp?.requestFullscreen?.(); } catch(e) {}
+                    // TG лочит портрет в fullscreen — разрешаем поворот и просим landscape
+                    try { tgApp?.unlockOrientation?.(); } catch(e) {}
+                    try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(()=>{}); } catch(e) {}
                 });
 
                 p.on('exitfullscreen', () => {
@@ -3052,6 +3055,8 @@ const F1VideoPlayer = ({src, title, poster, streamType}) => {
                         origParent.insertBefore(plyrEl, origNext);
                     }
                     document.body.style.overflow = '';
+                    try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch(e) {}
+                    try { tgApp?.lockOrientation?.(); } catch(e) {}
                     try { tgApp?.exitFullscreen?.(); } catch(e) {}
                 });
             } else {
