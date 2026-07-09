@@ -1785,9 +1785,22 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
             <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>{'\u2190'} Видео</button>
 
-            <div style={{borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)'}}>
-                <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type}/>
-            </div>
+            {(() => {
+                // Нативные плееры провайдеров (как удобнее в TG): YouTube/Rutube/VK iframe.
+                const u = b.video_url || b.embed_url || '';
+                const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
+                const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+                const src = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1')
+                          : rt ? ('https://rutube.ru/play/embed/'+rt[1])
+                          : (b.embed_url || u);
+                return (
+                    <div style={{position:'relative',borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)',background:'#000',paddingTop:'56.25%'}}>
+                        <iframe src={src} title={title} frameBorder="0" allowFullScreen
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; screen-wake-lock"
+                                style={{position:'absolute',inset:0,width:'100%',height:'100%',border:0}}/>
+                    </div>
+                );
+            })()}
 
             <div style={{margin:'0 2px 14px'}}>
                 <div style={{fontSize:19,fontWeight:800,letterSpacing:-0.3}}>{names[b.session_type]||b.session_type}</div>
