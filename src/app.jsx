@@ -60,6 +60,13 @@ const api = {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return await res.json();
         } catch (err) { console.error('API POST ' + url + ':', err); return null; }
+    },
+    del: async (url) => {
+        try {
+            const res = await fetch(url, { method: 'DELETE', headers: _getAuthHeaders() });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return await res.json();
+        } catch (err) { console.error('API DELETE ' + url + ':', err); return null; }
     }
 };
 
@@ -1727,11 +1734,134 @@ const PredictionsPage = ({user}) => {
 
 // ==== PROFILE PAGE ====
 
+// ==== BROADCAST VIEW (app design: player + likes + comments) ====
+const _relTime = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso.replace(' ','T') + (iso.includes('Z')||iso.includes('+')?'':'Z'));
+    const s = Math.max(0, (Date.now() - d.getTime())/1000);
+    if (s < 60) return 'только что';
+    if (s < 3600) return Math.floor(s/60) + ' мин';
+    if (s < 86400) return Math.floor(s/3600) + ' ч';
+    return Math.floor(s/86400) + ' дн';
+};
+
+const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => {
+    const b = broadcast;
+    const [social, setSocial] = useState(null);
+    const [comments, setComments] = useState(null);
+    const [text, setText] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [reveal, setReveal] = useState(!spoilerFree);
+    const isAdmin = !!(user && window.__F1_ADMIN_IDS && window.__F1_ADMIN_IDS.includes(user.user_id));
+    const names = {race:'Гонка', qualifying:'Квалификация', sprint:'Спринт', sprint_qualifying:'Спринт-квалификация', fp1:'Практика 1', fp2:'Практика 2', fp3:'Практика 3', review:'Обзор'};
+    const title = (names[b.session_type]||b.session_type) + ' · ' + (raceName||'');
+
+    const loadSocial = () => api.get(`/api/broadcast/${b.id}/social`).then(setSocial);
+    const loadComments = () => api.get(`/api/broadcast/${b.id}/comments?sort=new&limit=50`).then(d=>setComments(d?d.comments:[]));
+    useEffect(() => { loadSocial(); loadComments(); }, [b.id]);
+
+    const toggleLike = async () => {
+        if (!user) return;
+        const r = await api.post(`/api/broadcast/${b.id}/like`, {});
+        if (r) setSocial(s => ({...(s||{}), likes_count: r.likes_count, my_liked: r.my_liked}));
+    };
+    const share = () => {
+        const url = 'https://f1hub.lead-seek.ru/';
+        if (navigator.share) navigator.share({title, url}).catch(()=>{});
+        else { try { navigator.clipboard.writeText(url); } catch(e){} }
+    };
+    const send = async () => {
+        const t = text.trim();
+        if (!t || !user) return;
+        setBusy(true);
+        const r = await api.post(`/api/broadcast/${b.id}/comment`, {text: t});
+        setBusy(false);
+        if (r) { setText(''); loadComments(); loadSocial(); }
+    };
+    const likeComment = async (id) => { if (!user) return; const r = await api.post(`/api/comment/${id}/like`, {}); if (r) loadComments(); };
+    const delComment = async (id) => { if (!confirm('Удалить комментарий?')) return; const r = await api.del(`/api/comment/${id}`); if (r) { loadComments(); loadSocial(); } };
+
+    return (
+        <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+            <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>{'\u2190'} Видео</button>
+
+            <div style={{borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)'}}>
+                <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type}/>
+            </div>
+
+            <div style={{margin:'0 2px 14px'}}>
+                <div style={{fontSize:19,fontWeight:800,letterSpacing:-0.3}}>{names[b.session_type]||b.session_type}</div>
+                <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:3}}>{raceName}{b.started_at ? ' · ' + new Date(b.started_at.replace(' ','T')).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}) : ''}</div>
+            </div>
+
+            {/* Actions: like / comments / share */}
+            <div style={{display:'flex',gap:8,marginBottom:16}}>
+                <button onClick={toggleLike} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'12px 0',borderRadius:14,border:'1px solid '+(social&&social.my_liked?'rgba(225,6,0,0.5)':'var(--f1-border)'),background:social&&social.my_liked?'rgba(225,6,0,0.15)':'var(--f1-card-solid)',color:social&&social.my_liked?'var(--f1-red)':'var(--f1-text)',fontFamily:'inherit',fontWeight:800,fontSize:13,cursor:'pointer'}}>
+                    {social&&social.my_liked?'\u2764\ufe0f':'\ud83e\udd0d'} {social?social.likes_count:'—'}
+                </button>
+                <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'12px 0',borderRadius:14,border:'1px solid var(--f1-border)',background:'var(--f1-card-solid)',fontWeight:800,fontSize:13}}>
+                    {'\ud83d\udcac'} {social?social.comments_count:'—'}
+                </div>
+                <button onClick={share} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'12px 0',borderRadius:14,border:'1px solid var(--f1-border)',background:'var(--f1-card-solid)',color:'var(--f1-text)',fontFamily:'inherit',fontWeight:800,fontSize:13,cursor:'pointer'}}>
+                    {'\ud83d\udce4'} Поделиться
+                </button>
+            </div>
+
+            {/* Comments */}
+            <div style={{fontSize:16,fontWeight:800,margin:'0 2px 12px'}}>Комментарии{social?` (${social.comments_count})`:''}</div>
+
+            {!reveal ? (
+                <div className="card" onClick={()=>setReveal(true)} style={{textAlign:'center',padding:'24px 16px',cursor:'pointer',border:'1px solid rgba(225,6,0,0.2)',marginBottom:16}}>
+                    <div style={{fontSize:28,marginBottom:8}}>{'\ud83d\ude48'}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:'var(--f1-red)'}}>Комментарии скрыты</div>
+                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>Могут содержать спойлеры результатов. Нажми, чтобы показать.</div>
+                </div>
+            ) : (<>
+                {/* Input */}
+                {user ? (
+                    <div style={{display:'flex',gap:8,marginBottom:16}}>
+                        <input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')send();}} placeholder="Написать комментарий..." maxLength={1000}
+                               style={{flex:1,background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',borderRadius:14,padding:'12px 14px',color:'var(--f1-text)',fontSize:14,fontFamily:'inherit',outline:'none'}}/>
+                        <button onClick={send} disabled={busy||!text.trim()} style={{width:46,borderRadius:14,border:'none',background:text.trim()?'var(--f1-red)':'var(--f1-card-solid)',color:'#fff',fontSize:16,cursor:'pointer',fontFamily:'inherit',opacity:busy?0.5:1}}>{'\u27a4'}</button>
+                    </div>
+                ) : (
+                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:14,textAlign:'center'}}>Войди, чтобы комментировать</div>
+                )}
+
+                <div style={{display:'flex',flexDirection:'column',gap:14,paddingBottom:20}}>
+                    {comments === null && <F1MiniLoader/>}
+                    {comments && comments.length === 0 && <div style={{textAlign:'center',color:'var(--f1-text-muted)',fontSize:13,padding:'20px 0'}}>Будь первым {'\ud83d\udcac'}</div>}
+                    {(comments||[]).map(c => {
+                        const canDel = c.is_mine || isAdmin;
+                        return (
+                            <div key={c.id} style={{display:'flex',gap:10}}>
+                                {c.user_photo_url ? <img src={c.user_photo_url} alt="" style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,background:'var(--f1-card-hover)'}} onError={e=>{e.target.style.display='none'}}/> : <div style={{width:34,height:34,borderRadius:'50%',background:'var(--f1-card-hover)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0}}>{'\ud83d\udc64'}</div>}
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                        <span style={{fontSize:13,fontWeight:800}}>{c.user_name}</span>
+                                        {c.is_mine && <span style={{background:'rgba(225,6,0,0.15)',color:'var(--f1-red)',fontSize:9,fontWeight:800,letterSpacing:0.5,padding:'1px 6px',borderRadius:4}}>ВЫ</span>}
+                                        <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{_relTime(c.created_at)}</span>
+                                    </div>
+                                    <div style={{fontSize:13.5,lineHeight:'18px',marginTop:4,wordBreak:'break-word'}}>{c.text}</div>
+                                    <div style={{display:'flex',alignItems:'center',gap:14,marginTop:6}}>
+                                        <span onClick={()=>likeComment(c.id)} style={{cursor:'pointer',fontSize:11,fontWeight:700,color:c.my_liked?'var(--f1-red)':'var(--f1-text-muted)'}}>{c.my_liked?'\u2764\ufe0f':'\ud83e\udd0d'}{c.likes_count>0?' '+c.likes_count:''}</span>
+                                        {canDel && <span onClick={()=>delComment(c.id)} style={{cursor:'pointer',fontSize:11,fontWeight:700,color:'var(--f1-red)'}}>{c.is_mine?'Удалить':'Удалить (модер.)'}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </>)}
+        </div>
+    );
+};
+
 // ==== VIDEOS PAGE (app design) ====
 const VIDEO_SESSION_LABELS = {race:'Гонка', qualifying:'Квалификация', sprint:'Спринт', sprint_qualifying:'Спринт-квалификация', fp1:'Практика 1', fp2:'Практика 2', fp3:'Практика 3', review:'Обзор'};
 const VIDEO_SESSION_COLOR = {race:'#E10600', qualifying:'#27F4D2', sprint:'#FF8000', sprint_qualifying:'#FFB800', review:'#3B9BFF'};
 const VIDEO_SESSION_BADGE = {race:'ГОНКА', qualifying:'QUALI', sprint:'SPRINT', sprint_qualifying:'SQ', fp1:'FP1', fp2:'FP2', fp3:'FP3', review:'ОБЗОР'};
-const VideosPage = ({schedule, onRaceClick}) => {
+const VideosPage = ({schedule, onOpen}) => {
     const [broadcasts, setBroadcasts] = useState(null);
     useEffect(() => { api.get('/api/broadcasts').then(d => setBroadcasts((d && d.broadcasts) || [])).catch(()=>setBroadcasts([])); }, []);
     if (broadcasts === null) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка записей..."/></div>;
@@ -1765,7 +1895,7 @@ const VideosPage = ({schedule, onRaceClick}) => {
                             {items.map(b => {
                                 const color = VIDEO_SESSION_COLOR[b.session_type] || '#E10600';
                                 return (
-                                    <div key={b.id} className="vid-card" onClick={()=>onRaceClick(round,'broadcast')} style={{borderColor:b.session_type==='race'?color+'55':'var(--f1-border)'}}>
+                                    <div key={b.id} className="vid-card" onClick={()=>onOpen(b, raceName)} style={{borderColor:b.session_type==='race'?color+'55':'var(--f1-border)'}}>
                                         <div className="vid-thumb">
                                             {b.thumbnail_url ? <img src={b.thumbnail_url} alt="" referrerPolicy="no-referrer" loading="lazy" onError={e=>{e.target.style.display='none'}}/> : <span style={{fontSize:22,opacity:0.4}}>{'\ud83c\udfac'}</span>}
                                             <span className="vid-badge" style={{background:color}}>{VIDEO_SESSION_BADGE[b.session_type] || (b.session_type||'').toUpperCase()}</span>
@@ -4407,6 +4537,7 @@ const App = () => {
     const [seasonResults, setSeasonResults] = useState(null);
     const [selectedRound, setSelectedRound] = useState(null);
     const [raceDetailTab, setRaceDetailTab] = useState('race');
+    const [selectedBroadcast, setSelectedBroadcast] = useState(null);
     const [selectedArticle, setSelectedArticle] = useState(null);
     const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
     const isLive = session?.is_live;
@@ -4529,7 +4660,8 @@ const App = () => {
             case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
             case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onBack={()=>setTab('home')} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
             case 'predict': return <PredictionsPage user={user}/>;
-            case 'videos': return <VideosPage schedule={schedule} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'broadcast');setTab('raceDetail');}}/>;
+            case 'videos': return <VideosPage schedule={schedule} onOpen={(b,rn)=>{setSelectedBroadcast({b,rn});setTab('broadcastView');}}/>;
+            case 'broadcastView': return selectedBroadcast ? <BroadcastViewPage broadcast={selectedBroadcast.b} raceName={selectedBroadcast.rn} onBack={()=>setTab('videos')} user={user} spoilerFree={spoilerFree}/> : null;
             case 'profile': return <ProfilePage user={user} onNavigate={setTab} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
             case 'analytics': return <AnalyticsPage/>;
             case 'games': return <GamesPage onChange={setTab}/>;
