@@ -24,6 +24,15 @@ const _getAuthHeaders = () => {
     return token ? { 'Authorization': 'TgLogin ' + token } : {};
 };
 
+// Upscale F1 CDN image params for retina screens.
+const hiResImg = (url, targetW = 800) => {
+    if (!url || typeof url !== 'string') return url;
+    if (!url.includes('media.formula1.com/image/upload/')) return url;
+    return url
+        .replace(/(\b)w_\d+/g, `$1w_${targetW}`)
+        .replace(/(\b)h_\d+/g, `$1h_${Math.round(targetW * 0.75)}`);
+};
+
 // ==== API CLIENT ====
 const api = {
     get: async (url) => {
@@ -170,7 +179,7 @@ const TyreLoader = ({text = 'Анализ данных...'}) => (
 const BottomNav = ({active, onChange, isLive}) => {
     const tabs = [
         {id:'home', icon:NavIcons.home, label:'Главная'},
-        {id:'live', icon:NavIcons.live, label:'Онлайн'},
+        {id:'schedule', icon:NavIcons.calendar, label:'Календарь'},
         {id:'news', icon:NavIcons.news, label:'Новости'},
         {id:'standings', icon:NavIcons.trophy, label:'Чемпионат'},
         {id:'predict', icon:NavIcons.predict, label:'Прогнозы'},
@@ -196,18 +205,21 @@ const BottomNav = ({active, onChange, isLive}) => {
 // ==== COUNTDOWN ====
 const Countdown = ({targetDate}) => {
     const [time, setTime] = useState(formatCountdown(targetDate));
-    const [prevSec, setPrevSec] = useState(-1);
     useEffect(() => {
-        const iv = setInterval(() => { const t = formatCountdown(targetDate); setPrevSec(time.seconds); setTime(t); }, 1000);
+        const iv = setInterval(() => setTime(formatCountdown(targetDate)), 1000);
         return () => clearInterval(iv);
-    }, [targetDate, time.seconds]);
+    }, [targetDate]);
+    const cells = [{val:time.days,label:'ДНЕЙ'},{val:time.hours,label:'ЧАСОВ'},{val:time.minutes,label:'МИНУТ'},{val:time.seconds,label:'СЕКУНД'}];
     return (
-        <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-            {[{val:time.days,label:'дней'},{val:time.hours,label:'часов'},{val:time.minutes,label:'минут'},{val:time.seconds,label:'секунд'}].map((item,i)=>(
-                <div key={i} className="countdown-block">
-                    <div className={`countdown-num ${i===3?'flip-anim':''}`} key={i===3?item.val:'s'}>{String(item.val).padStart(2,'0')}</div>
-                    <div className="countdown-label">{item.label}</div>
-                </div>
+        <div className="cd-card">
+            {cells.map((item,i)=>(
+                <React.Fragment key={item.label}>
+                    <div className="cd-cell">
+                        <div className="cd-num">{String(item.val).padStart(2,'0')}</div>
+                        <div className="cd-label">{item.label}</div>
+                    </div>
+                    {i<3 && <div className="cd-slash"><i/><i/></div>}
+                </React.Fragment>
             ))}
         </div>
     );
@@ -223,7 +235,7 @@ const FlagIcon = ({flag}) => {
 };
 
 const DriverPhoto = ({url, size=32, style:s={}}) => (
-    <img src={url} alt="" className="driver-avatar"
+    <img src={size >= 40 ? hiResImg(url, Math.max(200, size * 4)) : url} alt="" className="driver-avatar"
          style={{width:size,height:size,...s}}
          onError={e=>{e.target.style.display='none'}}
          loading="lazy"/>
@@ -259,35 +271,24 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             </div>
 
             {nextRace && nextRace.name && (
-                <div className="gradient-card" style={{minHeight:200,background:nextRace.circuit_image?`linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${nextRace.circuit_image})`:'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',backgroundSize:'cover',backgroundPosition:'center'}}>
-                    <div style={{position:'absolute',right:-20,top:-20,fontSize:120,fontWeight:900,color:'rgba(255,255,255,0.04)',lineHeight:1,pointerEvents:'none',fontFamily:'monospace'}}>{nextRace.round}</div>
-                    <div style={{position:'relative',zIndex:1}}>
-                        <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>
-                            Следующий гран-при
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-                            <FlagImg code={nextRace.country_code} size={28}/>
+                <>
+                    <div className="eyebrow-row"><span className="eyebrow-dot"/><span className="eyebrow-text">СТАРТ ЧЕРЕЗ</span></div>
+                    {nextRace.race_datetime && <Countdown targetDate={nextRace.race_datetime}/>}
+                    <div className="hero-card">
+                        {nextRace.circuit_image && <div className="hero-bg" style={{backgroundImage:`url(${hiResImg(nextRace.circuit_image, 1200)})`}}/>}
+                        <div className="hero-shade"/>
+                        <img className="hero-car" src="/static/car-drift.webp" alt="" loading="lazy"/>
+                        <div className="hero-inner">
+                            <div className="hero-badge">СЛЕДУЮЩИЙ ГРАН-ПРИ</div>
                             <div>
-                                <div style={{fontSize:20,fontWeight:900}}>{nextRace.name}</div>
-                                <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{nextRace.circuit} · Раунд {nextRace.round}</div>
+                                <div className="hero-name">{(() => { const m = nextRace.name.match(/^Гран[- ]при\s+(.+)$/i); return m ? <>Гран-при<br/>{m[1]}</> : nextRace.name; })()}</div>
+                                <div className="hero-place"><FlagImg code={nextRace.country_code} size={20}/><span>{nextRace.locality ? `${nextRace.locality}${nextRace.country ? ', ' + nextRace.country : ''}` : (nextRace.circuit || '')}</span></div>
+                                <div className="hero-round">РАУНД {String(nextRace.round).padStart(2,'0')} · {season}</div>
+                                <button className="hero-btn" onClick={()=>onRaceClick(nextRace.round)}>ОТКРЫТЬ ГРАН-ПРИ <span style={{fontSize:16,lineHeight:1}}>›</span></button>
                             </div>
                         </div>
-                        {nextRace.race_datetime && <div style={{marginTop:16}}><Countdown targetDate={nextRace.race_datetime}/></div>}
-                        {nextRace.sessions && (
-                            <div style={{marginTop:16,display:'flex',flexWrap:'wrap',gap:6}}>
-                                {Object.entries(nextRace.sessions).map(([key,val])=>{
-                                    const names = {fp1:'FP1',fp2:'FP2',fp3:'FP3',qualifying:'КВАЛИ',race:'ГОНКА',sprint:'СПРИНТ',sprint_qualifying:'СК'};
-                                    return (
-                                        <div key={key} style={{background:key==='race'?'var(--f1-red)':'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:600}}>
-                                            <div style={{opacity:0.7}}>{names[key]||key}</div>
-                                            <div>{val.date?.slice(5)} {val.time?.slice(0,5)}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
                     </div>
-                </div>
+                </>
             )}
 
             {/* Upcoming races */}
@@ -338,7 +339,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                             return (
                                 <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
                                     <div style={{position:'relative',marginBottom:6}}>
-                                        {r.photo_url && <img src={r.photo_url} alt="" style={{width:photoSizes[idx],height:photoSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${colors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                        {r.photo_url && <img src={hiResImg(r.photo_url, 256)} alt="" style={{width:photoSizes[idx],height:photoSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${colors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                     </div>
                                     <div style={{fontWeight:900,fontSize:idx===0?15:13}}>{r.code || r.name?.split(' ').pop()}</div>
                                     <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{r.team?.split(' ')[0]}</div>
@@ -381,7 +382,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                     {standings.standings.slice(0,3).map((s,i)=>(
                         <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
                             <div style={{fontSize:20,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:24,textAlign:'center'}}>{s.position}</div>
-                            {s.photo_url && <img src={s.photo_url} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                            {s.photo_url && <img src={hiResImg(s.photo_url, 256)} alt="" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                             <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontWeight:900,fontSize:15}}>{s.name}</div>
                                 <div style={{fontSize:11,color:s.team_color,fontWeight:600}}>{s.team}</div>
@@ -419,27 +420,22 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                 </div>
             )}
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div className="gradient-card" onClick={()=>onChange('predict')} style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(225,6,0,0.12),var(--f1-card))'}}>
-                    <div style={{fontSize:32}}>&#x1F52E;</div>
-                    <div style={{fontSize:14,fontWeight:700,marginTop:6}}>Прогнозы</div>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Угадай результат</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                <div className="gradient-card" onClick={()=>onChange('predict')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(225,6,0,0.15),var(--f1-card))'}}>
+                    <div style={{fontSize:28}}>&#x1F52E;</div>
+                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Прогнозы</div>
+                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Угадай</div>
                 </div>
-                <div className="gradient-card" onClick={()=>onChange('schedule')} style={{textAlign:'center',cursor:'pointer',padding:'20px 16px',background:'linear-gradient(135deg,rgba(102,146,255,0.12),var(--f1-card))'}}>
-                    <div style={{fontSize:32}}>📅</div>
-                    <div style={{fontSize:14,fontWeight:700,marginTop:6}}>Расписание</div>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Все гран-при</div>
+                <div className="gradient-card" onClick={()=>onChange('games')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(255,128,0,0.15),var(--f1-card))'}}>
+                    <div style={{fontSize:28}}>🎮</div>
+                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Игры</div>
+                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Пит-стоп, реакция</div>
                 </div>
-            </div>
-
-            {/* Mini-games button */}
-            <div className="card" onClick={()=>onChange('games')} style={{display:'flex',alignItems:'center',gap:14,padding:16,cursor:'pointer',marginTop:10,borderLeft:'4px solid var(--f1-red)'}}>
-                <div style={{fontSize:28}}>🎮</div>
-                <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:16}}>Мини-игры</div>
-                    <div style={{fontSize:12,color:'var(--f1-text-muted)'}}>Пит-стоп, реакция, квиз и другие</div>
+                <div className="gradient-card" onClick={()=>onChange('schedule')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(102,146,255,0.15),var(--f1-card))'}}>
+                    <div style={{fontSize:28}}>📅</div>
+                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Календарь</div>
+                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Все гонки</div>
                 </div>
-                <div style={{color:'var(--f1-red)',fontWeight:700}}>→</div>
             </div>
         </div>
     );
@@ -1080,7 +1076,7 @@ const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree
                 return (
                     <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
                          style={{marginBottom:8, padding:12, cursor: 'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
-                        {race.circuit_image && <img src={race.circuit_image} alt="" style={{position:'absolute',top:0,right:0,width:'40%',height:'100%',objectFit:'cover',opacity:0.12,pointerEvents:'none',borderRadius:'0 12px 12px 0'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                        {race.circuit_image && <img src={hiResImg(race.circuit_image, 800)} alt="" style={{position:'absolute',top:0,right:0,width:'40%',height:'100%',objectFit:'cover',opacity:0.12,pointerEvents:'none',borderRadius:'0 12px 12px 0'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                         <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
                             <div style={{width:36,height:36,borderRadius:10,background:isPast?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0,color:isPast?'var(--f1-red)':'var(--f1-text-muted)'}}>{race.round}</div>
                             <div style={{flex:1,minWidth:0}}>
@@ -1202,7 +1198,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                 <div className="gradient-card" style={{marginBottom:16}}>
                     <div style={{position:'absolute',top:0,left:0,bottom:0,width:6,background:d.team_color,borderRadius:'16px 0 0 16px'}}/>
                     <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:12}}>
-                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:64,height:64,borderRadius:12,objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${d.team_color}`}} onError={e=>{e.target.style.display='none'}}/>}
+                        {d.photo_url && <img src={hiResImg(d.photo_url, 320)} alt="" style={{width:64,height:64,borderRadius:12,objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${d.team_color}`}} onError={e=>{e.target.style.display='none'}}/>}
                         <div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.country)} {d.country}</div>
                             <div style={{fontSize:20,fontWeight:900,lineHeight:1.1}}>{d.first_name}<br/><span style={{color:d.team_color}}>{d.last_name}</span></div>
@@ -1282,7 +1278,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                                  style={{cursor:'pointer',padding:14,background:`linear-gradient(135deg,${s.team_color}20,var(--f1-card) 70%)`,borderLeft:`4px solid ${s.team_color}`}}>
                                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                                     <div style={{fontSize:28,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:32,textAlign:'center',lineHeight:1}}>{s.position}</div>
-                                    {s.photo_url && <img src={s.photo_url} alt="" style={{width:56,height:56,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                    {s.photo_url && <img src={hiResImg(s.photo_url, 256)} alt="" style={{width:56,height:56,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                     <div style={{flex:1,minWidth:0}}>
                                         <div style={{fontWeight:900,fontSize:16}}>{s.name}</div>
                                         <div style={{fontSize:12,color:s.team_color,fontWeight:600}}>{s.team}</div>
@@ -1308,7 +1304,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                             <div className="standings-row" onClick={()=>s.driver_number&&openDriver(s.driver_number)} style={{cursor:'pointer',padding:'10px 8px',gap:10}}>
                                 <div style={{width:28,fontWeight:900,fontSize:15,color:'var(--f1-text-muted)',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{s.position}</div>
                                 <div style={{background:s.team_color,width:4,height:40,borderRadius:2}}/>
-                                {s.photo_url && <img src={s.photo_url} alt="" style={{width:40,height:40,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                {s.photo_url && <img src={hiResImg(s.photo_url, 200)} alt="" style={{width:40,height:40,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                 <div style={{flex:1,minWidth:0}}>
                                     <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
                                     <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{s.team}</div>
@@ -1338,13 +1334,13 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                             <div key={i} className="card" style={{marginBottom:8,padding:12,borderLeft:`4px solid ${s.team_color}`}}>
                                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                                     <div style={{fontSize:20,fontWeight:900,color:i<3?['#FFD700','#C0C0C0','#CD7F32'][i]:'var(--f1-text-muted)',minWidth:28,textAlign:'center'}}>{s.position}</div>
-                                    {s.logo_url && <img src={s.logo_url} alt="" style={{width:36,height:36,objectFit:'contain',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                    {s.logo_url && <img src={hiResImg(s.logo_url, 200)} alt="" style={{width:36,height:36,objectFit:'contain',flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                     <div style={{flex:1,minWidth:0}}>
                                         <div style={{fontWeight:700,fontSize:15}}>{s.team}</div>
                                         <div style={{display:'flex',gap:8,marginTop:6,alignItems:'center'}}>
                                             {driverPoints.map((d,j)=>(
                                                 <div key={j} onClick={(e)=>{e.stopPropagation();d.driver_number&&openDriver(d.driver_number);}} style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer',padding:'3px 8px',background:'rgba(255,255,255,0.03)',borderRadius:8,border:'1px solid var(--f1-border)'}}>
-                                                    {d.photo_url && <img src={d.photo_url} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                    {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                                     <span style={{fontSize:11,fontWeight:700}}>{d.code}</span>
                                                     <span style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{d.points}</span>
                                                 </div>
@@ -1413,7 +1409,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                     ) : (
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                             {allDrivers.map(d=>{
-                                const bigPhoto = d.card_photo_url || d.photo_url_large || largePhoto(d.photo_url);
+                                const bigPhoto = hiResImg(d.card_photo_url || d.photo_url_large || largePhoto(d.photo_url), 800);
                                 return (
                                     <div key={d.driver_number} onClick={()=>openDriver(d.driver_number)}
                                          style={{cursor:'pointer',borderRadius:16,overflow:'hidden',position:'relative',background:'var(--f1-card)',border:'1px solid var(--f1-border)',boxShadow:'0 4px 24px rgba(0,0,0,0.2)',transition:'transform 0.15s'}}>
@@ -1460,7 +1456,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                                         {/* Driver headers */}
                                         <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
                                             <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                                {d1.photo_url && <img src={d1.photo_url} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',border:`2px solid ${pair.color}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}}/>}
+                                                {d1.photo_url && <img src={hiResImg(d1.photo_url, 200)} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',border:`2px solid ${pair.color}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}}/>}
                                                 <div>
                                                     <div style={{fontWeight:800,fontSize:16}}>{d1.name}</div>
                                                     <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{d1.full_name}</div>
@@ -1471,7 +1467,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                                                     <div style={{fontWeight:800,fontSize:16}}>{d2.name}</div>
                                                     <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{d2.full_name}</div>
                                                 </div>
-                                                {d2.photo_url && <img src={d2.photo_url} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',border:`2px solid ${pair.color}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}}/>}
+                                                {d2.photo_url && <img src={hiResImg(d2.photo_url, 200)} alt="" style={{width:36,height:36,borderRadius:'50%',objectFit:'cover',border:`2px solid ${pair.color}`,background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}}/>}
                                             </div>
                                         </div>
                                         {/* Points bar */}
@@ -1516,12 +1512,12 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                             <div key={i} className="card" style={{marginBottom:12,padding:0,overflow:'hidden'}}>
                                 {team.car_url && (
                                     <div style={{width:'100%',height:140,background:`linear-gradient(135deg,${team.team_color}15,var(--f1-card-solid))`,position:'relative',overflow:'hidden'}}>
-                                        <img src={team.car_url} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:12}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>
+                                        <img src={hiResImg(team.car_url, 1200)} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:12}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>
                                     </div>
                                 )}
                                 <div style={{padding:'12px 14px'}}>
                                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-                                        {team.logo_url && <img src={team.logo_url} alt="" style={{width:28,height:28,objectFit:'contain'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                        {team.logo_url && <img src={hiResImg(team.logo_url, 200)} alt="" style={{width:28,height:28,objectFit:'contain'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                         <div style={{flex:1}}>
                                             <div style={{fontWeight:700,fontSize:15,color:team.team_color}}>{team.team}</div>
                                         </div>
@@ -1533,7 +1529,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                                     <div style={{display:'flex',gap:12}}>
                                         {team.drivers?.map((d,j)=>(
                                             <div key={j} onClick={(e)=>{e.stopPropagation();d.driver_number&&openDriver(d.driver_number);}} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1,padding:'6px 8px',background:'rgba(255,255,255,0.03)',borderRadius:10,border:'1px solid var(--f1-border)'}}>
-                                                {d.photo_url && <img src={d.photo_url} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${team.team_color}`}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                                {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`2px solid ${team.team_color}`}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                                 <div>
                                                     <div style={{fontWeight:700,fontSize:13}}>{d.code}</div>
                                                     <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>{d.name?.split(' ').pop()}</div>
@@ -1587,7 +1583,7 @@ const PredictionsPage = ({user}) => {
                                     <div key={d.driver_number} onClick={()=>{if(!submitting)handlePredict(pred.type,d.driver_number)}}
                                         style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:'var(--f1-gray)',border:'2px solid '+d.team_color+'66',opacity:submitting?0.5:1,transition:'transform 0.15s'}}>
                                         <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-                                            {d.photo_url && <img src={d.photo_url} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
+                                            {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
                                         </div>
                                         <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
                                             <div style={{fontSize:11,fontWeight:800,color:d.team_color}}>{d.code}</div>
@@ -1607,7 +1603,7 @@ const PredictionsPage = ({user}) => {
                                                 style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:picked?d.team_color+'33':'var(--f1-gray)',border:'2px solid '+(picked?d.team_color:d.team_color+'44'),opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1,transition:'transform 0.15s',position:'relative'}}>
                                                 {picked && <div style={{position:'absolute',top:4,right:4,width:18,height:18,borderRadius:'50%',background:d.team_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',zIndex:2}}>{idx+1}</div>}
                                                 <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-                                                    {d.photo_url && <img src={d.photo_url} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
+                                                    {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
                                                 </div>
                                                 <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
                                                     <div style={{fontSize:11,fontWeight:800,color:picked?d.team_color:'var(--f1-text)'}}>{d.code}</div>
@@ -1634,7 +1630,56 @@ const PredictionsPage = ({user}) => {
             </>) : (
                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🔮</div><div style={{fontSize:15,fontWeight:700}}>Нет доступных прогнозов</div><div style={{fontSize:13}}>Прогнозы откроются перед следующей гонкой</div></div>
             )}
-            {myPredictions.length>0 && (
+            {myPredictions.length>0 && (() => {
+                const grouped = {};
+                myPredictions.filter(p => p.status !== 'pending').forEach(p => { (grouped[p.race_round] = grouped[p.race_round] || []).push(p); });
+                const rounds = Object.keys(grouped).map(Number).sort((a,b) => b - a);
+                const typeLabels = {'winner':'Победитель','podium':'Подиум','fastest_lap':'Быстр. круг','dnf_count':'Сходы','safety_car':'Safety Car'};
+                const typeIcons = {winner:'🏆',podium:'🥇',fastest_lap:'⚡',safety_car:'🚗',dnf_count:'💥'};
+                return (
+                    <div style={{marginTop:20}}>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>История прогнозов</div>
+                        {rounds.map(r => {
+                            const items = grouped[r];
+                            const totalPts = items.reduce((s,p) => s + (p.points_won || 0), 0);
+                            const correctCount = items.filter(p => p.status === 'correct').length;
+                            const raceName = items[0]?.race_name || ('Гран-при ' + r);
+                            return (
+                                <div key={r} className="card" style={{marginBottom:8,padding:0,overflow:'hidden'}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid var(--f1-border)'}}>
+                                        <div style={{width:32,height:32,borderRadius:8,background:'rgba(225,6,0,0.15)',color:'var(--f1-red)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,flexShrink:0}}>R{r}</div>
+                                        <div style={{flex:1,minWidth:0}}>
+                                            <div style={{fontSize:13,fontWeight:700}}>{raceName}</div>
+                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{correctCount}/{items.length} угадано</div>
+                                        </div>
+                                        <div style={{textAlign:'right'}}>
+                                            <div style={{fontSize:16,fontWeight:900,color:totalPts>0?'#27F4D2':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{totalPts}</div>
+                                            <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>очков</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        {items.map((p,i) => {
+                                            const statusColor = p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)';
+                                            const display = Array.isArray(p.prediction_value) ? p.prediction_value.join(' → ') : (p.prediction_type==='safety_car' ? ([true,'yes','true',1,'1'].includes(p.prediction_value)?'Да':'Нет') : String(p.prediction_value ?? ''));
+                                            return (
+                                                <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderBottom:i<items.length-1?'1px solid var(--f1-border)':'none'}}>
+                                                    <span style={{fontSize:14}}>{typeIcons[p.prediction_type]||'•'}</span>
+                                                    <div style={{flex:1,minWidth:0}}>
+                                                        <div style={{fontSize:12,fontWeight:700}}>{typeLabels[p.prediction_type]||p.prediction_type}</div>
+                                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{display}</div>
+                                                    </div>
+                                                    <div style={{fontWeight:800,fontSize:13,color:statusColor,flexShrink:0}}>{p.status==='pending'?'⏳':p.status==='correct'?'+'+p.points_won:p.status==='partial'?'+'+p.points_won:'✗'}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            })()}
+            {false && myPredictions.length>0 && (
                 <div style={{marginTop:20}}>
                     <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Мои прогнозы</div>
                     {myPredictions.slice(0,15).map((p,i)=>{
@@ -1669,7 +1714,7 @@ const ProfilePage = ({user}) => {
             <div className="card" style={{textAlign:'center',marginBottom:16,position:'relative',overflow:'hidden'}}>
                 <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,rgba(225,6,0,0.2),transparent)'}}/>
                 {user.photo_url ? (
-                    <img src={user.photo_url} alt="" style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',objectFit:'cover',border:'3px solid var(--f1-red)',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
+                    <img src={hiResImg(user.photo_url, 256)} alt="" style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',objectFit:'cover',border:'3px solid var(--f1-red)',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
                 ) : null}
                 <div style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,position:'relative',boxShadow:'0 4px 16px rgba(225,6,0,0.3)',display:user.photo_url?'none':'flex'}}>{user.first_name?.[0]||'?'}</div>
                 <div style={{fontSize:20,fontWeight:900}}>{user.first_name}</div>
@@ -2720,15 +2765,32 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
     const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
     const rtMatch = url.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
 
-    // YouTube: mobile = our CSS overlay, desktop = native iframe
+    // YouTube: lite-embed pattern — show thumbnail, load iframe on click for instant render
+    const [ytPlay, setYtPlay] = useState(false);
     if (ytMatch) {
-        if (isMob) {
-            const ytSrc = 'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1&fs=0';
-            return <IframeFullscreenPlayer src={ytSrc} title={title}/>;
+        if (ytPlay) {
+            if (isMob) {
+                const ytSrc = 'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1&fs=0&autoplay=1';
+                return <IframeFullscreenPlayer src={ytSrc} title={title}/>;
+            }
+            return (
+                <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
+                    <iframe src={'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1&autoplay=1'} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
+                </div>
+            );
         }
+        const thumb = 'https://i.ytimg.com/vi/' + ytMatch[1] + '/hqdefault.jpg';
         return (
-            <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
-                <iframe src={'https://www.youtube.com/embed/' + ytMatch[1] + '?rel=0&playsinline=1'} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
+            <div onClick={() => setYtPlay(true)} style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12,cursor:'pointer'}}>
+                <img src={thumb} alt="" loading="lazy" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:0.92}}/>
+                <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 50%,rgba(0,0,0,0.5))'}}/>
+                <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+                <div style={{position:'absolute',bottom:8,left:10,right:10,display:'flex',alignItems:'center',justifyContent:'space-between',color:'#fff'}}>
+                    <span style={{fontSize:11,fontWeight:700,opacity:0.85}}>YouTube</span>
+                    {title && <span style={{fontSize:11,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginLeft:8}}>{title}</span>}
+                </div>
             </div>
         );
     }
@@ -2792,8 +2854,23 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
 
 
         // ==== BROADCAST TAB CONTENT ====
-const BroadcastTab = ({broadcasts, raceName}) => {
-    if (!broadcasts || broadcasts.length === 0) {
+const BroadcastTab = ({broadcasts, raceName, hasSprint}) => {
+    const SESSION_ORDER = ['sprint_qualifying','sprint','qualifying','race','review'];
+    const SESSION_LABELS = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация',review:'Обзор'};
+    const SESSION_ICONS = {sprint_qualifying:'⚡',sprint:'🏁',qualifying:'⏱️',race:'🏆',review:'📺'};
+    const types = hasSprint ? SESSION_ORDER : SESSION_ORDER.filter(t => t !== 'sprint_qualifying' && t !== 'sprint');
+    const byType = {};
+    (broadcasts || []).forEach(b => { byType[b.session_type] = b; });
+    const items = types.map(t => ({type:t, broadcast: byType[t] || null}));
+    const total = items.filter(i => i.broadcast).length;
+    const [openType, setOpenType] = useState(null);
+    useEffect(() => {
+        if (openType !== null) return;
+        const first = items.find(i => i.broadcast);
+        if (first) setOpenType(first.type);
+    }, [broadcasts]);
+
+    if (total === 0) {
         return (
             <div className="card" style={{padding:'24px 16px',textAlign:'center'}}>
                 <div style={{fontSize:32,marginBottom:8}}>📺</div>
@@ -2802,30 +2879,35 @@ const BroadcastTab = ({broadcasts, raceName}) => {
             </div>
         );
     }
-    const sessionLabels = {race:'Гонка',qualifying:'Квалификация',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация',review:'Обзор'};
     return (
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {broadcasts.map(b => (
-                <div key={b.id} className="card" style={{padding:'12px 16px'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                        {b.is_live ? (
-                            <div style={{display:'flex',alignItems:'center',gap:6}}>
-                                <div style={{width:8,height:8,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>
-                                <span style={{color:'var(--f1-red)',fontWeight:700,fontSize:11,textTransform:'uppercase'}}>Live</span>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {items.map(it => {
+                const b = it.broadcast;
+                const open = openType === it.type;
+                return (
+                    <div key={it.type} className="card" style={{padding:0,opacity:b?1:0.5,overflow:'hidden'}}>
+                        <div onClick={() => b && setOpenType(open ? null : it.type)}
+                            style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',cursor:b?'pointer':'default'}}>
+                            <span style={{fontSize:18}}>{SESSION_ICONS[it.type]}</span>
+                            <div style={{flex:1}}>
+                                <div style={{fontWeight:700,fontSize:14}}>{SESSION_LABELS[it.type]}</div>
+                                {b?.title && b.title !== SESSION_LABELS[it.type] && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{b.title}</div>}
                             </div>
-                        ) : (
-                            <span style={{fontSize:14}}>📺</span>
-                        )}
-                        <div style={{flex:1}}>
-                            <div style={{fontWeight:700,fontSize:14}}>{b.title || sessionLabels[b.session_type] || b.session_type}</div>
-                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{sessionLabels[b.session_type]}</div>
+                            {!!b?.is_live && <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                <div style={{width:8,height:8,borderRadius:'50%',background:'var(--f1-red)',animation:'pulse 1.5s infinite'}}/>
+                                <span style={{color:'var(--f1-red)',fontWeight:700,fontSize:10,textTransform:'uppercase'}}>Live</span>
+                            </div>}
+                            {!b && <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>Не добавлено</span>}
+                            {b && <span style={{color:'var(--f1-text-muted)',fontSize:12}}>{open ? '▲' : '▼'}</span>}
                         </div>
+                        {b && open && (b.embed_url || b.video_url) && (
+                            <div style={{padding:'0 14px 14px'}}>
+                                <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={b.title} sessionType={b.session_type}/>
+                            </div>
+                        )}
                     </div>
-                    {(b.embed_url || b.video_url) ? (
-                        <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={b.title} sessionType={b.session_type}/>
-                    ) : null}
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
@@ -3125,7 +3207,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>← Расписание</button>
 
             {/* Race header */}
-            <div className="gradient-card" style={{marginBottom:16,minHeight:120,background:race.circuit_image?`linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.85)), url(${race.circuit_image})`:'var(--f1-card)',backgroundSize:'cover',backgroundPosition:'center'}}>
+            <div className="gradient-card" style={{marginBottom:16,minHeight:120,background:race.circuit_image?`linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.85)), url(${hiResImg(race.circuit_image, 1200)})`:'var(--f1-card)',backgroundSize:'cover',backgroundPosition:'center'}}>
                 <div style={{position:'relative',zIndex:1}}>
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
                         {race.country_code ? <FlagImg code={race.country_code} size={32}/> : <span style={{fontSize:36}}>{flag}</span>}
@@ -3164,7 +3246,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
 
             {/* Sessions schedule (for future races) */}
             {raceTab === 'broadcast' && broadcastData && (
-                <BroadcastTab broadcasts={broadcastData} raceName={race.name}/>
+                <BroadcastTab broadcasts={broadcastData} raceName={race.name} hasSprint={!!race.sprint}/>
             )}
 
 
@@ -3224,7 +3306,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
                             return (
                                 <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
                                     <div style={{position:'relative',marginBottom:6}}>
-                                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:podiumSizes[idx],height:podiumSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${podiumColors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
+                                        {d.photo_url && <img src={hiResImg(d.photo_url, 320)} alt="" style={{width:podiumSizes[idx],height:podiumSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${podiumColors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
                                     </div>
                                     <div style={{fontWeight:900,fontSize:idx===0?16:14}}>{d.code}</div>
                                     <div style={{fontSize:10,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</div>
@@ -4199,7 +4281,7 @@ const App = () => {
 
     useEffect(() => {
         if (tab !== 'live') return;
-        const fetchLive = async () => { const d=await api.get('/api/live/dashboard'); if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);} };
+        const fetchLive = async () => { const d=await api.get('/api/live/dashboard'); if(d){setSession(d.session || {is_live:false, is_demo:false, offline:true, message:d.message});setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);} };
         fetchLive();
         const iv = setInterval(fetchLive, isLive ? 10000 : 30000);
         return () => clearInterval(iv);
@@ -4215,11 +4297,6 @@ const App = () => {
         } else if (tab === 'raceDetail') {
             tg.BackButton?.show();
             const h = () => setTab('schedule');
-            tg.BackButton?.onClick(h);
-            return () => tg.BackButton?.offClick(h);
-        } else if (tab === 'analytics') {
-            tg.BackButton?.show();
-            const h = () => setTab('live');
             tg.BackButton?.onClick(h);
             return () => tg.BackButton?.offClick(h);
         } else if (tab !== 'home') {
@@ -4264,7 +4341,7 @@ const App = () => {
     const renderTab = () => {
         switch(tab) {
             case 'home': return <HomePage nextRace={nextRace} lastRace={lastRace} standings={driversStandings} user={user} streams={streams} seasonResults={seasonResults} schedule={schedule} onChange={setTab} season={currentSeason} onSeasonChange={setCurrentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onToggleSpoiler={toggleSpoiler} liveBroadcasts={liveBroadcasts} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} onRefresh={async()=>{const[home,ds]=await Promise.all([api.get(`/api/home?season=${currentSeason}`),api.get(`/api/standings/drivers?season=${currentSeason}`)]);if(home){setNextRace(home.next_race);setLastRace(home.last_race);}if(ds)setDriversStandings(ds);}}/>;
-            case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session);setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
+            case 'live': return <LivePage session={session} positions={positions} timing={timing} weather={weather} raceControl={raceControl} onChange={setTab} onRefresh={async()=>{const d=await api.get('/api/live/dashboard');if(d){setSession(d.session || {is_live:false, is_demo:false, offline:true, message:d.message});setPositions(d.positions);setTiming(d.timing);setWeather(d.weather);setRaceControl(d.race_control);}}}/>;
             case 'news': return <NewsPage onArticleClick={(url)=>{setSelectedArticle(url);setTab('article');}}/>;
             case 'article': return <ArticlePage articleUrl={selectedArticle} onBack={()=>{setSelectedArticle(null);setTab('news');}}/>;
             case 'schedule': return <SchedulePage seasonResults={seasonResults} schedule={schedule} season={currentSeason} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'race');setTab('raceDetail');}} spoilerFree={spoilerFree}/>;
