@@ -1014,26 +1014,26 @@ const NewsPage = ({ onArticleClick }) => {
     return (
         <div className="page-container fade-in" ref={ptr.containerRef} onTouchStart={ptr.onTouchStart} onTouchMove={ptr.onTouchMove} onTouchEnd={ptr.onTouchEnd} style={{padding:'12px 16px'}}>
             {ptr.indicatorEl}
-            <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Новости Ф-1</h2>
+            <h2 style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase',marginBottom:4}}>НОВОСТИ</h2>
             <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16,display:'flex',alignItems:'center',gap:6}}>
                 <span style={{width:6,height:6,borderRadius:'50%',background:'var(--f1-red)',display:'inline-block'}}/>
                 {news?.source || 'championat.com'}
             </div>
 
             {news?.posts?.length > 0 ? (
-                news.posts.map((post,i) => (
-                    <div key={i} className="news-card" onClick={()=>{if(post.url && onArticleClick) onArticleClick(post.url); else if(post.url) openLink(post.url);}}>
-                        {post.photo && <img src={post.photo} alt="" className="news-card-img" onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                        <div className="news-card-body">
-                            {post.title && <div className="news-card-title">{post.title}</div>}
-                            {post.preview && <div className="news-card-preview">{post.preview}</div>}
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{post.date_text || ''}</div>
-                                <span style={{fontSize:12,color:'var(--f1-red)',fontWeight:600}}>Читать →</span>
-                            </div>
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {news.posts.map((post,i) => (
+                    <div key={i} className="news-row" onClick={()=>{if(post.url && onArticleClick) onArticleClick(post.url); else if(post.url) openLink(post.url);}}>
+                        <div className="news-thumb">{(post.photo||post.image) ? <img src={post.photo||post.image} alt="" loading="lazy" onError={e=>{e.target.style.display='none'}}/> : <span style={{fontSize:22}}>{'\ud83d\udcf0'}</span>}</div>
+                        <div style={{flex:1,minWidth:0,padding:'12px 14px'}}>
+                            <div style={{color:'var(--f1-red)',fontSize:10,fontWeight:800,letterSpacing:2}}>{(post.source||'НОВОСТЬ').toUpperCase()}</div>
+                            <div style={{fontSize:14,fontWeight:700,lineHeight:'18px',marginTop:5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{post.title}</div>
+                            {post.date_text && <div style={{fontSize:10,color:'var(--f1-text-muted)',fontWeight:700,letterSpacing:1,marginTop:5,textTransform:'uppercase'}}>{post.date_text}</div>}
                         </div>
+                        <div style={{paddingRight:14,color:'var(--f1-red)',fontSize:18}}>{'\u203a'}</div>
                     </div>
-                ))
+                ))}
+                </div>
             ) : (
                 <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
                     <div style={{fontSize:48,marginBottom:12}}>📰</div>
@@ -1622,7 +1622,7 @@ const PredictionsPage = ({user}) => {
                                         const picked=podiumPicks.includes(d.driver_number), idx=podiumPicks.indexOf(d.driver_number);
                                         return (
                                             <div key={d.driver_number} onClick={()=>{if(submitting)return;if(picked)setPodiumPicks(p=>p.filter(n=>n!==d.driver_number));else if(podiumPicks.length<3)setPodiumPicks(p=>[...p,d.driver_number]);}}
-                                                style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:picked?d.team_color+'33':'var(--f1-gray)',border:'2px solid '+(picked?d.team_color:d.team_color+'44'),opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1,transition:'transform 0.15s',position:'relative'}}>
+                                                style={{cursor:'pointer',borderRadius:14,overflow:'hidden',background:picked?d.team_color+'33':'var(--f1-card-solid)',border:'2px solid '+(picked?d.team_color:d.team_color+'44'),opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1,transition:'transform 0.15s',position:'relative'}}>
                                                 {picked && <div style={{position:'absolute',top:4,right:4,width:18,height:18,borderRadius:'50%',background:d.team_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',zIndex:2}}>{idx+1}</div>}
                                                 <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
                                                     {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
@@ -3256,6 +3256,39 @@ const AdminBroadcastPanel = ({userId}) => {
 };
 
 // ==== RACE DETAIL PAGE ====
+// ==== RACE PODIUM (app design) ====
+const RacePodium = ({items}) => {
+    if (!items || items.length < 3) return null;
+    const METAL = ['#FFCB05','#C0C0C0','#CD7F32'];
+    const Card = ({d, place, winner}) => {
+        const portrait = d.card_photo_url || d.photo_url;
+        const metal = METAL[place-1];
+        return (
+            <div style={{flex:winner?1.18:1,background:winner?'#1A1505':'var(--f1-card-solid)',borderRadius:20,
+                         border:`1.5px solid ${metal}${winner?'CC':'55'}`,overflow:'hidden',
+                         boxShadow:winner?`0 6px 22px ${metal}40`:`0 4px 12px ${metal}20`,alignSelf:'flex-end',minWidth:0}}>
+                <div style={{width:'100%',height:winner?118:102,background:'#1A1A24',position:'relative'}}>
+                    {portrait && <img src={hiResImg(portrait, 400)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top center'}} onError={e=>{e.target.style.display='none'}}/>}
+                    <div style={{position:'absolute',top:0,left:10,fontSize:winner?40:32,fontWeight:800,letterSpacing:-1.5,color:'#FAFAFA',textShadow:'0 2px 8px rgba(0,0,0,0.75)'}}>{place}</div>
+                </div>
+                <div style={{padding:'9px 10px 11px'}}>
+                    <div style={{fontSize:12,fontWeight:700,lineHeight:'14px'}}>{d.first_name || (d.name||'').split(' ')[0]}</div>
+                    <div style={{fontSize:12,fontWeight:700,lineHeight:'14px'}}>{d.last_name || (d.name||'').split(' ').slice(1).join(' ') || d.code}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:d.team_color||'var(--f1-text-muted)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(d.team||'').replace('F1 Team','').trim()}</div>
+                    {d.points != null && d.points > 0 && <div style={{color:winner?'#FFCB05':'var(--f1-text)',fontWeight:800,fontSize:winner?16:14,marginTop:5}}>+{d.points}</div>}
+                </div>
+            </div>
+        );
+    };
+    return (
+        <div style={{display:'flex',gap:8,alignItems:'flex-end',margin:'2px 0 16px'}}>
+            <Card d={items[1]} place={2}/>
+            <Card d={items[0]} place={1} winner/>
+            <Card d={items[2]} place={3}/>
+        </div>
+    );
+};
+
 const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab}) => {
     const [tyreData, setTyreData] = useState(null);
     const [tyreLoading, setTyreLoading] = useState(false);
@@ -3486,31 +3519,8 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             )}
 
             {raceTab === 'race' && !isSpoilerHidden && (<>
-            {/* Podium */}
-            {race.podium?.length >= 3 && (
-                <div className="card" style={{padding:'16px 12px', marginBottom:16, position:'relative', overflow:'hidden'}}>
-                    <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏆 Подиум</div>
-                    <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:4}}>
-                        {[1,0,2].map(idx => {
-                            const d = race.podium[idx]; if(!d) return null;
-                            return (
-                                <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
-                                    <div style={{position:'relative',marginBottom:6}}>
-                                        {d.photo_url && <img src={hiResImg(d.photo_url, 320)} alt="" style={{width:podiumSizes[idx],height:podiumSizes[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${podiumColors[idx]}`,background:'var(--f1-gray)',margin:'0 auto'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                    </div>
-                                    <div style={{fontWeight:900,fontSize:idx===0?16:14}}>{d.code}</div>
-                                    <div style={{fontSize:10,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</div>
-                                    <div style={{background:`${podiumColors[idx]}22`,borderRadius:'8px 8px 0 0',padding:'10px 0',marginTop:6,height:podiumHeights[idx],display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',paddingTop:10}}>
-                                        <div style={{fontSize:28,fontWeight:900,color:podiumColors[idx]}}>{idx+1}</div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    </div>{/* close blur wrapper */}
-                </div>
-            )}
+            {/* Podium (app design) */}
+            {race.podium?.length >= 3 && <RacePodium items={race.podium.slice(0,3)}/>}
 
             {/* Full top-10 results */}
             {race.top_10?.length > 0 && (
@@ -3559,27 +3569,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             {/* API-loaded race results (2026+) */}
             {raceTab === 'race' && !race.podium && raceResults && !isSpoilerHidden && (
                 <div>
-                    <div className="card" style={{padding:'16px 12px',marginBottom:16,position:'relative',overflow:'hidden'}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>&#x1F3C6; Подиум</div>
-                        <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:4}}>
-                            {[1,0,2].map(idx => {
-                                const d = raceResults[idx]; if(!d) return null;
-                                const pc = ['#FFD700','#C0C0C0','#CD7F32'];
-                                const ph = [130,100,85]; const ps = [64,48,48];
-                                return (
-                                    <div key={idx} style={{flex:1,maxWidth:110,textAlign:'center'}}>
-                                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:ps[idx],height:ps[idx],borderRadius:'50%',objectFit:'cover',border:`3px solid ${pc[idx]}`,background:'var(--f1-gray)',margin:'0 auto 6px'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                        <div style={{fontWeight:900,fontSize:idx===0?16:14}}>{d.code}</div>
-                                        <div style={{fontSize:10,color:d.team_color,fontWeight:600}}>{d.team?.split(' ')[0]}</div>
-                                        <div style={{background:`${pc[idx]}22`,borderRadius:'8px 8px 0 0',padding:'10px 0',marginTop:6,height:ph[idx],display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',paddingTop:10}}>
-                                            <div style={{fontSize:28,fontWeight:900,color:pc[idx]}}>{d.position}</div>
-                                            {d.time && <div style={{fontSize:9,color:'var(--f1-text-muted)',marginTop:2}}>{d.time}</div>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <RacePodium items={raceResults.slice(0,3)}/>
                     <div className="card" style={{padding:'16px 12px',marginBottom:16}}>
                         <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>&#x1F4CB; Результаты гонки</div>
                         {raceResults.map((d,i) => (
