@@ -1280,29 +1280,42 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                 <div style={{padding:16}}><TyreLoader text="Загрузка..."/></div>
             ) : (
                 <div style={{padding:'0 12px'}}>
-                    {/* Top 3 podium cards */}
-                    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>
-                        {data.standings.slice(0,3).map((s,i)=>(
-                            <div key={i} className="gradient-card" onClick={()=>s.driver_number&&openDriver(s.driver_number)}
-                                 style={{cursor:'pointer',padding:14,background:`linear-gradient(135deg,${s.team_color}20,var(--f1-card) 70%)`,borderLeft:`4px solid ${s.team_color}`}}>
-                                <div style={{display:'flex',alignItems:'center',gap:12}}>
-                                    <div style={{fontSize:28,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:32,textAlign:'center',lineHeight:1}}>{s.position}</div>
-                                    {s.photo_url && <img src={hiResImg(s.photo_url, 256)} alt="" style={{width:56,height:56,borderRadius:'50%',objectFit:'cover',background:'var(--f1-gray)',border:`3px solid ${s.team_color}`,flexShrink:0}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                    <div style={{flex:1,minWidth:0}}>
-                                        <div style={{fontWeight:900,fontSize:16}}>{s.name}</div>
-                                        <div style={{fontSize:12,color:s.team_color,fontWeight:600}}>{s.team}</div>
-                                        <div className="progress-bar-bg" style={{marginTop:4,maxWidth:140}}>
-                                            <div className="progress-bar-fill" style={{width:`${Math.max(5,(s.points/leaderPts)*100)}%`,background:s.team_color}}/>
-                                        </div>
+                    {/* Top 3 podium cards (app design) */}
+                    {(() => {
+                        const top3 = data.standings.slice(0,3);
+                        if (top3.length < 3) return null;
+                        const METAL = ['#FFCB05','#C0C0C0','#CD7F32'];
+                        const orderIdx = [1,0,2]; // 2nd, 1st, 3rd
+                        const P = ({s, place, winner}) => {
+                            const portrait = s.card_photo_url || s.photo_url;
+                            const metal = METAL[place-1];
+                            return (
+                                <div onClick={()=>s.driver_number&&openDriver(s.driver_number)}
+                                     style={{flex:winner?1.18:1,background:winner?'#1A1505':'var(--f1-card-solid)',borderRadius:20,
+                                             border:`1.5px solid ${metal}${winner?'CC':'55'}`,overflow:'hidden',cursor:'pointer',
+                                             boxShadow:winner?`0 6px 22px ${metal}40`:`0 4px 12px ${metal}20`,alignSelf:'flex-end',flexShrink:0,minWidth:0}}>
+                                    <div style={{width:'100%',height:winner?122:106,background:'#1A1A24',position:'relative'}}>
+                                        {portrait && <img src={hiResImg(portrait, 400)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top center'}} onError={e=>{e.target.style.display='none'}}/>}
+                                        <div style={{position:'absolute',top:0,left:10,fontSize:winner?42:34,fontWeight:800,letterSpacing:-1.5,color:'#FAFAFA',textShadow:'0 2px 8px rgba(0,0,0,0.75)'}}>{place}</div>
                                     </div>
-                                    <div style={{textAlign:'right'}}>
-                                        <div style={{fontWeight:900,fontSize:22,fontVariantNumeric:'tabular-nums'}}>{s.points}</div>
-                                        <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>очков</div>
+                                    <div style={{padding:'10px 10px 12px'}}>
+                                        <div style={{fontSize:12,fontWeight:700,lineHeight:'14px'}}>{s.first_name || (s.name||'').split(' ')[0]}</div>
+                                        <div style={{fontSize:12,fontWeight:700,lineHeight:'14px'}}>{s.last_name || (s.name||'').split(' ').slice(1).join(' ')}</div>
+                                        <div style={{display:'flex',alignItems:'baseline',gap:3,marginTop:8}}>
+                                            <span style={{color:winner?'#FFCB05':(s.team_color||'#FAFAFA'),fontWeight:800,fontSize:winner?18:16,letterSpacing:-0.3}}>{s.points}</span>
+                                            <span style={{color:winner?'#FFCB05':(s.team_color||'#FAFAFA'),fontWeight:700,fontSize:9,letterSpacing:0.8}}>PTS</span>
+                                        </div>
+                                        {s.wins > 0 && <div style={{color:'var(--f1-text-secondary)',fontSize:10,fontWeight:700,marginTop:2}}>{s.wins} побед{s.wins===1?'а':''}</div>}
                                     </div>
                                 </div>
+                            );
+                        };
+                        return (
+                            <div style={{display:'flex',gap:8,alignItems:'flex-end',margin:'6px 0 18px'}}>
+                                {orderIdx.map(i => <P key={i} s={top3[i]} place={i+1} winner={i===0}/>)}
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })()}
 
                     <div className="divider-line" style={{margin:'8px 4px'}}/>
 
