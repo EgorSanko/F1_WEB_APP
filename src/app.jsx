@@ -127,15 +127,14 @@ const usePullToRefresh = (onRefresh) => {
 
 // ==== SVG NAV ICONS ====
 const NavIcons = {
-    home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-    live: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/></svg>,
-    news: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
-    calendar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-    trophy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>,
-    predict: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
-    user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-    analytics: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-};
+    home: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>,
+    calendar: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/></svg>,
+    trophy: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>,
+    play: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>,
+    user: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>,
+    news: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H6v-2h3v2zm0-4H6v-2h3v2zm0-4H6V7h3v2zm9 8h-7v-2h7v2zm0-4h-7v-2h7v2zm0-4h-7V7h7v2z"/></svg>,
+    analytics: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>,
+}
 
 // ==== SKELETON ====
 const Skeleton = ({w='100%',h='16px',r='8px',className=''}) => <div className={`skeleton ${className}`} style={{width:w,height:h,borderRadius:r}}/>;
@@ -180,9 +179,8 @@ const BottomNav = ({active, onChange, isLive}) => {
     const tabs = [
         {id:'home', icon:NavIcons.home, label:'Главная'},
         {id:'schedule', icon:NavIcons.calendar, label:'Календарь'},
-        {id:'news', icon:NavIcons.news, label:'Новости'},
-        {id:'standings', icon:NavIcons.trophy, label:'Чемпионат'},
-        {id:'predict', icon:NavIcons.predict, label:'Прогнозы'},
+        {id:'predict', icon:NavIcons.trophy, label:'Прогнозы'},
+        {id:'videos', icon:NavIcons.play, label:'Видео'},
         {id:'profile', icon:NavIcons.user, label:'Профиль'},
     ];
     return (
@@ -244,6 +242,8 @@ const DriverPhoto = ({url, size=32, style:s={}}) => (
 // ==== HOME PAGE ====
 const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onToggleSpoiler, onRaceClick, onRefresh, liveBroadcasts}) => {
     const ptr = usePullToRefresh(onRefresh);
+    const [homeNews, setHomeNews] = useState(null);
+    useEffect(() => { api.get('/api/news').then(d => setHomeNews(((d && d.posts) || []).slice(0, 3))).catch(()=>{}); }, []);
     if (!nextRace && !lastRace) return (
         <div className="page-container fade-in" style={{padding:16}}>
             <div style={{textAlign:'center',padding:'8px 0'}}>
@@ -291,6 +291,27 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                 </>
             )}
 
+            {homeNews && homeNews.length > 0 && (
+                <div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'6px 4px 12px'}}>
+                        <div style={{fontSize:22,fontWeight:800,fontStyle:'italic'}}>НОВОСТИ</div>
+                        <div onClick={()=>onChange('news')} style={{display:'flex',alignItems:'center',gap:4,color:'var(--f1-red)',fontSize:11,fontWeight:800,letterSpacing:1.5,cursor:'pointer'}}>ВСЕ НОВОСТИ <span style={{fontSize:14}}>{'\u203a'}</span></div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                        {homeNews.map((p,i)=>(
+                            <div key={i} className="news-row" onClick={()=>onChange('news')}>
+                                <div className="news-thumb">{(p.image||p.photo) ? <img src={p.image||p.photo} alt="" loading="lazy" onError={e=>{e.target.style.display='none'}}/> : <span style={{fontSize:22}}>{'\ud83d\udcf0'}</span>}</div>
+                                <div style={{flex:1,minWidth:0,padding:'12px 14px'}}>
+                                    <div style={{color:'var(--f1-red)',fontSize:10,fontWeight:800,letterSpacing:2}}>{(p.source||'НОВОСТЬ').toUpperCase()}</div>
+                                    <div style={{fontSize:14,fontWeight:700,lineHeight:'18px',marginTop:5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{p.title}</div>
+                                </div>
+                                <div style={{paddingRight:14,color:'var(--f1-red)',fontSize:18}}>{'\u203a'}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Upcoming races */}
             {schedule?.races && (() => {
                 const now = new Date();
@@ -329,7 +350,10 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             {/* Last race — podium layout */}
             {lastRace && lastRace.results && !spoilerFree && (
                 <div className="card" style={{padding:'16px 12px'}}>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:14}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
+                        <div onClick={()=>onChange('standings')} style={{color:'var(--f1-red)',fontSize:11,fontWeight:800,letterSpacing:1,cursor:'pointer',whiteSpace:'nowrap'}}>ЧЕМПИОНАТ {'\u203a'}</div>
+                    </div>
                     {/* Podium — positions 2, 1, 3 */}
                     <div style={{display:'flex',justifyContent:'center',alignItems:'flex-end',gap:8,marginBottom:16}}>
                         {[1,0,2].map(idx => {
@@ -1704,6 +1728,68 @@ const PredictionsPage = ({user}) => {
 };
 
 // ==== PROFILE PAGE ====
+
+// ==== VIDEOS PAGE (app design) ====
+const VIDEO_SESSION_LABELS = {race:'Гонка', qualifying:'Квалификация', sprint:'Спринт', sprint_qualifying:'Спринт-квалификация', fp1:'Практика 1', fp2:'Практика 2', fp3:'Практика 3', review:'Обзор'};
+const VIDEO_SESSION_COLOR = {race:'#E10600', qualifying:'#27F4D2', sprint:'#FF8000', sprint_qualifying:'#FFB800', review:'#3B9BFF'};
+const VIDEO_SESSION_BADGE = {race:'ГОНКА', qualifying:'QUALI', sprint:'SPRINT', sprint_qualifying:'SQ', fp1:'FP1', fp2:'FP2', fp3:'FP3', review:'ОБЗОР'};
+const VideosPage = ({schedule, onRaceClick}) => {
+    const [broadcasts, setBroadcasts] = useState(null);
+    useEffect(() => { api.get('/api/broadcasts').then(d => setBroadcasts((d && d.broadcasts) || [])).catch(()=>setBroadcasts([])); }, []);
+    if (broadcasts === null) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка записей..."/></div>;
+    const raceByRound = {};
+    (schedule && schedule.races || []).forEach(r => { raceByRound[r.round] = r; });
+    const groups = {};
+    broadcasts.filter(b => b.season === 2026 || !b.season).forEach(b => { (groups[b.race_round] = groups[b.race_round] || []).push(b); });
+    const rounds = Object.keys(groups).map(Number).sort((a,b)=>b-a);
+    const order = {review:-1, race:0, sprint:1, qualifying:2, sprint_qualifying:3, fp3:4, fp2:5, fp1:6};
+    return (
+        <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+            <div style={{fontSize:26,fontWeight:800,fontStyle:'italic',margin:'4px 4px 0'}}>ВИДЕО</div>
+            {rounds.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)'}}>Записей пока нет</div>}
+            {rounds.map(round => {
+                const race = raceByRound[round];
+                const items = groups[round].sort((a,b)=>((order[a.session_type]!=null?order[a.session_type]:9)-(order[b.session_type]!=null?order[b.session_type]:9)));
+                const raceName = race ? race.name : ('Раунд ' + round);
+                const cnt = items.length;
+                const cntWord = cnt===1 ? 'ЗАПИСЬ' : cnt<5 ? 'ЗАПИСИ' : 'ЗАПИСЕЙ';
+                return (
+                    <div key={round}>
+                        <div style={{display:'flex',alignItems:'center',gap:10,margin:'0 4px 10px'}}>
+                            <div style={{width:4,height:34,borderRadius:2,background:'var(--f1-red)',flexShrink:0}}/>
+                            <div>
+                                <div style={{color:'var(--f1-red)',fontSize:10,fontWeight:800,letterSpacing:2}}>ГРАН-ПРИ</div>
+                                <div style={{fontSize:19,fontWeight:800,lineHeight:'22px'}}>{raceName.replace(/^Гран[- ]при\s+/i,'')}</div>
+                                <div style={{color:'var(--f1-text-muted)',fontSize:10,fontWeight:700,letterSpacing:1,marginTop:1}}>РАУНД {String(round).padStart(2,'0')} · 2026 · {cnt} {cntWord}</div>
+                            </div>
+                        </div>
+                        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                            {items.map(b => {
+                                const color = VIDEO_SESSION_COLOR[b.session_type] || '#E10600';
+                                return (
+                                    <div key={b.id} className="vid-card" onClick={()=>onRaceClick(round,'broadcast')} style={{borderColor:b.session_type==='race'?color+'55':'var(--f1-border)'}}>
+                                        <div className="vid-thumb">
+                                            {b.thumbnail_url ? <img src={b.thumbnail_url} alt="" referrerPolicy="no-referrer" loading="lazy" onError={e=>{e.target.style.display='none'}}/> : <span style={{fontSize:22,opacity:0.4}}>{'\ud83c\udfac'}</span>}
+                                            <span className="vid-badge" style={{background:color}}>{VIDEO_SESSION_BADGE[b.session_type] || (b.session_type||'').toUpperCase()}</span>
+                                            <span className="vid-play" style={{borderColor:color}}>{'\u25b6'}</span>
+                                        </div>
+                                        <div style={{flex:1,minWidth:0,padding:'12px 14px'}}>
+                                            <div style={{fontSize:14,fontWeight:800}}>{VIDEO_SESSION_LABELS[b.session_type] || b.session_type}</div>
+                                            <div style={{color:'var(--f1-text-muted)',fontSize:11,marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.title || raceName}</div>
+                                            {b.started_at && <div style={{color:'var(--f1-text-muted)',fontSize:10,fontWeight:700,letterSpacing:1,marginTop:5}}>{new Date(b.started_at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}).toUpperCase()}</div>}
+                                        </div>
+                                        <div style={{paddingRight:14,color:'var(--f1-text-muted)',fontSize:18}}>{'\u203a'}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 const ProfilePage = ({user}) => {
     const [leaderboard, setLeaderboard] = useState(null);
     const [achievements, setAchievements] = useState(null);
@@ -4348,6 +4434,7 @@ const App = () => {
             case 'raceDetail': return <RaceDetailPage race={seasonResults?.races?.find(r=>r.round===selectedRound) || schedule?.races?.find(r=>r.round===selectedRound)} onBack={()=>setTab('schedule')} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} allRaces={seasonResults?.races} defaultTab={raceDetailTab}/>;
             case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onBack={()=>setTab('home')} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
             case 'predict': return <PredictionsPage user={user}/>;
+            case 'videos': return <VideosPage schedule={schedule} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'broadcast');setTab('raceDetail');}}/>;
             case 'profile': return <ProfilePage user={user}/>;
             case 'analytics': return <AnalyticsPage/>;
             case 'games': return <GamesPage onChange={setTab}/>;
