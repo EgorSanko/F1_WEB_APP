@@ -1752,6 +1752,7 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
     const [text, setText] = useState('');
     const [busy, setBusy] = useState(false);
     const [reveal, setReveal] = useState(!spoilerFree);
+    const [playerFs, setPlayerFs] = useState(false);
     const isAdmin = !!(user && window.__F1_ADMIN_IDS && window.__F1_ADMIN_IDS.includes(user.user_id));
     const names = {race:'Гонка', qualifying:'Квалификация', sprint:'Спринт', sprint_qualifying:'Спринт-квалификация', fp1:'Практика 1', fp2:'Практика 2', fp3:'Практика 3', review:'Обзор'};
     const title = (names[b.session_type]||b.session_type) + ' · ' + (raceName||'');
@@ -1786,19 +1787,35 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
             <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>{'\u2190'} Видео</button>
 
             {(() => {
-                // Нативные плееры провайдеров (как удобнее в TG): YouTube/Rutube/VK iframe.
+                // Нативные плееры провайдеров. TG WebView блокирует Fullscreen API,
+                // поэтому Rutube прячет свою кнопку — даём свой CSS-фулскрин + открытие в приложении.
                 const u = b.video_url || b.embed_url || '';
                 const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
                 const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
-                const src = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1')
-                          : rt ? ('https://rutube.ru/play/embed/'+rt[1])
-                          : (b.embed_url || u);
+                const src2 = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1')
+                           : rt ? ('https://rutube.ru/play/embed/'+rt[1])
+                           : (b.embed_url || u);
+                const provName = yt ? 'YouTube' : rt ? 'Rutube' : 'источнике';
+                const wrapStyle = playerFs
+                    ? {position:'fixed',inset:0,zIndex:9999,background:'#000',display:'flex',alignItems:'center',justifyContent:'center'}
+                    : {position:'relative',borderRadius:18,overflow:'hidden',marginBottom:10,border:'1px solid var(--f1-border)',background:'#000',paddingTop:'56.25%'};
                 return (
-                    <div style={{position:'relative',borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)',background:'#000',paddingTop:'56.25%'}}>
-                        <iframe src={src} title={title} frameBorder="0" allowFullScreen
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; screen-wake-lock"
-                                style={{position:'absolute',inset:0,width:'100%',height:'100%',border:0}}/>
-                    </div>
+                    <>
+                        <div style={wrapStyle}>
+                            <iframe src={src2} title={title} frameBorder="0" allowFullScreen
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; screen-wake-lock"
+                                    style={playerFs?{width:'100%',height:'100%',border:0,maxHeight:'100dvh'}:{position:'absolute',inset:0,width:'100%',height:'100%',border:0}}/>
+                            {playerFs && (
+                                <button onClick={()=>setPlayerFs(false)} style={{position:'fixed',top:'calc(env(safe-area-inset-top, 8px) + 8px)',right:12,zIndex:10000,width:38,height:38,borderRadius:'50%',border:'none',background:'rgba(0,0,0,0.65)',color:'#fff',fontSize:17,cursor:'pointer',fontFamily:'inherit'}}>{'\u2715'}</button>
+                            )}
+                        </div>
+                        {!playerFs && (
+                            <div style={{display:'flex',gap:8,marginBottom:14}}>
+                                <button onClick={()=>setPlayerFs(true)} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'10px 0',borderRadius:12,border:'1px solid var(--f1-border)',background:'var(--f1-card-solid)',color:'var(--f1-text)',fontFamily:'inherit',fontWeight:700,fontSize:12,cursor:'pointer'}}>{'\u26f6'} Во весь экран</button>
+                                <button onClick={()=>openLink(b.video_url || u)} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'10px 0',borderRadius:12,border:'1px solid var(--f1-border)',background:'var(--f1-card-solid)',color:'var(--f1-text)',fontFamily:'inherit',fontWeight:700,fontSize:12,cursor:'pointer'}}>{'\u2197'} Открыть в {provName}</button>
+                            </div>
+                        )}
+                    </>
                 );
             })()}
 
