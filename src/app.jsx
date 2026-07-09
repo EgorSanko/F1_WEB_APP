@@ -1787,15 +1787,20 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
             <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>{'\u2190'} Видео</button>
 
             {(() => {
-                // Нативные плееры провайдеров. TG WebView блокирует Fullscreen API,
-                // поэтому Rutube прячет свою кнопку — даём свой CSS-фулскрин + открытие в приложении.
+                // Rutube — НАШ плеер (Plyr/HLS: работает лучше в TG, свой фулскрин).
+                // YouTube — нативный embed. Остальное — iframe c CSS-фулскрином.
                 const u = b.video_url || b.embed_url || '';
-                const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
                 const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
-                const src2 = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1')
-                           : rt ? ('https://rutube.ru/play/embed/'+rt[1])
-                           : (b.embed_url || u);
-                const provName = yt ? 'YouTube' : rt ? 'Rutube' : 'источнике';
+                if (rt) {
+                    return (
+                        <div style={{borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)'}}>
+                            <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type}/>
+                        </div>
+                    );
+                }
+                const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
+                const src2 = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1') : (b.embed_url || u);
+                const provName = yt ? 'YouTube' : 'источнике';
                 const wrapStyle = playerFs
                     ? {position:'fixed',inset:0,zIndex:9999,background:'#000',display:'flex',alignItems:'center',justifyContent:'center'}
                     : {position:'relative',borderRadius:18,overflow:'hidden',marginBottom:10,border:'1px solid var(--f1-border)',background:'#000',paddingTop:'56.25%'};
