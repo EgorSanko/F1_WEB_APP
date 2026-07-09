@@ -1588,7 +1588,7 @@ const PredictionsPage = ({user}) => {
     if (loading) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка прогнозов..."/></div>;
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>Прогнозы</h2>
+            <h2 style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase',marginBottom:4}}>ПРОГНОЗЫ</h2>
             {available?.available && available.race ? (<>
                 <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{flagEmoji(available.race.country)} {available.race.name} · Раунд {available.race.round}</div>
                 {available.predictions?.map(pred=>(
@@ -1788,26 +1788,50 @@ const VideosPage = ({schedule, onRaceClick}) => {
     );
 };
 
-const ProfilePage = ({user}) => {
+const ProfilePage = ({user, onNavigate}) => {
     const [leaderboard, setLeaderboard] = useState(null);
     const [achievements, setAchievements] = useState(null);
     useEffect(() => { api.get('/api/leaderboard').then(setLeaderboard); api.get('/api/user/achievements').then(setAchievements); }, []);
     if (!user) return <div className="page-container fade-in" style={{padding:16}}><F1MiniLoader/></div>;
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            <div className="card" style={{textAlign:'center',marginBottom:16,position:'relative',overflow:'hidden'}}>
-                <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,rgba(225,6,0,0.2),transparent)'}}/>
-                {user.photo_url ? (
-                    <img src={hiResImg(user.photo_url, 256)} alt="" style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',objectFit:'cover',border:'3px solid var(--f1-red)',boxShadow:'0 4px 16px rgba(225,6,0,0.3)'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
-                ) : null}
-                <div style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 8px',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:900,position:'relative',boxShadow:'0 4px 16px rgba(225,6,0,0.3)',display:user.photo_url?'none':'flex'}}>{user.first_name?.[0]||'?'}</div>
-                <div style={{fontSize:20,fontWeight:900}}>{user.first_name}</div>
-                {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)'}}>@{user.username}</div>}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:16}}>
-                    <div><div style={{fontSize:24,fontWeight:900,color:'var(--f1-red)'}}>{user.points}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Очки</div></div>
-                    <div><div style={{fontSize:24,fontWeight:900}}>#{user.rank||'—'}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Рейтинг</div></div>
-                    <div><div style={{fontSize:24,fontWeight:900}}>{user.streak||0}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>🔥 Серия</div></div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'2px 4px 18px'}}>
+                <div style={{fontSize:30,fontWeight:800,letterSpacing:-0.5}}>Профиль</div>
+            </div>
+
+            <div style={{display:'flex',alignItems:'center',gap:18,margin:'0 4px 16px'}}>
+                <div style={{position:'relative',flexShrink:0}}>
+                    <div style={{width:88,height:88,borderRadius:'50%',border:'2px solid var(--f1-red)',padding:3,boxShadow:'0 0 18px rgba(225,6,0,0.45)'}}>
+                        {user.photo_url ? (
+                            <img src={hiResImg(user.photo_url, 256)} alt="" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',display:'block'}} onError={e=>{e.target.style.display='none'}}/>
+                        ) : (
+                            <div style={{width:'100%',height:'100%',borderRadius:'50%',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,fontWeight:900}}>{(user.first_name||'?')[0]}</div>
+                        )}
+                    </div>
                 </div>
+                <div style={{minWidth:0}}>
+                    <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.3}}>{user.first_name}</div>
+                    {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2}}>@{user.username}</div>}
+                </div>
+            </div>
+
+            <div className="card" style={{display:'flex',padding:'16px 0',marginBottom:12}}>
+                {[{v:user.points,l:'Очков'},{v:'#'+(user.rank||'—'),l:'Рейтинг'},{v:user.streak||0,l:'Серия'}].map((s,i)=>(
+                    <div key={i} style={{flex:1,textAlign:'center',borderLeft:i>0?'1px solid var(--f1-border)':'none'}}>
+                        <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.3,color:i===0?'var(--f1-red)':'var(--f1-text)'}}>{s.v}</div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>{s.l}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="card" style={{padding:0,overflow:'hidden',marginBottom:16}}>
+                {[['standings','\ud83c\udfc6','Чемпионат'],['news','\ud83d\udcf0','Новости'],['schedule','\ud83d\udcc5','Календарь'],['videos','\u25b6\ufe0f','Видео']].map(([id,ic,label],i,arr)=>(
+                    <div key={id} onClick={()=>onNavigate && onNavigate(id)} style={{display:'flex',alignItems:'center',gap:14,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid var(--f1-border)':'none',cursor:'pointer'}}>
+                        <div style={{width:30,height:30,borderRadius:8,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{ic}</div>
+                        <div style={{flex:1,fontSize:15}}>{label}</div>
+                        <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'\u203a'}</div>
+                    </div>
+                ))}
             </div>
 
             <div className="card" style={{marginBottom:16}}>
@@ -4433,7 +4457,7 @@ const App = () => {
             case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onBack={()=>setTab('home')} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
             case 'predict': return <PredictionsPage user={user}/>;
             case 'videos': return <VideosPage schedule={schedule} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'broadcast');setTab('raceDetail');}}/>;
-            case 'profile': return <ProfilePage user={user}/>;
+            case 'profile': return <ProfilePage user={user} onNavigate={setTab}/>;
             case 'analytics': return <AnalyticsPage/>;
             case 'games': return <GamesPage onChange={setTab}/>;
             default: return null;
