@@ -1074,75 +1074,60 @@ const toMSK = (utcTime) => {
 };
 
 const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree}) => {
-    const races = (seasonResults?.races?.length ? seasonResults.races : null) || schedule?.races || [];
+    const [filter, setFilter] = useState('all');
+    const races = (seasonResults && seasonResults.races && seasonResults.races.length ? seasonResults.races : null) || (schedule && schedule.races) || [];
     if (!races.length) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка расписания..."/></div>;
 
     const now = new Date();
-    const lastCompletedRound = races.filter(r => new Date(r.date) < now).pop();
-    const isSpoilerActive = spoilerFree && season === 2026;
+    const raceTime = (r) => new Date((r.race_datetime || r.date || '').replace('Z','')).getTime();
+    const future = races.filter(r => raceTime(r) > now.getTime());
+    const nextRound = future.length ? future[0].round : null;
+    const filtered = filter === 'up' ? future : filter === 'past' ? races.filter(r => raceTime(r) <= now.getTime()) : races;
 
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                <h2 style={{fontSize:22,fontWeight:900}}>Сезон {season}</h2>
-
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                <div style={{fontSize:30,fontWeight:800,letterSpacing:-0.5,textTransform:'uppercase'}}>КАЛЕНДАРЬ</div>
+                <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',borderRadius:999,padding:'8px 16px',fontSize:14,fontWeight:700}}>{season}</div>
             </div>
-            <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{races.length} гран-при{seasonResults?.races?.length ? ' · Все результаты' : ''}</div>
 
-            {races.map((race) => {
-                const isPast = new Date(race.date) < now;
-                const flag = countryFlag(race.country_code) || circuitFlags[race.circuit_id] || '🏁';
-                const dateStr = new Date(race.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
-                const raceTime = toMSK(race.time);
-                const winner = race.winner;
-                const shouldHide = isSpoilerActive && isPast;
+            <div className="tab-switch" style={{marginBottom:16}}>
+                {[['all','ВСЕ'],['up','БЛИЖАЙШИЕ'],['past','ПРОШЕДШИЕ']].map(([id,label]) => (
+                    <button key={id} className={`tab-switch-btn ${filter===id?'active':''}`} style={{letterSpacing:2,fontSize:11,fontWeight:800}} onClick={()=>setFilter(id)}>{label}</button>
+                ))}
+            </div>
 
-                return (
-                    <div key={race.round} className="card" onClick={() => onRaceClick(race.round)}
-                         style={{marginBottom:8, padding:12, cursor: 'pointer', opacity: isPast ? 1 : 0.6, position:'relative', overflow:'hidden'}}>
-                        {race.circuit_image && <img src={hiResImg(race.circuit_image, 800)} alt="" style={{position:'absolute',top:0,right:0,width:'40%',height:'100%',objectFit:'cover',opacity:0.12,pointerEvents:'none',borderRadius:'0 12px 12px 0'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                        <div style={{display:'flex',alignItems:'center',gap:10,position:'relative'}}>
-                            <div style={{width:36,height:36,borderRadius:10,background:isPast?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,flexShrink:0,color:isPast?'var(--f1-red)':'var(--f1-text-muted)'}}>{race.round}</div>
-                            <div style={{flex:1,minWidth:0}}>
-                                <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                                    {race.country_code ? <FlagImg code={race.country_code} size={20}/> : <span>{circuitFlags[race.circuit_id]||'🏁'}</span>}
-                                    <span style={{fontWeight:700,fontSize:14}}>{race.name}</span>
-                                    {race.sprint ? (
-                                        <span style={{background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>СПРИНТ + ГОНКА</span>
-                                    ) : (
-                                        <span style={{background:'rgba(225,6,0,0.15)',color:'var(--f1-red)',fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:4,letterSpacing:0.5}}>ГОНКА</span>
-                                    )}
-                                </div>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{race.circuit || race.circuit_name} · {dateStr}{raceTime ? ` · ${raceTime}` : ''}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {filtered.map((race) => {
+                    const isPast = raceTime(race) <= now.getTime();
+                    const isNext = race.round === nextRound;
+                    const d = new Date((race.race_datetime || race.date || '').replace('Z',''));
+                    const dateRu = d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'}).toUpperCase();
+                    const title = (race.name || '').replace(/^Гран[- ]при\s+/i,'').toUpperCase();
+                    return (
+                        <div key={race.round} onClick={()=>onRaceClick(race.round)}
+                             style={{background:'var(--f1-card-solid)',borderRadius:22,border:'1px solid '+(isNext?'rgba(225,6,0,0.55)':'var(--f1-border)'),
+                                     boxShadow:isNext?'0 6px 18px rgba(225,6,0,0.22)':'none',
+                                     display:'flex',alignItems:'center',padding:'16px 14px 16px 18px',cursor:'pointer',opacity:isPast?0.55:1,flexShrink:0}}>
+                            <div style={{width:74,flexShrink:0}}>
+                                <div style={{fontSize:36,lineHeight:'38px',fontWeight:800,letterSpacing:-1}}>{String(race.round).padStart(2,'0')}</div>
+                                <div style={{fontSize:10,color:'var(--f1-red)',marginTop:8,letterSpacing:1.5,fontWeight:800}}>{dateRu}</div>
+                                {race.locality && <div style={{fontSize:9,letterSpacing:1.2,fontWeight:700,marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.locality.toUpperCase()}</div>}
                             </div>
-                            {shouldHide ? (
-                                null
-                            ) : (<>
-                                {isPast && winner && (
-                                    <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-                                        {winner.photo_url && <img src={winner.photo_url} alt="" style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',border:'2px solid #FFD700',background:'var(--f1-gray)'}} onError={e=>{e.target.style.display='none'}} loading="lazy"/>}
-                                        <div style={{textAlign:'right'}}>
-                                            <div style={{fontSize:12,fontWeight:900,color:'#FFD700'}}>{winner.code}</div>
-                                            <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>{winner.team?.split(' ')[0]}</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {(race.vk_url || race.vk_search_url) && isPast && (
-                                    <button onClick={(e)=>{e.stopPropagation();openLink(race.vk_url || race.vk_search_url);}} style={{background:'rgba(0,119,255,0.15)',border:'1px solid rgba(0,119,255,0.3)',borderRadius:8,padding:'4px 8px',color:'#4DA3FF',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-                                        {race.vk_url ? '📺' : '🔍'}
-                                    </button>
-                                )}
-                            </>)}
+                            <div style={{margin:'0 8px',flexShrink:0}}>{race.country_code ? <FlagImg code={race.country_code} size={26}/> : <span style={{fontSize:24}}>{circuitFlags[race.circuit_id]||''}</span>}</div>
+                            <div style={{flex:1,minWidth:0,marginLeft:4}}>
+                                <div style={{fontSize:10,color:'var(--f1-text-secondary)',letterSpacing:2.5,fontWeight:700}}>ГРАН-ПРИ</div>
+                                <div style={{fontSize:18,lineHeight:'21px',fontWeight:800,letterSpacing:-0.3,marginTop:2}}>{title}</div>
+                                {race.circuit && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.circuit}</div>}
+                                {race.sprint && <span style={{display:'inline-block',marginTop:5,background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:5,letterSpacing:1}}>СПРИНТ</span>}
+                            </div>
+                            {race.circuit_image && <img src={hiResImg(race.circuit_image, 400)} alt="" loading="lazy" style={{width:66,height:50,objectFit:'cover',borderRadius:12,opacity:isNext?1:0.8,flexShrink:0,border:'1px solid '+(isNext?'rgba(225,6,0,0.4)':'var(--f1-border)')}} onError={e=>{e.target.style.display='none'}}/>}
+                            <div style={{color:'var(--f1-text-muted)',fontSize:17,marginLeft:8}}>{'\u203a'}</div>
                         </div>
-                        {isPast && !shouldHide && (
-                            <div style={{display:'flex',gap:6,marginTop:8}} onClick={e=>e.stopPropagation()}>
-                                <button onClick={()=>onRaceClick(race.round,'race')} style={{flex:1,padding:'6px 0',borderRadius:8,border:'none',fontFamily:'inherit',fontWeight:600,fontSize:11,cursor:'pointer',background:'rgba(225,6,0,0.12)',color:'var(--f1-red)'}}>🏁 Результаты</button>
-                                <button onClick={()=>onRaceClick(race.round,'qualifying')} style={{flex:1,padding:'6px 0',borderRadius:8,border:'none',fontFamily:'inherit',fontWeight:600,fontSize:11,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-secondary)'}}>⏱️ Квали</button>
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
+                    );
+                })}
+                {filtered.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)'}}>Гонок не найдено</div>}
+            </div>
         </div>
     );
 };
