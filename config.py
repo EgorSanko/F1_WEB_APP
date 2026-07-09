@@ -314,33 +314,33 @@ CIRCUIT_BASE_LAP = {
 # Maps Ergast circuitId → F1 media track outline image name
 CIRCUIT_IMAGES = {
     "bahrain": "Bahrain",
-    "jeddah": "Saudi%20Arabia",
+    "jeddah": "Saudi_Arabia",
     "albert_park": "Australia",
     "suzuka": "Japan",
     "shanghai": "China",
     "miami": "Miami",
-    "imola": "Emilia%20Romagna",
+    "imola": "Emilia_Romagna",
     "monaco": "Monaco",
     "catalunya": "Spain",
     "villeneuve": "Canada",
     "red_bull_ring": "Austria",
-    "silverstone": "Great%20Britain",
+    "silverstone": "Great_Britain",
     "hungaroring": "Hungary",
     "spa": "Belgium",
     "zandvoort": "Netherlands",
     "monza": "Italy",
-    "baku": "Azerbaijan",
+    "baku": "Baku",
     "marina_bay": "Singapore",
     "americas": "USA",
     "rodriguez": "Mexico",
     "interlagos": "Brazil",
-    "las_vegas": "Las%20Vegas",
-    "vegas": "Las%20Vegas",
+    "las_vegas": "Las_Vegas",
+    "vegas": "Las_Vegas",
     "losail": "Qatar",
-    "yas_marina": "Abu%20Dhabi",
+    "yas_marina": "Abu_Dhabi",
 }
 
-CIRCUIT_IMAGE_BASE = "https://media.formula1.com/image/upload/f_auto/q_auto/v1677245035/content/dam/fom-website/2018-redesign-assets/Track%20outline%20702x405"
+CIRCUIT_IMAGE_BASE = "https://media.formula1.com/image/upload/f_auto,c_limit,w_400,q_auto/content/dam/fom-website/2018-redesign-assets/Circuit%20maps%2016x9"
 
 # ============ CIRCUIT CARD IMAGES (race promo cards) ============
 CIRCUIT_CARD_IMAGES = {

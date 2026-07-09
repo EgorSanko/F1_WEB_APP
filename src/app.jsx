@@ -1121,7 +1121,7 @@ const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree
                                 {race.circuit && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.circuit}</div>}
                                 {race.sprint && <span style={{display:'inline-block',marginTop:5,background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:5,letterSpacing:1}}>СПРИНТ</span>}
                             </div>
-                            {race.circuit_image && <img src={hiResImg(race.circuit_image, 400)} alt="" loading="lazy" style={{width:66,height:50,objectFit:'cover',borderRadius:12,opacity:isNext?1:0.8,flexShrink:0,border:'1px solid '+(isNext?'rgba(225,6,0,0.4)':'var(--f1-border)')}} onError={e=>{e.target.style.display='none'}}/>}
+                            {race.circuit_outline && <img src={race.circuit_outline} alt="" loading="lazy" style={{width:72,height:52,objectFit:'contain',opacity:isNext?1:0.95,flexShrink:0,filter:isNext?'drop-shadow(0 0 6px rgba(225,6,0,0.9))':'none'}} onError={e=>{e.target.style.display='none'}}/>}
                             <div style={{color:'var(--f1-text-muted)',fontSize:17,marginLeft:8}}>{'\u203a'}</div>
                         </div>
                     );
@@ -1788,7 +1788,7 @@ const VideosPage = ({schedule, onRaceClick}) => {
     );
 };
 
-const ProfilePage = ({user, onNavigate}) => {
+const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
     const [leaderboard, setLeaderboard] = useState(null);
     const [achievements, setAchievements] = useState(null);
     useEffect(() => { api.get('/api/leaderboard').then(setLeaderboard); api.get('/api/user/achievements').then(setAchievements); }, []);
@@ -1799,33 +1799,104 @@ const ProfilePage = ({user, onNavigate}) => {
                 <div style={{fontSize:30,fontWeight:800,letterSpacing:-0.5}}>Профиль</div>
             </div>
 
-            <div style={{display:'flex',alignItems:'center',gap:18,margin:'0 4px 16px'}}>
+            {/* User row: avatar glow + name + car (app design) */}
+            <div style={{display:'flex',alignItems:'center',gap:18,margin:'0 4px 14px'}}>
                 <div style={{position:'relative',flexShrink:0}}>
-                    <div style={{width:88,height:88,borderRadius:'50%',border:'2px solid var(--f1-red)',padding:3,boxShadow:'0 0 18px rgba(225,6,0,0.45)'}}>
+                    <div style={{width:92,height:92,borderRadius:'50%',border:'2px solid var(--f1-red)',padding:3,boxShadow:'0 0 18px rgba(225,6,0,0.45)'}}>
                         {user.photo_url ? (
                             <img src={hiResImg(user.photo_url, 256)} alt="" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',display:'block'}} onError={e=>{e.target.style.display='none'}}/>
                         ) : (
-                            <div style={{width:'100%',height:'100%',borderRadius:'50%',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,fontWeight:900}}>{(user.first_name||'?')[0]}</div>
+                            <div style={{width:'100%',height:'100%',borderRadius:'50%',background:'linear-gradient(135deg,var(--f1-red),#FF6B00)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:34,fontWeight:900}}>{(user.first_name||'?')[0]}</div>
                         )}
                     </div>
                 </div>
-                <div style={{minWidth:0}}>
-                    <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.3}}>{user.first_name}</div>
+                <div style={{flex:1,minWidth:0,position:'relative',overflow:'hidden',paddingRight:4}}>
+                    <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.first_name}</div>
                     {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2}}>@{user.username}</div>}
+                    <img src="/static/car-drift.webp" alt="" style={{position:'absolute',right:-16,top:4,width:120,height:64,objectFit:'contain',opacity:0.55,pointerEvents:'none'}}/>
                 </div>
             </div>
 
-            <div className="card" style={{display:'flex',padding:'16px 0',marginBottom:12}}>
-                {[{v:user.points,l:'Очков'},{v:'#'+(user.rank||'—'),l:'Рейтинг'},{v:user.streak||0,l:'Серия'}].map((s,i)=>(
-                    <div key={i} style={{flex:1,textAlign:'center',borderLeft:i>0?'1px solid var(--f1-border)':'none'}}>
-                        <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.3,color:i===0?'var(--f1-red)':'var(--f1-text)'}}>{s.v}</div>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>{s.l}</div>
+            {/* Bio */}
+            <div style={{fontSize:13,lineHeight:'18px',color:'var(--f1-text-muted)',margin:'0 4px 16px'}}>Фанат Формулы-1 и скорости. Аналитика, прогнозы и гонки! {'\ud83c\udfc1'}</div>
+
+            {/* Stats: Очков / Прогнозов / Точность (app design) */}
+            {(() => {
+                const total = user.predictions_total || 0;
+                const correct = user.predictions_correct || 0;
+                const acc = total ? Math.round(correct/total*100) : 0;
+                const cells = [[user.points,'Очков'],[total,'Прогнозов'],[acc+'%','Точность']];
+                return (
+                    <div className="card" style={{display:'flex',padding:'16px 0',marginBottom:10}}>
+                        {cells.map((s,i)=>(
+                            <div key={i} style={{flex:1,textAlign:'center',borderLeft:i>0?'1px solid var(--f1-border)':'none'}}>
+                                <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.3}}>{s[0]}</div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>{s[1]}</div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                );
+            })()}
+
+            {/* Premium banner */}
+            <div className="card" style={{display:'flex',alignItems:'center',gap:14,padding:16,marginBottom:10,border:'1px solid rgba(225,6,0,0.18)'}}>
+                <div style={{width:40,height:40,borderRadius:10,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{'\ud83d\udee1\ufe0f'}</div>
+                <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:800}}>Премиум статус</div>
+                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>Больше возможностей и эксклюзивный контент</div>
+                </div>
+                <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'\u203a'}</div>
             </div>
 
+            {/* Achievements: hex badges + anti-spoiler toggle (app design) */}
+            {(() => {
+                const total = user.predictions_total || 0;
+                const correct = user.predictions_correct || 0;
+                const acc = total ? Math.round(correct/total*100) : 0;
+                const badges = [
+                    {ic:'\ud83c\udfc1', label:'Первые шаги', desc:'Сделал 1 прогноз', ok: total>=1},
+                    {ic:'\ud83c\udfc6', label:'Профи', desc:'Сделал 10 прогнозов', ok: total>=10},
+                    {ic:'\ud83c\udfaf', label:'Точный глаз', desc:'Точность 70%+', ok: acc>=70 && total>=5},
+                    {ic:'\ud83c\udf96\ufe0f', label:'Эксперт', desc:'Сделал 50 прогнозов', ok: total>=50},
+                ];
+                const unlocked = badges.filter(b=>b.ok).length;
+                const Hex = ({b}) => (
+                    <div style={{flex:1,textAlign:'center',minWidth:0}}>
+                        <div style={{position:'relative',width:58,height:64,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'center',filter:b.ok?'drop-shadow(0 0 8px rgba(225,6,0,0.4))':'none'}}>
+                            <svg width="58" height="64" viewBox="0 0 60 66" style={{position:'absolute',inset:0}}>
+                                <polygon points="30,2 56,16 56,50 30,64 4,50 4,16" fill="var(--f1-card-solid)" stroke={b.ok?'var(--f1-red)':'#3A3A4A'} strokeWidth="2"/>
+                            </svg>
+                            <span style={{fontSize:20,position:'relative',opacity:b.ok?1:0.3}}>{b.ic}</span>
+                        </div>
+                        <div style={{fontSize:11,fontWeight:800,marginTop:8,color:b.ok?'var(--f1-text)':'var(--f1-text-secondary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.label}</div>
+                        <div style={{fontSize:9,color:'var(--f1-text-muted)',marginTop:2,lineHeight:'11px'}}>{b.desc}</div>
+                    </div>
+                );
+                return (
+                    <div className="card" style={{padding:16,marginBottom:10}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                            <div style={{fontSize:18,fontWeight:800}}>Достижения</div>
+                            <div style={{color:'var(--f1-red)',fontSize:13,fontWeight:800}}>{unlocked} / {badges.length} {'\u203a'}</div>
+                        </div>
+                        <div style={{display:'flex',gap:8}}>{badges.map((b,i)=><Hex key={i} b={b}/>)}</div>
+                        <div style={{height:1,background:'var(--f1-border)',margin:'16px 0 4px'}}/>
+                        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0 2px'}}>
+                            <div style={{width:36,height:36,borderRadius:10,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>{spoilerFree?'\ud83d\ude48':'\ud83d\udc41\ufe0f'}</div>
+                            <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:14,fontWeight:800}}>Антиспойлер</div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>Скрывает результаты гонок и таблицу сезона</div>
+                            </div>
+                            <div onClick={onToggleSpoiler} style={{width:46,height:26,borderRadius:13,background:spoilerFree?'var(--f1-red)':'#2A2A38',position:'relative',cursor:'pointer',transition:'background 0.2s',flexShrink:0}}>
+                                <div style={{position:'absolute',top:2,left:spoilerFree?22:2,width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Menu (app design) */}
             <div className="card" style={{padding:0,overflow:'hidden',marginBottom:16}}>
-                {[['standings','\ud83c\udfc6','Чемпионат'],['news','\ud83d\udcf0','Новости'],['schedule','\ud83d\udcc5','Календарь'],['videos','\u25b6\ufe0f','Видео']].map(([id,ic,label],i,arr)=>(
+                {[['predict','\ud83d\udcc8','Мои прогнозы'],['standings','\ud83c\udfc6','Чемпионат'],['news','\ud83d\udcf0','Новости'],['schedule','\ud83d\udcc5','Календарь'],['videos','\u25b6\ufe0f','Видео']].map(([id,ic,label],i,arr)=>(
                     <div key={id} onClick={()=>onNavigate && onNavigate(id)} style={{display:'flex',alignItems:'center',gap:14,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid var(--f1-border)':'none',cursor:'pointer'}}>
                         <div style={{width:30,height:30,borderRadius:8,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{ic}</div>
                         <div style={{flex:1,fontSize:15}}>{label}</div>
@@ -3314,19 +3385,15 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
             <button onClick={onBack} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,fontFamily:'inherit',cursor:'pointer',marginBottom:12,display:'flex',alignItems:'center',gap:4}}>← Расписание</button>
 
-            {/* Race header */}
-            <div className="gradient-card" style={{marginBottom:16,minHeight:120,background:race.circuit_image?`linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.85)), url(${hiResImg(race.circuit_image, 1200)})`:'var(--f1-card)',backgroundSize:'cover',backgroundPosition:'center'}}>
-                <div style={{position:'relative',zIndex:1}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                        {race.country_code ? <FlagImg code={race.country_code} size={32}/> : <span style={{fontSize:36}}>{flag}</span>}
-                        <div>
-                            <div style={{fontSize:20,fontWeight:900}}>{race.name}</div>
-                            <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{race.circuit_name || race.circuit} · Раунд {race.round}</div>
-                            <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>{dateStr}{race.laps ? ` · ${race.laps} кругов` : ''}</div>
-                        </div>
-                    </div>
-                    {race.sprint && <div style={{marginTop:8,display:'inline-block',background:'rgba(255,128,0,0.2)',color:'#FF8000',fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6}}>Спринт-уикенд</div>}
+            {/* Race header — app design: city italic + circuit outline */}
+            <div style={{marginBottom:16,background:'var(--f1-card-solid)',border:'1px solid rgba(225,6,0,0.18)',borderRadius:20,boxShadow:'0 6px 14px rgba(225,6,0,0.12)',display:'flex',alignItems:'center',padding:'18px 20px',minHeight:120}}>
+                <div style={{flex:1,minWidth:0}}>
+                    <div style={{marginBottom:8}}>{race.country_code ? <FlagImg code={race.country_code} size={26}/> : <span style={{fontSize:24}}>{flag}</span>}</div>
+                    <div style={{fontSize:26,lineHeight:'28px',fontWeight:800,letterSpacing:-1,fontStyle:'italic',textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(race.locality || (race.name||'').replace(/^Гран[- ]при\s+/i,'')).toUpperCase()}</div>
+                    <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:6}}>{dateStr}{race.laps ? ` · ${race.laps} кругов` : ''} · Раунд {race.round}</div>
+                    {race.sprint && <div style={{marginTop:8,display:'inline-block',background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:10,fontWeight:800,padding:'3px 10px',borderRadius:6,letterSpacing:1}}>СПРИНТ-УИКЕНД</div>}
                 </div>
+                {race.circuit_outline && <img src={race.circuit_outline} alt="" loading="lazy" style={{width:118,height:96,objectFit:'contain',flexShrink:0,filter:'drop-shadow(0 0 6px rgba(225,6,0,0.85))'}} onError={e=>{e.target.style.display='none'}}/>}
             </div>
 
             {isSpoilerHidden && isPastRace && (
@@ -3345,7 +3412,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             {isPastRace && !isSpoilerHidden && (race.podium || race.top_10 || raceResults || qualiData) && (
                 <div style={{display:'flex',gap:6,marginBottom:16}}>
                     {[...(broadcastData?['race','qualifying','broadcast']:['race','qualifying'])].map(t=>(
-                        <button key={t} onClick={()=>{if(t!=='broadcast'&&isSpoilerHidden)return;setRaceTab(t);}} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab===t?'#fff':'var(--f1-text-muted)'}}>
+                        <button key={t} onClick={()=>{if(t!=='broadcast'&&isSpoilerHidden)return;setRaceTab(t);}} style={{flex:1,padding:'10px 0',borderRadius:999,border:'none',fontFamily:'inherit',fontWeight:800,fontSize:12,letterSpacing:0.5,cursor:'pointer',transition:'all 0.2s',background:raceTab===t?'var(--f1-red)':'var(--f1-card-solid)',color:raceTab===t?'#fff':'var(--f1-text-muted)',boxShadow:raceTab===t?'0 3px 10px rgba(225,6,0,0.35)':'none'}}>
                             {t==='race'?'🏁 Гонка':t==='qualifying'?'⏱️ Квалификация':'📺 Запись'}
                         </button>
                     ))}
@@ -3360,7 +3427,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
 
             {!isPastRace && broadcastData && !isSpoilerHidden && (
                 <div style={{display:'flex',gap:6,marginBottom:16}}>
-                    <button onClick={()=>setRaceTab('broadcast')} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',background:raceTab==='broadcast'?'var(--f1-red)':'rgba(255,255,255,0.08)',color:raceTab==='broadcast'?'#fff':'var(--f1-text-muted)'}}>
+                    <button onClick={()=>setRaceTab('broadcast')} style={{flex:1,padding:'10px 0',borderRadius:999,border:'none',fontFamily:'inherit',fontWeight:800,fontSize:12,letterSpacing:0.5,cursor:'pointer',transition:'all 0.2s',background:raceTab==='broadcast'?'var(--f1-red)':'var(--f1-card-solid)',color:raceTab==='broadcast'?'#fff':'var(--f1-text-muted)',boxShadow:raceTab==='broadcast'?'0 3px 10px rgba(225,6,0,0.35)':'none'}}>
                         📺 Запись
                     </button>
                 </div>
@@ -3368,27 +3435,43 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
 
             {race.sessions && !race.podium && !raceResults && (() => {
                 const sessionNames = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
+                const sessionShort = {fp1:'FP1',fp2:'FP2',fp3:'FP3',qualifying:'QUALI',race:'RACE',sprint:'SPRINT',sprint_qualifying:'SQ'};
                 const sessionOrder = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
                 const entries = typeof race.sessions === 'object' && !Array.isArray(race.sessions) ? Object.entries(race.sessions).sort((a,b)=>sessionOrder.indexOf(a[0])-sessionOrder.indexOf(b[0])) : [];
                 if (!entries.length) return null;
+                const days = {};
+                entries.forEach(([key,val]) => {
+                    if (!val.date) return;
+                    const dt = new Date(val.date+'T'+(val.time||'00:00:00').replace('Z',''));
+                    const msk = new Date(dt.getTime() + 3*3600000);
+                    const dayKey = msk.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+                    (days[dayKey] = days[dayKey] || []).push({key, time: msk.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})});
+                });
                 return (
-                    <div className="card" style={{padding:'16px 12px',marginBottom:16}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>📅 Расписание сессий</div>
-                        {entries.map(([key,val],i) => {
-                            const dt = val.date ? new Date(val.date+'T'+(val.time||'00:00:00').replace('Z','')) : null;
-                            const msk = dt ? new Date(dt.getTime() + 3*3600000) : null;
-                            const dayStr = msk ? msk.toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'}) : '';
-                            const timeStr = msk ? msk.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
-                            return (
-                                <div key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:i<entries.length-1?'1px solid var(--f1-border)':'none'}}>
-                                    <span style={{fontSize:13,fontWeight:key==='race'?700:400,color:key==='race'?'var(--f1-red)':'var(--f1-text)'}}>{sessionNames[key]||key}</span>
-                                    <div style={{textAlign:'right'}}>
-                                        <div style={{fontSize:12,color:'var(--f1-text-secondary)'}}>{dayStr}</div>
-                                        {timeStr && <div style={{fontSize:13,fontWeight:600}}>{timeStr} МСК</div>}
-                                    </div>
+                    <div style={{marginBottom:16}}>
+                        {Object.entries(days).map(([day, list]) => (
+                            <div key={day} style={{marginBottom:18}}>
+                                <div style={{display:'flex',alignItems:'center',marginBottom:10,paddingLeft:2}}>
+                                    <div style={{width:3,height:16,background:'var(--f1-red)',borderRadius:2,marginRight:10}}/>
+                                    <div style={{fontSize:13,fontWeight:800,letterSpacing:2,textTransform:'uppercase'}}>{day}</div>
                                 </div>
-                            );
-                        })}
+                                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                                    {list.map(({key,time}) => {
+                                        const isRace = key==='race';
+                                        return (
+                                            <div key={key} style={{background:'var(--f1-card-solid)',borderRadius:16,border:'1px solid '+(isRace?'rgba(225,6,0,0.4)':'var(--f1-border)'),boxShadow:isRace?'0 4px 14px rgba(225,6,0,0.18)':'none',display:'flex',alignItems:'center',padding:'16px'}}>
+                                                <div style={{color:'var(--f1-red)',fontSize:26,lineHeight:'28px',fontWeight:800,letterSpacing:-0.5,minWidth:76}}>{time}</div>
+                                                <div style={{flex:1,marginLeft:10}}>
+                                                    <div style={{fontSize:15,fontWeight:700}}>{sessionNames[key]||key}</div>
+                                                    <span style={{display:'inline-block',marginTop:6,padding:'3px 8px',borderRadius:6,background:'rgba(255,255,255,0.06)',border:'1px solid var(--f1-border)',fontSize:10,fontWeight:800,letterSpacing:1.5,color:'var(--f1-text-secondary)'}}>{sessionShort[key]||key.toUpperCase()}</span>
+                                                </div>
+                                                <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'\u203a'}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 );
             })()}
@@ -4457,7 +4540,7 @@ const App = () => {
             case 'standings': return <StandingsPage driversStandings={driversStandings} constructorsStandings={constructorsStandings} season={currentSeason} spoilerFree={spoilerFree && currentSeason === 2026} onBack={()=>setTab('home')} onRefresh={async()=>{const[ds,cs]=await Promise.all([api.get(`/api/standings/drivers?season=${currentSeason}`),api.get(`/api/standings/constructors?season=${currentSeason}`)]);if(ds)setDriversStandings(ds);if(cs)setConstructorsStandings(cs);}}/>;
             case 'predict': return <PredictionsPage user={user}/>;
             case 'videos': return <VideosPage schedule={schedule} onRaceClick={(round,dtab)=>{setSelectedRound(round);setRaceDetailTab(dtab||'broadcast');setTab('raceDetail');}}/>;
-            case 'profile': return <ProfilePage user={user} onNavigate={setTab}/>;
+            case 'profile': return <ProfilePage user={user} onNavigate={setTab} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
             case 'analytics': return <AnalyticsPage/>;
             case 'games': return <GamesPage onChange={setTab}/>;
             default: return null;

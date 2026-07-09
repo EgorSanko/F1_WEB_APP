@@ -588,7 +588,7 @@ def _get_circuit_image(circuit_id: str) -> str:
     """Get track outline image URL for a circuit."""
     name = CIRCUIT_IMAGES.get(circuit_id, "")
     if name:
-        return f"{CIRCUIT_IMAGE_BASE}/{name}.png"
+        return f"{CIRCUIT_IMAGE_BASE}/{name}_Circuit"
     return ""
 
 
@@ -741,6 +741,7 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
             "circuit": race["Circuit"]["circuitName"],
             "circuit_id": circuit_id,
             "circuit_image": get_circuit_card_url(circuit_id) or _get_circuit_image(circuit_id),
+            "circuit_outline": _get_circuit_image(circuit_id),
             "country": race["Circuit"]["Location"]["country"],
             "country_code": CIRCUIT_COUNTRIES.get(circuit_id, ""),
             "locality": race["Circuit"]["Location"]["locality"],
@@ -2607,6 +2608,7 @@ def get_season_results(season: int = 2025) -> Dict[str, Any]:
             "circuit_id": circuit_id,
             "circuit_name": circuit_info.get("name", ""),
             "circuit_image": get_circuit_card_url(circuit_id) or _get_circuit_image(circuit_id),
+            "circuit_outline": _get_circuit_image(circuit_id),
             "laps": data.get("laps", 0),
             "sprint": data.get("sprint", False),
             "winner": winner,
