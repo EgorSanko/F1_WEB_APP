@@ -131,22 +131,32 @@ def gen_background(race, style, key):
         "modalities": ["image", "text"],
         "image_config": {"aspect_ratio": "9:16"},
     }
+    CF_URL = os.environ.get("POSTER_CF_URL", "https://or-proxy.egor3sanko22.workers.dev")
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(body, f)
         bf = f.name
-    try:
-        out = subprocess.run(
-            ["curl", "-s", "--socks5-hostname", SOCKS, "-m", "240",
+
+    def _curl(extra, base):
+        return subprocess.run(
+            ["curl", "-s", *extra, "-m", "240",
              "-H", "Authorization: Bearer " + key,
              "-H", "Content-Type: application/json",
              "-H", "HTTP-Referer: https://f1hub.lead-seek.ru",
              "-H", "X-Title: f1hub-poster",
              "-d", "@" + bf,
-             "https://openrouter.ai/api/v1/chat/completions"],
+             base + "/api/v1/chat/completions"],
             capture_output=True, text=True, timeout=300)
+
+    try:
+        # 1) SOCKS-туннель через NL-сервер; 2) fallback: Cloudflare Worker
+        out = _curl(["--socks5-hostname", SOCKS], "https://openrouter.ai")
+        m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", out.stdout or "")
+        if not m:
+            print("socks path failed, retry via CF worker...")
+            out = _curl([], CF_URL)
+            m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", out.stdout or "")
     finally:
         os.unlink(bf)
-    m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", out.stdout or "")
     if not m:
         raise SystemExit("no image in response: " + (out.stdout or out.stderr or "")[:400])
     return base64.b64decode(m.group(1))
