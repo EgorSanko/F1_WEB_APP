@@ -117,7 +117,12 @@ def next_race(round_override=None):
     raise SystemExit("no upcoming race")
 
 
+SOCKS = os.environ.get("POSTER_SOCKS", "127.0.0.1:1080")  # f1hub-socks.service (NL)
+
+
 def gen_background(race, style, key):
+    """OpenRouter блокирует RU-IP — ходим через SOCKS-туннель curl-ом."""
+    import subprocess, tempfile
     flavor = FLAVOR.get(race.get("country", ""), f"iconic landmarks and atmosphere of {race.get('country','the host country')}, national flag brush stroke")
     prompt = STYLES[style].format(flavor=flavor)
     body = {
@@ -126,11 +131,24 @@ def gen_background(race, style, key):
         "modalities": ["image", "text"],
         "image_config": {"aspect_ratio": "9:16"},
     }
-    j = http_json("https://openrouter.ai/api/v1/chat/completions", body,
-                  {"Authorization": "Bearer " + key, "HTTP-Referer": "https://f1hub.lead-seek.ru", "X-Title": "f1hub-poster"})
-    m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", json.dumps(j))
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(body, f)
+        bf = f.name
+    try:
+        out = subprocess.run(
+            ["curl", "-s", "--socks5-hostname", SOCKS, "-m", "240",
+             "-H", "Authorization: Bearer " + key,
+             "-H", "Content-Type: application/json",
+             "-H", "HTTP-Referer: https://f1hub.lead-seek.ru",
+             "-H", "X-Title: f1hub-poster",
+             "-d", "@" + bf,
+             "https://openrouter.ai/api/v1/chat/completions"],
+            capture_output=True, text=True, timeout=300)
+    finally:
+        os.unlink(bf)
+    m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", out.stdout or "")
     if not m:
-        raise SystemExit("no image in response: " + json.dumps(j)[:400])
+        raise SystemExit("no image in response: " + (out.stdout or out.stderr or "")[:400])
     return base64.b64decode(m.group(1))
 
 
@@ -219,13 +237,75 @@ def send_photo(chat_id, path, caption):
         return json.loads(r.read().decode()).get("ok")
 
 
+def all_user_ids():
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(HERE, "data", "f1hub.db"))
+    ids = [r[0] for r in conn.execute("SELECT user_id FROM users").fetchall()]
+    conn.close()
+    return ids
+
+
+def broadcast(path, caption):
+    ok = fail = 0
+    for uid in all_user_ids():
+        try:
+            if send_photo(uid, path, caption):
+                ok += 1
+            else:
+                fail += 1
+        except Exception:
+            fail += 1
+    print(f"broadcast: ok={ok} fail={fail}")
+    return ok
+
+
+# окна авто-режима: (секунд до старта от..до, стиль, подпись)
+AUTO_WINDOWS = [
+    (23.5 * 3600, 24.5 * 3600, "city",
+     "\U0001F3C1 {name} — уже завтра!\n{sub}\nДелай прогноз в приложении \U0001F449 @F1_egor_bot"),
+    (0.75 * 3600, 1.25 * 3600, "retro",
+     "\U0001F3C6 {name} — старт через час!\n{sub}\nПрогнозы закрываются со стартом гонки!"),
+    (2 * 60, 10 * 60, "fans",
+     "\U0001F525 {name} — LIGHTS OUT через 5 минут!\n{sub}\nСмотрим \U0001F440"),
+]
+
+
+def run_auto():
+    from datetime import datetime
+    race = next_race()
+    dt = datetime.fromisoformat(race["race_datetime"].replace("Z", ""))
+    left = (dt - datetime.utcnow()).total_seconds()
+    for lo, hi, style, cap_tpl in AUTO_WINDOWS:
+        if lo <= left <= hi:
+            flag = os.path.join(OUT_DIR, f"sent-r{race['round']}-{style}.flag")
+            if os.path.exists(flag):
+                print(f"window {style}: already sent")
+                return
+            key = load_key()
+            print(f"auto: R{race['round']} {race['name']}, {left/3600:.2f}h left -> {style}")
+            bg = gen_background(race, style, key)
+            out = os.path.join(OUT_DIR, f"round{race['round']}-{style}.png")
+            overlay(bg, race, out)
+            sub = f"{race.get('circuit') or ''} · {dt.day} {MONTHS_RU[dt.month].capitalize().lower()}"
+            cap = cap_tpl.format(name=race["name"], sub=sub)
+            broadcast(out, cap)
+            open(flag, "w").write("1")
+            return
+    print(f"auto: no window ({left/3600:.2f}h to race)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--round", type=int, default=None)
     ap.add_argument("--style", choices=list(STYLES), default="city")
     ap.add_argument("--send-to", type=int, default=None)
     ap.add_argument("--caption", default=None)
+    ap.add_argument("--auto", action="store_true", help="cron mode: check windows, generate, broadcast")
     args = ap.parse_args()
+
+    if args.auto:
+        run_auto()
+        return
 
     key = load_key()
     if not key:
