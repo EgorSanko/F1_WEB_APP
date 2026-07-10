@@ -12,3 +12,5 @@ __pycache__/
 test-*.html
 node_modules/
 package-lock.json
+poster.env
+data/posters/
