@@ -1578,155 +1578,352 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
 };
 
 // ==== PREDICTIONS PAGE ====
-const PredictionsPage = ({user}) => {
-    const [available, setAvailable] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [selected, setSelected] = useState({});
-    const [podiumPicks, setPodiumPicks] = useState([]);
-    const [submitting, setSubmitting] = useState(false);
-    const [myPredictions, setMyPredictions] = useState([]);
-    useEffect(() => { (async()=>{ const [a,p] = await Promise.all([api.get('/api/predictions/available'),api.get('/api/user/predictions')]); setAvailable(a); setMyPredictions(p?.predictions||[]); setLoading(false); })(); }, []);
-    const handlePredict = async (type, value) => {
-        if (!available?.race?.round) return; setSubmitting(true);
-        const result = await api.post('/api/predictions/make',{race_round:available.race.round,season:new Date().getFullYear(),prediction_type:type,prediction_value:value});
-        if (result?.status==='ok') { setSelected(prev=>({...prev,[type]:value})); const p=await api.get('/api/user/predictions'); setMyPredictions(p?.predictions||[]); }
-        setSubmitting(false);
-    };
-    if (loading) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка прогнозов..."/></div>;
+const PRED_ICON = {winner:'🏆', podium:'🥇', fastest_lap:'⚡', dnf_count:'💥', safety_car:'🚗'};
+const PRED_LABELS = {winner:'Победитель', podium:'Подиум', fastest_lap:'Быстрый круг', dnf_count:'Сходы', safety_car:'Safety Car'};
+const PODIUM_COLORS = ['#FFCB05','#C0C0C0','#CD7F32'];
+
+const fmtPredValue = (type, value, drivers) => {
+    const byNum = {}; (drivers||[]).forEach(d=>{byNum[d.driver_number]=d;});
+    const nm = (n) => byNum[n] ? (byNum[n].last_name || byNum[n].name || ('#'+n)) : ('#'+n);
+    let v = value;
+    if (typeof v === 'string' && (v.startsWith('[') || /^\d+$/.test(v))) { try { v = JSON.parse(v); } catch(e){} }
+    if (type === 'safety_car') return [true,'yes','true',1,'1'].includes(v) ? 'Да' : 'Нет';
+    if (type === 'dnf_count') return v + ' сходов';
+    if (type === 'podium' && Array.isArray(v)) return v.map(nm).join(' → ');
+    if (type === 'winner' || type === 'fastest_lap') return nm(v);
+    return String(v ?? '');
+};
+
+// Строка пилота — как DriverPickerList в приложении
+const DriverPickRow = ({d, isSelected, rank, onClick, disabled}) => {
+    const tc = d.team_color || '#666';
     return (
-        <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            <h2 style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase',marginBottom:4}}>ПРОГНОЗЫ</h2>
-            {available?.available && available.race ? (<>
-                <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16}}>{flagEmoji(available.race.country)} {available.race.name} · Раунд {available.race.round}</div>
-                {available.predictions?.map(pred=>(
-                    <div key={pred.type} className="card" style={{marginBottom:10}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                            <div><div style={{fontWeight:700,fontSize:15}}>{pred.label}</div><div style={{fontSize:12,color:'var(--f1-text-muted)'}}>{pred.description}</div></div>
-                            <div style={{background:'rgba(225,6,0,0.15)',borderRadius:8,padding:'4px 8px',fontSize:12,fontWeight:700,color:'var(--f1-red)'}}>+{pred.max_points}</div>
-                        </div>
-                        {pred.already_predicted || selected[pred.type] ? (
-                            <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(57,181,74,0.1)',color:'#39B54A',fontSize:13,fontWeight:600}}>✓ Прогноз сделан</div>
-                        ) : pred.type==='winner'||pred.type==='fastest_lap' ? (
-                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-                                {available.drivers?.slice(0,20).map(d=>(
-                                    <div key={d.driver_number} onClick={()=>{if(!submitting)handlePredict(pred.type,d.driver_number)}}
-                                        style={{cursor:'pointer',borderRadius:10,overflow:'hidden',background:'var(--f1-gray)',border:'2px solid '+d.team_color+'66',opacity:submitting?0.5:1,transition:'transform 0.15s'}}>
-                                        <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-                                            {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
-                                        </div>
-                                        <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
-                                            <div style={{fontSize:11,fontWeight:800,color:d.team_color}}>{d.code}</div>
-                                            <div style={{fontSize:8,color:'var(--f1-text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.team?.split(' ')[0]||''}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : pred.type==='podium' ? (
-                            <div>
-                                <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:6}}>Выбрано: {podiumPicks.length}/3 {podiumPicks.length===3&&<span style={{color:'#39B54A',marginLeft:8}}>Готово!</span>}</div>
-                                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-                                    {available.drivers?.slice(0,20).map(d=>{
-                                        const picked=podiumPicks.includes(d.driver_number), idx=podiumPicks.indexOf(d.driver_number);
-                                        return (
-                                            <div key={d.driver_number} onClick={()=>{if(submitting)return;if(picked)setPodiumPicks(p=>p.filter(n=>n!==d.driver_number));else if(podiumPicks.length<3)setPodiumPicks(p=>[...p,d.driver_number]);}}
-                                                style={{cursor:'pointer',borderRadius:14,overflow:'hidden',background:picked?d.team_color+'33':'var(--f1-card-solid)',border:'2px solid '+(picked?d.team_color:d.team_color+'44'),opacity:submitting?0.5:(!picked&&podiumPicks.length>=3)?0.3:1,transition:'transform 0.15s',position:'relative'}}>
-                                                {picked && <div style={{position:'absolute',top:4,right:4,width:18,height:18,borderRadius:'50%',background:d.team_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#fff',zIndex:2}}>{idx+1}</div>}
-                                                <div style={{height:48,background:'linear-gradient(180deg,'+d.team_color+'30,transparent)',position:'relative',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-                                                    {d.photo_url && <img src={hiResImg(d.photo_url, 200)} alt="" style={{height:44,objectFit:'cover',objectPosition:'top',borderRadius:'50%'}} loading="lazy" onError={e=>{e.target.style.display='none'}}/>}
-                                                </div>
-                                                <div style={{padding:'4px 2px 6px',textAlign:'center'}}>
-                                                    <div style={{fontSize:11,fontWeight:800,color:picked?d.team_color:'var(--f1-text)'}}>{d.code}</div>
-                                                    <div style={{fontSize:8,color:'var(--f1-text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.team?.split(' ')[0]||''}</div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                {podiumPicks.length===3 && <button className="btn-primary" style={{width:'100%',marginTop:10}} onClick={()=>handlePredict('podium',podiumPicks)} disabled={submitting}>Подтвердить подиум</button>}
-                            </div>
-                        ) : pred.type==='safety_car' ? (
-                            <div style={{display:'flex',gap:8}}>
-                                <button className="btn-primary" style={{flex:1}} onClick={()=>handlePredict('safety_car','yes')} disabled={submitting}>Да</button>
-                                <button className="btn-primary" style={{flex:1,background:'var(--f1-gray)'}} onClick={()=>handlePredict('safety_car','no')} disabled={submitting}>Нет</button>
-                            </div>
-                        ) : pred.type==='dnf_count' ? (
-                            <div style={{display:'flex',gap:6}}>{[0,1,2,3,4,5].map(n=>(
-                                <button key={n} onClick={()=>handlePredict('dnf_count',n)} disabled={submitting} style={{flex:1,padding:'10px 0',background:'rgba(255,255,255,0.05)',border:'1px solid var(--f1-border)',borderRadius:8,color:'white',fontSize:16,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{n}</button>
-                            ))}</div>
-                        ) : null}
-                    </div>
-                ))}
-            </>) : (
-                <div style={{textAlign:'center',padding:'40px 20px',color:'var(--f1-text-muted)'}}><div style={{fontSize:48,marginBottom:12}}>🔮</div><div style={{fontSize:15,fontWeight:700}}>Нет доступных прогнозов</div><div style={{fontSize:13}}>Прогнозы откроются перед следующей гонкой</div></div>
+        <div onClick={()=>!disabled&&onClick()} style={{background:'var(--f1-card-solid)',borderRadius:18,border:'1.5px solid '+(isSelected?'#E10600':'var(--f1-border)'),display:'flex',alignItems:'center',padding:'10px 14px 10px 0',cursor:disabled?'default':'pointer',opacity:disabled?0.45:1,boxShadow:isSelected?'0 4px 14px rgba(225,6,0,0.25)':'none',flexShrink:0}}>
+            <div style={{width:4,height:44,borderRadius:2,background:tc,marginLeft:14}}/>
+            <div style={{width:46,textAlign:'center',marginLeft:4,fontSize:26,fontWeight:800,color:tc,flexShrink:0}}>{d.driver_number}</div>
+            {d.photo_url && <img src={d.photo_url} alt="" loading="lazy" style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',background:'var(--f1-card-hover)',marginLeft:4,flexShrink:0}} onError={e=>{e.target.style.display='none'}}/>}
+            <div style={{flex:1,minWidth:0,marginLeft:12}}>
+                <div style={{fontSize:16,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</div>
+                <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <span style={{color:tc,fontWeight:700}}>{d.team}</span>
+                </div>
+            </div>
+            {rank ? (
+                <div style={{width:28,height:28,borderRadius:14,background:'#E10600',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:13,flexShrink:0}}>{rank}</div>
+            ) : (
+                <div style={{width:22,height:22,borderRadius:11,border:'2px solid '+(isSelected?'#E10600':'#3A3A4A'),background:isSelected?'#E10600':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    {isSelected && <div style={{width:8,height:8,borderRadius:4,background:'#fff'}}/>}
+                </div>
             )}
-            {myPredictions.length>0 && (() => {
-                const grouped = {};
-                myPredictions.filter(p => p.status !== 'pending').forEach(p => { (grouped[p.race_round] = grouped[p.race_round] || []).push(p); });
-                const rounds = Object.keys(grouped).map(Number).sort((a,b) => b - a);
-                const typeLabels = {'winner':'Победитель','podium':'Подиум','fastest_lap':'Быстр. круг','dnf_count':'Сходы','safety_car':'Safety Car'};
-                const typeIcons = {winner:'🏆',podium:'🥇',fastest_lap:'⚡',safety_car:'🚗',dnf_count:'💥'};
-                return (
-                    <div style={{marginTop:20}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>История прогнозов</div>
-                        {rounds.map(r => {
-                            const items = grouped[r];
-                            const totalPts = items.reduce((s,p) => s + (p.points_won || 0), 0);
-                            const correctCount = items.filter(p => p.status === 'correct').length;
-                            const raceName = items[0]?.race_name || ('Гран-при ' + r);
+        </div>
+    );
+};
+
+// Полноэкранная форма прогноза — как Modal в приложении
+const PredictForm = ({info, drivers, raceRound, onClose, onDone}) => {
+    const [pick, setPick] = useState(null);
+    const [podium, setPodium] = useState([]);
+    const [dnf, setDnf] = useState('');
+    const [sc, setSc] = useState(null);
+    const [busy, setBusy] = useState(false);
+
+    const canSubmit = (info.type==='winner'||info.type==='fastest_lap') ? pick!=null
+        : info.type==='podium' ? podium.length===3
+        : info.type==='dnf_count' ? /^\d+$/.test(dnf.trim())
+        : info.type==='safety_car' ? sc!=null : false;
+
+    const submit = async () => {
+        let value = null;
+        if (info.type==='winner'||info.type==='fastest_lap') value = pick;
+        else if (info.type==='podium') value = podium;
+        else if (info.type==='dnf_count') value = parseInt(dnf.trim(),10);
+        else if (info.type==='safety_car') value = sc ? 'yes' : 'no';
+        setBusy(true);
+        const r = await api.post('/api/predictions/make', {race_round: raceRound, prediction_type: info.type, prediction_value: value});
+        setBusy(false);
+        if (r) onDone(); else alert('Не удалось отправить прогноз');
+    };
+
+    const togglePodium = (n) => {
+        setPodium(p => p.includes(n) ? p.filter(x=>x!==n) : (p.length<3 ? [...p,n] : p));
+    };
+
+    return (
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'var(--f1-darker)',display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',alignItems:'center',padding:'14px 12px 6px'}}>
+                <button onClick={onClose} style={{width:44,height:44,background:'none',border:'none',color:'var(--f1-text)',fontSize:24,cursor:'pointer',fontFamily:'inherit'}}>{'‹'}</button>
+                <div style={{flex:1,textAlign:'center',fontSize:18,fontWeight:700}}>{info.label}</div>
+                <div style={{width:44}}/>
+            </div>
+            <div style={{padding:'0 20px 14px',fontSize:13,color:'var(--f1-text-muted)'}}>
+                {info.description} <span style={{color:'#3A3A4A'}}>•</span> до <span style={{color:'#E10600',fontWeight:800}}>+{info.max_points} очков</span>
+            </div>
+
+            <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:20}}>
+                {(info.type==='winner'||info.type==='fastest_lap') && (
+                    <div style={{display:'flex',flexDirection:'column',gap:10,padding:'0 16px'}}>
+                        {drivers.map(d=>(<DriverPickRow key={d.driver_number} d={d} isSelected={pick===d.driver_number} onClick={()=>setPick(d.driver_number)}/>))}
+                    </div>
+                )}
+
+                {info.type==='podium' && (<>
+                    <div style={{display:'flex',gap:10,padding:'0 16px',marginBottom:14}}>
+                        {[0,1,2].map(i=>{
+                            const n = podium[i];
+                            const d = n!=null ? drivers.find(x=>x.driver_number===n) : null;
                             return (
-                                <div key={r} className="card" style={{marginBottom:8,padding:0,overflow:'hidden'}}>
-                                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid var(--f1-border)'}}>
-                                        <div style={{width:32,height:32,borderRadius:8,background:'rgba(225,6,0,0.15)',color:'var(--f1-red)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,flexShrink:0}}>R{r}</div>
-                                        <div style={{flex:1,minWidth:0}}>
-                                            <div style={{fontSize:13,fontWeight:700}}>{raceName}</div>
-                                            <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{correctCount}/{items.length} угадано</div>
-                                        </div>
-                                        <div style={{textAlign:'right'}}>
-                                            <div style={{fontSize:16,fontWeight:900,color:totalPts>0?'#27F4D2':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{totalPts}</div>
-                                            <div style={{fontSize:9,color:'var(--f1-text-muted)'}}>очков</div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        {items.map((p,i) => {
-                                            const statusColor = p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)';
-                                            const display = Array.isArray(p.prediction_value) ? p.prediction_value.join(' → ') : (p.prediction_type==='safety_car' ? ([true,'yes','true',1,'1'].includes(p.prediction_value)?'Да':'Нет') : String(p.prediction_value ?? ''));
-                                            return (
-                                                <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderBottom:i<items.length-1?'1px solid var(--f1-border)':'none'}}>
-                                                    <span style={{fontSize:14}}>{typeIcons[p.prediction_type]||'•'}</span>
-                                                    <div style={{flex:1,minWidth:0}}>
-                                                        <div style={{fontSize:12,fontWeight:700}}>{typeLabels[p.prediction_type]||p.prediction_type}</div>
-                                                        <div style={{fontSize:11,color:'var(--f1-text-muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{display}</div>
-                                                    </div>
-                                                    <div style={{fontWeight:800,fontSize:13,color:statusColor,flexShrink:0}}>{p.status==='pending'?'⏳':p.status==='correct'?'+'+p.points_won:p.status==='partial'?'+'+p.points_won:'✗'}</div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                <div key={i} style={{flex:1,background:'var(--f1-card-solid)',borderRadius:18,border:'1.5px solid '+(d?PODIUM_COLORS[i]:'var(--f1-border)'),padding:'12px 8px',textAlign:'center',minHeight:132}}>
+                                    <div style={{width:34,height:34,borderRadius:17,margin:'0 auto',background:PODIUM_COLORS[i]+'22',border:'1.5px solid '+PODIUM_COLORS[i],display:'flex',alignItems:'center',justifyContent:'center',color:PODIUM_COLORS[i],fontWeight:800,fontSize:13}}>P{i+1}</div>
+                                    {d ? (<>
+                                        {d.photo_url && <img src={d.photo_url} alt="" style={{width:54,height:54,borderRadius:'50%',objectFit:'cover',marginTop:10,background:'var(--f1-card-hover)'}} onError={e=>{e.target.style.display='none'}}/>}
+                                        <div style={{fontSize:12,fontWeight:700,marginTop:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.last_name||d.name}</div>
+                                    </>) : (
+                                        <div style={{fontSize:10,color:'var(--f1-text-muted)',marginTop:44}}>Не выбран</div>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
-                );
-            })()}
-            {false && myPredictions.length>0 && (
-                <div style={{marginTop:20}}>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Мои прогнозы</div>
-                    {myPredictions.slice(0,15).map((p,i)=>{
-                        const typeLabels = {'winner':'Победитель','podium':'Подиум','fastest_lap':'Быстр. круг','dnf_count':'Сходы','safety_car':'Safety Car'};
-                        const statusColor = p.status==='correct'?'#39B54A':p.status==='partial'?'#FFD700':p.status==='incorrect'?'#E10600':'var(--f1-text-muted)';
-                        const statusBg = p.status==='correct'?'rgba(57,181,74,0.1)':p.status==='partial'?'rgba(255,215,0,0.1)':p.status==='incorrect'?'rgba(225,6,0,0.1)':'rgba(255,255,255,0.03)';
-                        return (
-                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',marginBottom:6,borderRadius:10,background:statusBg}}>
-                            <div style={{width:32,height:32,borderRadius:8,background:'rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,color:statusColor,flexShrink:0}}>R{p.race_round}</div>
-                            <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:13,fontWeight:700}}>{typeLabels[p.prediction_type]||p.prediction_type}</div>
-                                <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{typeof p.prediction_value==='object'?JSON.stringify(p.prediction_value):String(p.prediction_value)}</div>
+                    <div style={{padding:'0 20px 12px',fontSize:12,color:'var(--f1-text-muted)'}}>Первый тап {'→'} P1, второй {'→'} P2, третий {'→'} P3. Тап повторно — убрать.</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:10,padding:'0 16px'}}>
+                        {drivers.map(d=>{
+                            const idx = podium.indexOf(d.driver_number);
+                            return <DriverPickRow key={d.driver_number} d={d} isSelected={idx>=0} rank={idx>=0?idx+1:null} disabled={idx<0&&podium.length>=3} onClick={()=>togglePodium(d.driver_number)}/>;
+                        })}
+                    </div>
+                </>)}
+
+                {info.type==='dnf_count' && (
+                    <div style={{padding:'30px 16px',textAlign:'center'}}>
+                        <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:24}}>Сколько пилотов не финишируют?</div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16}}>
+                            <button onClick={()=>setDnf(String(Math.max(0,(parseInt(dnf||'0',10)||0)-1)))} style={{width:56,height:56,borderRadius:28,background:'var(--f1-card-solid)',border:'1.5px solid rgba(225,6,0,0.3)',color:'var(--f1-text)',fontSize:26,cursor:'pointer',fontFamily:'inherit'}}>{'−'}</button>
+                            <div style={{background:'var(--f1-card-solid)',border:'1.5px solid rgba(225,6,0,0.35)',borderRadius:22,padding:'8px 26px',boxShadow:'0 6px 18px rgba(225,6,0,0.15)'}}>
+                                <input value={dnf} onChange={e=>setDnf(e.target.value.replace(/[^0-9]/g,'').slice(0,2))} placeholder="0" inputMode="numeric"
+                                       style={{width:110,background:'none',border:'none',outline:'none',color:'var(--f1-text)',fontSize:54,fontWeight:800,textAlign:'center',fontFamily:'inherit'}}/>
                             </div>
-                            <div style={{fontWeight:800,fontSize:13,color:statusColor,flexShrink:0}}>{p.status==='pending'?'\u23f3':p.status==='correct'?'+'+p.points_won:p.status==='partial'?'+'+p.points_won:'\u2717'}</div>
+                            <button onClick={()=>setDnf(String(Math.min(22,(parseInt(dnf||'0',10)||0)+1)))} style={{width:56,height:56,borderRadius:28,background:'var(--f1-card-solid)',border:'1.5px solid rgba(225,6,0,0.3)',color:'var(--f1-text)',fontSize:26,cursor:'pointer',fontFamily:'inherit'}}>+</button>
                         </div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:22}}>Точное попадание +40 · {'±'}1 сход +15</div>
+                    </div>
+                )}
+
+                {info.type==='safety_car' && (
+                    <div style={{padding:'30px 16px',textAlign:'center'}}>
+                        <div style={{fontSize:13,color:'var(--f1-text-muted)',marginBottom:22}}>Выедет ли машина безопасности во время гонки?</div>
+                        <div style={{display:'flex',gap:12}}>
+                            {[[true,'Да'],[false,'Нет']].map(([val,label])=>(
+                                <button key={label} onClick={()=>setSc(val)} style={{flex:1,padding:'22px 0',borderRadius:20,border:'1.5px solid '+(sc===val?'#E10600':'var(--f1-border)'),background:sc===val?'#E10600':'var(--f1-card-solid)',color:sc===val?'#fff':'var(--f1-text-secondary)',fontWeight:800,fontSize:16,cursor:'pointer',fontFamily:'inherit',boxShadow:sc===val?'0 6px 18px rgba(225,6,0,0.35)':'none',transition:'all 0.15s'}}>{label}</button>
+                            ))}
+                        </div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:22}}>Учитывается полный Safety Car (не VSC)</div>
+                    </div>
+                )}
+            </div>
+
+            <div style={{padding:'12px 16px calc(16px + env(safe-area-inset-bottom, 0px))'}}>
+                <button onClick={submit} disabled={!canSubmit||busy}
+                        style={{width:'100%',padding:'17px 0',borderRadius:18,border:'none',background:canSubmit&&!busy?'#E10600':'rgba(225,6,0,0.25)',color:'#fff',fontWeight:800,fontSize:16,cursor:canSubmit?'pointer':'default',fontFamily:'inherit',boxShadow:canSubmit&&!busy?'0 6px 18px rgba(225,6,0,0.45)':'none'}}>
+                    {busy ? 'Отправка...' : 'Отправить прогноз'}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const PredictionsPage = ({user}) => {
+    const [available, setAvailable] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [myPredictions, setMyPredictions] = useState([]);
+    const [activeForm, setActiveForm] = useState(null);
+    const [view, setView] = useState('make'); // make | mine
+    const [mineTab, setMineTab] = useState('done'); // wait | done
+    const [now, setNow] = useState(Date.now());
+
+    const reload = () => {
+        api.get('/api/predictions/available').then(d=>{setAvailable(d);setLoading(false);});
+        api.get('/api/user/predictions').then(d=>setMyPredictions(d?.predictions||[]));
+    };
+    useEffect(reload, []);
+    useEffect(() => { const iv = setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(iv); }, []);
+
+    if (loading) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка прогнозов..."/></div>;
+
+    const race = available?.race;
+    const raceName = race?.name || '';
+    const cd = (() => {
+        if (!race?.race_datetime) return null;
+        const left = Math.max(0, new Date(race.race_datetime.replace('Z','')).getTime() + 0 - (now - new Date().getTimezoneOffset()*0) ) ;
+        const ms = new Date(race.race_datetime).getTime() - now;
+        if (ms <= 0) return {d:0,h:0,m:0,s:0};
+        return {d:Math.floor(ms/86400000), h:Math.floor(ms/3600000)%24, m:Math.floor(ms/60000)%60, s:Math.floor(ms/1000)%60};
+    })();
+
+    // ---- Мои прогнозы (view=mine) ----
+    const donePreds = myPredictions.filter(p=>p.status!=='pending');
+    const waitPreds = myPredictions.filter(p=>p.status==='pending');
+    const totalEarned = myPredictions.reduce((s,p)=>s+(p.points_won||0),0);
+    const list = mineTab==='wait' ? waitPreds : donePreds;
+    const grouped = {};
+    list.forEach(p=>{ (grouped[p.race_round+'_'+(p.season||'')] = grouped[p.race_round+'_'+(p.season||'')] || []).push(p); });
+    const groups = Object.values(grouped).sort((a,b)=>(b[0].race_round-a[0].race_round));
+
+    return (
+        <div className="page-container fade-in" style={{padding:'12px 16px'}}>
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16}}>
+                <div style={{minWidth:0}}>
+                    <div style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase'}}>ПРОГНОЗЫ</div>
+                    {raceName && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{raceName}</div>}
+                </div>
+                <button onClick={()=>setView(view==='make'?'mine':'make')} style={{display:'flex',alignItems:'center',gap:7,background:view==='mine'?'#E10600':'var(--f1-card-solid)',border:'1px solid '+(view==='mine'?'#E10600':'var(--f1-border)'),borderRadius:999,padding:'10px 16px',color:view==='mine'?'#fff':'var(--f1-text)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                    {'📋'} Мои
+                </button>
+            </div>
+
+            {!user && (
+                <div className="card" style={{textAlign:'center',padding:'26px 20px'}}>
+                    <div style={{fontSize:30,marginBottom:10}}>{'🔒'}</div>
+                    <div style={{fontSize:15,fontWeight:700}}>Войдите, чтобы делать прогнозы</div>
+                </div>
+            )}
+
+            {user && view==='mine' && (<>
+                {/* Сводка */}
+                <div className="card" style={{display:'flex',alignItems:'center',gap:14,padding:16,marginBottom:12,border:'1px solid rgba(225,6,0,0.18)'}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{'🏆'}</div>
+                    <div style={{flex:1}}>
+                        <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.5}}>{totalEarned}</div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>Очков заработано</div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:16,fontWeight:800}}>{donePreds.length} / {myPredictions.length}</div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)'}}>завершено</div>
+                    </div>
+                </div>
+                {/* Переключатель */}
+                <div className="tab-switch" style={{marginBottom:14}}>
+                    <button className={'tab-switch-btn '+(mineTab==='wait'?'active':'')} onClick={()=>setMineTab('wait')}>Ожидают</button>
+                    <button className={'tab-switch-btn '+(mineTab==='done'?'active':'')} onClick={()=>setMineTab('done')}>Завершены</button>
+                </div>
+                {groups.length===0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)',padding:'26px 16px'}}>{mineTab==='wait'?'Нет ожидающих прогнозов':'Пока нет завершённых прогнозов'}</div>}
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                    {groups.map((items,gi)=>{
+                        const totalPts = items.reduce((s,p)=>s+(p.points_won||0),0);
+                        const rn = items[0].race_name || ('Раунд '+items[0].race_round);
+                        return (
+                            <div key={gi} className="card" style={{padding:0,overflow:'hidden'}}>
+                                <div style={{display:'flex',alignItems:'center',padding:'12px 16px',borderBottom:'1px solid var(--f1-border)'}}>
+                                    <div style={{width:4,height:26,borderRadius:2,background:'#E10600',marginRight:12}}/>
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:10,color:'var(--f1-red)',fontWeight:800,letterSpacing:1.5}}>ГРАН-ПРИ · РАУНД {String(items[0].race_round).padStart(2,'0')}</div>
+                                        <div style={{fontSize:15,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{rn.replace(/^Гран[- ]при\s+/i,'')}</div>
+                                    </div>
+                                    {totalPts>0 && <div style={{background:'rgba(225,6,0,0.15)',color:'#E10600',fontWeight:800,fontSize:12,padding:'4px 10px',borderRadius:8}}>+{totalPts} оч.</div>}
+                                </div>
+                                {items.map((p,i)=>{
+                                    const st = p.status;
+                                    const stColor = st==='correct'?'#39B54A':st==='partial'?'#FFD700':st==='incorrect'?'#E10600':'var(--f1-text-muted)';
+                                    const stLabel = st==='correct'?'ВЕРНО':st==='partial'?'ЧАСТИЧНО':st==='incorrect'?'НЕВЕРНО':'⏳';
+                                    return (
+                                        <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',borderBottom:i<items.length-1?'1px solid var(--f1-border)':'none'}}>
+                                            <div style={{width:34,height:34,borderRadius:10,background:'rgba(225,6,0,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,flexShrink:0}}>{PRED_ICON[p.prediction_type]||'•'}</div>
+                                            <div style={{flex:1,minWidth:0}}>
+                                                <div style={{fontSize:13,fontWeight:800}}>{PRED_LABELS[p.prediction_type]||p.prediction_type}</div>
+                                                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{fmtPredValue(p.prediction_type, p.prediction_value, available?.drivers)}</div>
+                                            </div>
+                                            <div style={{textAlign:'right',flexShrink:0}}>
+                                                <div style={{fontSize:10,fontWeight:800,letterSpacing:0.8,color:stColor}}>{stLabel}</div>
+                                                {st!=='pending' && <div style={{fontSize:13,fontWeight:800,color:(p.points_won||0)>0?'#39B54A':'var(--f1-text-muted)',marginTop:2}}>{(p.points_won||0)>0?'+'+p.points_won:'0'}</div>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         );
                     })}
                 </div>
+            </>)}
+
+            {user && view==='make' && (available?.available && race ? (<>
+                {/* Race info card: флаг + город + дата + машинка + countdown */}
+                <div style={{background:'var(--f1-card-solid)',border:'1px solid rgba(225,6,0,0.22)',borderRadius:22,overflow:'hidden',boxShadow:'0 6px 18px rgba(225,6,0,0.15)',marginBottom:20}}>
+                    <div style={{display:'flex',alignItems:'center',padding:'16px 18px 12px',position:'relative'}}>
+                        <div style={{marginRight:12}}>{race.country_code ? <FlagImg code={race.country_code} size={30}/> : null}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:17,fontWeight:800,letterSpacing:1,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(race.locality||race.country||'').toUpperCase()}</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{race.race_datetime ? new Date(race.race_datetime.replace('Z','')).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})+' г.' : ''}</div>
+                        </div>
+                        <img src="/static/car-drift.webp" alt="" style={{position:'absolute',right:-18,top:2,width:150,height:66,objectFit:'contain',opacity:0.85,pointerEvents:'none'}}/>
+                    </div>
+                    <div style={{height:1,background:'rgba(225,6,0,0.18)',margin:'0 14px'}}/>
+                    {cd && (
+                        <div style={{display:'flex',alignItems:'center',padding:'13px 8px'}}>
+                            {[[cd.d,'ДНЕЙ',true],[cd.h,'ЧАСОВ'],[cd.m,'МИНУТ'],[cd.s,'СЕКУНД']].map(([v,l,hi],i)=>(
+                                <React.Fragment key={l}>
+                                    <div style={{flex:1,textAlign:'center'}}>
+                                        <div style={{fontSize:27,lineHeight:'29px',fontWeight:800,letterSpacing:-0.5,color:hi?'#E10600':'var(--f1-text)',fontVariantNumeric:'tabular-nums'}}>{String(v).padStart(2,'0')}</div>
+                                        <div style={{fontSize:9,color:'var(--f1-text-muted)',marginTop:3,letterSpacing:1.8,fontWeight:700}}>{l}</div>
+                                    </div>
+                                    {i<3 && <div style={{width:1,height:28,background:'rgba(225,6,0,0.35)'}}/>}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Секция */}
+                <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',marginBottom:14}}>
+                    <div>
+                        <div style={{fontSize:20,fontWeight:800,fontStyle:'italic',letterSpacing:-0.3,textTransform:'uppercase'}}>СДЕЛАЙ ПРОГНОЗЫ</div>
+                        <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:2}}>До закрытия — старт гонки</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:6}}>
+                        <div style={{width:20,height:2,background:'#3A3A4A',borderRadius:1}}/>
+                        <div style={{width:28,height:2,background:'#E10600',borderRadius:1}}/>
+                        <div style={{width:12,height:2,background:'rgba(225,6,0,0.5)',borderRadius:1}}/>
+                    </div>
+                </div>
+
+                {/* Карточки типов */}
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    {(available.predictions||[]).map(p=>(
+                        <div key={p.type} onClick={()=>!p.already_predicted&&setActiveForm(p)}
+                             style={{background:'var(--f1-card-solid)',borderRadius:20,border:'1px solid '+(p.already_predicted?'var(--f1-border)':'rgba(225,6,0,0.18)'),display:'flex',alignItems:'center',padding:16,opacity:p.already_predicted?0.55:1,cursor:p.already_predicted?'default':'pointer',flexShrink:0}}>
+                            <div style={{width:52,height:52,borderRadius:26,background:'rgba(225,6,0,0.18)',border:'1px solid rgba(225,6,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{PRED_ICON[p.type]||'•'}</div>
+                            <div style={{flex:1,minWidth:0,marginLeft:14}}>
+                                <div style={{fontSize:14,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>{p.label}</div>
+                                <div style={{fontSize:12,color:'var(--f1-text-muted)',marginTop:4}}>{p.description}</div>
+                            </div>
+                            <div style={{textAlign:'right',marginRight:8,flexShrink:0}}>
+                                {p.already_predicted ? (
+                                    <span style={{background:'rgba(255,255,255,0.06)',padding:'4px 8px',borderRadius:6,fontSize:10,fontWeight:800,letterSpacing:1.5,color:'var(--f1-text-muted)'}}>СДЕЛАН</span>
+                                ) : (<>
+                                    <div style={{fontSize:22,fontWeight:800,color:'#E10600',lineHeight:'24px'}}>+{p.max_points}</div>
+                                    <div style={{fontSize:9,color:'var(--f1-text-muted)',fontWeight:700,letterSpacing:1.5,marginTop:1}}>ОЧ.</div>
+                                </>)}
+                            </div>
+                            <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'›'}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Инфо-футер */}
+                <div className="card" style={{display:'flex',alignItems:'center',gap:12,padding:14,marginTop:18}}>
+                    <div style={{width:28,height:28,borderRadius:14,background:'rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>{'ℹ️'}</div>
+                    <div style={{fontSize:11.5,color:'var(--f1-text-muted)',lineHeight:'17px'}}>Очки начисляются после расчёта результатов гонки. Один прогноз — один способ заработать больше очков!</div>
+                </div>
+            </>) : (
+                <div className="card">
+                    <div style={{fontWeight:700}}>Нет доступных гонок</div>
+                    <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:4}}>Прогнозы открываются перед стартом Гран-при.</div>
+                </div>
+            ))}
+
+            {activeForm && race && (
+                <PredictForm info={activeForm} drivers={available.drivers||[]} raceRound={race.round}
+                             onClose={()=>setActiveForm(null)}
+                             onDone={()=>{setActiveForm(null);reload();}}/>
             )}
         </div>
     );
