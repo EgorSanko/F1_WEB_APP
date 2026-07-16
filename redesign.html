@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>F1 HUB — главная</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Titillium+Web:wght@300;400;600;700;900&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0a0a0c; --surface:#16161c; --surface-2:#1f1f28;
+  --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.16);
+  --text:#fafafa; --muted:#8a8a98; --muted-2:#5a5a66;
+  --red:#E10600; --accent:var(--red);
+  --gold:#E8C547; --silver:#C8CCD2; --bronze:#C68A4E;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:'Titillium Web',ui-sans-serif,system-ui,sans-serif;
+  font-weight:400;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{overflow-x:hidden}
+.f-display{font-family:'Anton',Impact,sans-serif;font-weight:400;letter-spacing:.005em;line-height:.9;text-transform:uppercase}
+.f-mono{font-family:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.f-italic{font-family:'Fraunces',Georgia,serif;font-style:italic;font-variation-settings:"opsz" 144}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyebrow-accent{color:var(--accent)}
+.hairline{border:0;border-top:1px solid var(--line);margin:0}
+.sect-num{font-family:'Anton',sans-serif;color:var(--accent);letter-spacing:.02em;line-height:1;font-size:14px}
+.sect-num::after{content:" — "}
+.tstripe{position:relative}
+.tstripe::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--team,#888)}
+.row-hover{transition:background .18s ease}
+.row-hover:hover{background:rgba(255,255,255,.025)}
+@keyframes pulseRed{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulseRed 1.6s ease-in-out infinite;display:inline-block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{opacity:0;animation:fadeUp .6s cubic-bezier(.2,.7,.2,1) forwards}
+.ph{position:relative;overflow:hidden;background:#13131a;
+  background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 14px,transparent 14px 28px);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;
+  color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.12em;text-align:center;padding:8px}
+.ph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.5))}
+.hero-overlay{position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(10,10,12,.4) 0%,rgba(10,10,12,.2) 35%,rgba(10,10,12,.95) 95%),
+  linear-gradient(90deg,rgba(10,10,12,.85) 0%,rgba(10,10,12,.55) 35%,rgba(10,10,12,0) 70%)}
+.news-card{transition:transform .25s ease, border-color .25s ease}
+.news-card:hover{transform:translateY(-2px);border-color:var(--line-strong)}
+.nav-link{position:relative;padding:6px 0;color:var(--muted);font-size:13px;letter-spacing:.04em;
+  text-transform:uppercase;font-weight:600;transition:color .2s;text-decoration:none;cursor:pointer}
+.nav-link:hover{color:var(--text)}
+.nav-link[data-active="true"]{color:var(--text)}
+.nav-link[data-active="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;font-family:'Titillium Web',sans-serif;
+  font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.1em;border:1px solid var(--line-strong);
+  background:transparent;color:var(--text);cursor:pointer;border-radius:0;transition:all .2s ease}
+.btn:hover{background:rgba(255,255,255,.04);border-color:var(--text)}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn-ghost{border-color:var(--line)}
+.dot-sep{display:inline-block;width:3px;height:3px;border-radius:50%;background:currentColor;margin:0 8px;vertical-align:middle;opacity:.55}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#23232c;border-radius:0;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#33333d}
+.cd-digit{font-family:'Anton',sans-serif;font-size:clamp(56px,7vw,108px);line-height:.85;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.cd-label{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-top:8px}
+.badge-sprint{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;font-weight:700;text-transform:uppercase;padding:4px 8px;background:var(--accent);color:#fff;border-radius:0}
+.badge-outline{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;font-weight:700;text-transform:uppercase;padding:4px 8px;border:1px solid var(--line-strong);color:var(--muted)}
+.text-muted{color:var(--muted)} .text-muted-2{color:var(--muted-2)} .text-accent{color:var(--accent)}
+.bg-surface{background:var(--surface)}
+.hero-photo{filter:contrast(1.05) saturate(.95) brightness(.65)}
+.tnum{font-variant-numeric:tabular-nums}
+.diag-kicker{display:inline-block;border-left:2px solid var(--accent);padding-left:10px;color:var(--text);text-transform:uppercase;letter-spacing:.18em;font-size:11px;font-weight:700}
+.podium-p1{height:280px} .podium-p2{height:210px} .podium-p3{height:160px}
+@media (max-width:900px){.podium-p1{height:220px} .podium-p2{height:170px} .podium-p3{height:130px}}
+.topnav{backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);background:rgba(10,10,12,.78);border-bottom:1px solid var(--line)}
+.flag-img{display:inline-block;object-fit:cover;border:1px solid rgba(255,255,255,.1)}
+
+.tweaks-fab{position:fixed;right:18px;bottom:18px;z-index:99;width:48px;height:48px;border:1px solid var(--line-strong);
+  background:rgba(10,10,12,.85);backdrop-filter:blur(12px);color:var(--text);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.16em}
+.tweaks-fab:hover{border-color:var(--text)}
+.tweaks-panel{position:fixed;right:18px;bottom:78px;z-index:99;width:300px;background:rgba(15,15,20,.96);backdrop-filter:blur(20px);
+  border:1px solid var(--line-strong);padding:18px;display:flex;flex-direction:column;gap:14px;
+  font-size:12px;letter-spacing:.02em;color:var(--text)}
+.tweaks-panel .sect{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.tweaks-panel .sect:first-child{margin-top:0}
+.tweaks-panel .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tweaks-panel .chips{display:flex;gap:6px}
+.tweaks-panel .chip{flex:1;height:36px;border:1px solid var(--line);cursor:pointer;background:transparent;font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);transition:all .15s}
+.tweaks-panel .chip[data-on="1"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tweaks-panel .swatch{flex:1;height:36px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.tweaks-panel .swatch[data-on="1"]{border-color:var(--text);box-shadow:inset 0 0 0 2px var(--bg)}
+.tweaks-panel .toggle{position:relative;width:34px;height:18px;border:0;background:rgba(255,255,255,.12);cursor:pointer;transition:background .15s}
+.tweaks-panel .toggle[data-on="1"]{background:var(--accent)}
+.tweaks-panel .toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;transition:left .15s;display:block}
+.tweaks-panel .toggle[data-on="1"] i{left:18px}
+
+@media (max-width:1000px){
+  .lastrace-grid{grid-template-columns:1fr !important}
+  .standings-grid{grid-template-columns:1fr !important}
+  .calendar-grid{grid-template-columns:1fr !important}
+  .news-grid{grid-template-columns:1fr !important}
+}
+@media (max-width:1200px) and (min-width:1001px){
+  .news-grid{grid-template-columns:repeat(2,1fr) !important}
+}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, Fragment } = React;
+
+// ============== HELPERS ==============
+const apiGet = (path) => fetch(path).then(r => r.ok ? r.json() : null).catch(() => null);
+
+function hiResImg(url, w = 800) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('media.formula1.com/image/upload/')) return url;
+  return url.replace(/w_\d+/g, 'w_' + w).replace(/h_\d+/g, 'h_' + Math.round(w * 0.75));
+}
+
+// Country code → Russian nominative name for big headings
+const COUNTRY_RU = {
+  AU:'Австралия', CN:'Китай', JP:'Япония', US:'США', CA:'Канада', MC:'Монако',
+  ES:'Испания', AT:'Австрия', GB:'Британия', HU:'Венгрия', BE:'Бельгия',
+  NL:'Нидерланды', IT:'Италия', AZ:'Азербайджан', SG:'Сингапур', MX:'Мексика',
+  BR:'Бразилия', QA:'Катар', AE:'ОАЭ', SA:'Саудия', BH:'Бахрейн',
+  EM:'Имола', UM:'Майами'
+};
+// Short race name. If country_code is in our map, use nominative Russian; otherwise strip "Гран-при" from name.
+const shortName = (race) => {
+  if (typeof race === 'string') return race.replace(/^Гран-при\s+/i, '').replace(/\s*Grand Prix$/i, '');
+  if (!race) return '';
+  const cc = (race.country_code || '').toUpperCase();
+  if (COUNTRY_RU[cc]) return COUNTRY_RU[cc];
+  return (race.name || '').replace(/^Гран-при\s+/i, '').replace(/\s*Grand Prix$/i, '');
+};
+
+// Short month from date string YYYY-MM-DD
+const monthShort = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+const dayMonth = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')} ${monthShort[d.getMonth()]}`;
+};
+const fullDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getDate()} ${['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'][d.getMonth()]} ${d.getFullYear()}`;
+};
+
+// ============== F1 IMG WITH FALLBACK ==============
+function F1Img({ src, w = 800, label = 'image', className = '', style = {}, alt = '' }) {
+  const [failed, setFailed] = useState(!src);
+  const finalSrc = src ? hiResImg(src, w) : '';
+  if (failed || !finalSrc) {
+    return (<div className={"ph " + className} style={style} aria-label={label}><span>{label}</span></div>);
+  }
+  return (<img src={finalSrc} alt={alt || label} className={className}
+    style={{ objectFit:'cover', ...style }} onError={() => setFailed(true)} loading="lazy" />);
+}
+
+// ============== FLAG ==============
+function FlagImg({ code, size = 36 }) {
+  if (!code) return null;
+  const c = code.toLowerCase();
+  const h = Math.round(size * 0.75);
+  return (
+    <img src={`https://flagcdn.com/${size*2}x${h*2}/${c}.png`}
+      className="flag-img" alt={code}
+      style={{ width:size, height:h }}
+      onError={(e) => { e.target.style.display = 'none'; }}
+      loading="lazy" />
+  );
+}
+
+// ============== TOP NAV ==============
+function TopNav({ active, onNavigate, antispoiler, onToggleSpoiler }) {
+  const links = [
+    { id:'home', label:'Главная' }, { id:'calendar', label:'Календарь' },
+    { id:'standings', label:'Чемпионат' }, { id:'predictions', label:'Прогнозы' },
+    { id:'games', label:'Игры' }, { id:'news', label:'Новости' }, { id:'profile', label:'Профиль' },
+  ];
+  return (
+    <header className="topnav" style={{ position:'sticky', top:0, zIndex:50, padding:'14px 0' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', gap:32, flexWrap:'wrap' }}>
+        <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('home'); }}
+           style={{ textDecoration:'none', color:'inherit', display:'flex', alignItems:'baseline', gap:8 }}>
+          <span className="f-display" style={{ fontSize:22, letterSpacing:'-.01em' }}>
+            F1<span style={{ color:'var(--accent)' }}>·</span>HUB
+          </span>
+          <span className="f-italic" style={{ fontSize:11, color:'var(--muted)', marginLeft:2 }}>trackside&nbsp;edition</span>
+        </a>
+        <nav style={{ display:'flex', gap:22, marginLeft:18, flexWrap:'wrap' }}>
+          {links.map(l => (
+            <a key={l.id} href="#" className="nav-link" data-active={active === l.id}
+               onClick={(e) => { e.preventDefault(); onNavigate(l.id); }}>{l.label}</a>
+          ))}
+        </nav>
+        <div style={{ flex:1 }} />
+        <button onClick={onToggleSpoiler} aria-pressed={antispoiler}
+          style={{ display:'inline-flex', alignItems:'center', gap:8, border:'1px solid var(--line)',
+            background:'transparent', cursor:'pointer', padding:'7px 11px',
+            color: antispoiler ? 'var(--text)' : 'var(--muted)',
+            fontSize:11, letterSpacing:'.16em', textTransform:'uppercase', fontWeight:600, fontFamily:'inherit' }}>
+          <span style={{ width:18, height:10, borderRadius:6,
+            background: antispoiler ? 'var(--accent)' : 'rgba(255,255,255,.12)',
+            position:'relative', transition:'background .2s ease', display:'inline-block' }}>
+            <span style={{ position:'absolute', top:1, left: antispoiler ? 9 : 1, width:8, height:8,
+              borderRadius:'50%', background:'#fff', transition:'left .2s ease' }} />
+          </span>
+          Антиспойлер
+        </button>
+        <button className="btn btn-accent" style={{ padding:'8px 14px', fontSize:11 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+          </svg>
+          Войти&nbsp;через&nbsp;Telegram
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// ============== COUNTDOWN ==============
+function Countdown({ iso }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  if (!iso) return null;
+  const ms = Math.max(0, new Date(iso).getTime() - now);
+  const days  = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const mins  = Math.floor((ms % 3600000) / 60000);
+  const secs  = Math.floor((ms % 60000) / 1000);
+  const pad = n => String(n).padStart(2, '0');
+  const units = [
+    { v: pad(days),  l: 'дней' },
+    { v: pad(hours), l: 'часов' },
+    { v: pad(mins),  l: 'минут' },
+    { v: pad(secs),  l: 'секунд' },
+  ];
+  return (
+    <div style={{ display:'flex', gap:'clamp(16px,3vw,40px)', alignItems:'flex-end' }}>
+      {units.map((u, i) => (
+        <div key={u.l} style={{ display:'flex', alignItems:'flex-end', gap:'clamp(16px,3vw,40px)' }}>
+          <div>
+            <div className="cd-digit">{u.v}</div>
+            <div className="cd-label">{u.l}</div>
+          </div>
+          {i < units.length - 1 && (<div className="cd-digit" style={{ color:'var(--accent)', opacity:.8 }}>:</div>)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeader({ num, title, kicker, right }) {
+  return (
+    <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:28, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', alignItems:'baseline', gap:20, flexWrap:'wrap' }}>
+        <span className="sect-num">{num}</span>
+        <h2 className="f-display" style={{ margin:0, fontSize:'clamp(34px,4.6vw,56px)', letterSpacing:'-.005em' }}>{title}</h2>
+        {kicker && (<span className="f-italic" style={{ color:'var(--muted)', fontSize:18 }}>{kicker}</span>)}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function DriverRow({ place, driver, right, dense = false }) {
+  return (
+    <div className="tstripe row-hover" style={{
+      '--team': driver.team_color || '#888',
+      display:'grid', gridTemplateColumns: 'auto auto 1fr auto',
+      alignItems:'center', gap: 18,
+      padding: dense ? '12px 16px 12px 22px' : '18px 20px 18px 26px',
+      borderTop:'1px solid var(--line)',
+    }}>
+      <span className="f-display tnum" style={{ fontSize: dense ? 26 : 34, color:'var(--muted)', minWidth:34, textAlign:'left' }}>
+        {String(place).padStart(2, '0')}
+      </span>
+      <div style={{ width:dense?44:54, height:dense?44:54, background:'#13131a', overflow:'hidden' }}>
+        <F1Img src={driver.photo_url} w={200} label={driver.code} style={{ width:'100%', height:'100%' }} />
+      </div>
+      <div>
+        <div style={{ fontSize: dense ? 15 : 17, fontWeight:600, letterSpacing:'.005em' }}>
+          {driver.first_name} <span className="f-display" style={{ fontSize: dense ? 18 : 22, marginLeft:4, letterSpacing:'.005em' }}>{driver.last_name}</span>
+        </div>
+        <div style={{ fontSize:11, letterSpacing:'.16em', textTransform:'uppercase', color:'var(--muted)', marginTop:2, fontWeight:600 }}>
+          {driver.team} <span className="dot-sep" /> №{driver.driver_number}
+        </div>
+      </div>
+      <div style={{ textAlign:'right' }}>{right}</div>
+    </div>
+  );
+}
+
+// ============== HERO ==============
+function HeroCountdown({ heroVariant, nextRace }) {
+  if (!nextRace) return null;
+  const short = shortName(nextRace);
+  if (heroVariant === 'typography') {
+    return (
+      <section style={{ position:'relative', padding:'80px 0 64px', borderBottom:'1px solid var(--line)', background:'var(--bg)' }}>
+        <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22, flexWrap:'wrap' }}>
+            <span className="live-dot" />
+            <span className="eyebrow eyebrow-accent">Следующий гран-при</span>
+            <span className="dot-sep text-muted" />
+            <span className="eyebrow">Раунд {String(nextRace.round).padStart(2,'0')} · сезон 2026</span>
+          </div>
+          <div style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(120px,18vw,260px)', lineHeight:.82, letterSpacing:'-.02em', textTransform:'uppercase' }}>
+            {short}<span style={{ color:'var(--accent)' }}>.</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:40, gap:32, flexWrap:'wrap' }}>
+            <div>
+              <div className="diag-kicker">{nextRace.circuit} · {nextRace.locality || ''}</div>
+              <div className="f-italic" style={{ fontSize:22, color:'var(--muted)', marginTop:14, maxWidth:560 }}>
+                {fullDate(nextRace.date)} · старт гонки в {(nextRace.time||'').slice(0,5) || '—'} UTC
+              </div>
+            </div>
+            <Countdown iso={nextRace.race_datetime} />
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section style={{ position:'relative', minHeight:620, overflow:'hidden', borderBottom:'1px solid var(--line)' }}>
+      <div style={{ position:'absolute', inset:0 }}>
+        <F1Img src={nextRace.circuit_image} w={1800} label={`track · ${short}`} className="hero-photo"
+               style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+        <div className="hero-overlay" />
+      </div>
+      <div style={{ position:'relative', maxWidth:1440, margin:'0 auto', padding:'90px 28px 56px',
+        display:'flex', flexDirection:'column', justifyContent:'space-between', minHeight:620 }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:18, flexWrap:'wrap' }}>
+            <span className="live-dot" />
+            <span className="eyebrow eyebrow-accent">Следующий гран-при</span>
+            <span className="dot-sep text-muted" />
+            <span className="eyebrow">Раунд {String(nextRace.round).padStart(2,'0')} · сезон 2026</span>
+            <span className="dot-sep text-muted" />
+            <span className="eyebrow">{fullDate(nextRace.date)}</span>
+            {nextRace.sprint && <span className="badge-sprint" style={{ marginLeft:6 }}>Спринт</span>}
+          </div>
+          <div style={{ display:'flex', alignItems:'baseline', gap:'min(2vw,28px)', flexWrap:'wrap' }}>
+            <h1 className="f-display" style={{ margin:0, fontSize:'clamp(56px,11vw,176px)', letterSpacing:'-.015em', lineHeight:.88 }}>{short}</h1>
+            <FlagImg code={nextRace.country_code} size={56} />
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:18, flexWrap:'wrap' }}>
+            <span className="diag-kicker">{nextRace.circuit}</span>
+            <span className="dot-sep text-muted" />
+            <span className="eyebrow">{nextRace.locality || nextRace.country}</span>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:32, flexWrap:'wrap', marginTop:48 }}>
+          <Countdown iso={nextRace.race_datetime} />
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <button className="btn btn-accent">Открыть гран-при →</button>
+            <button className="btn btn-ghost">Расписание сессий</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============== 01 LAST RACE ==============
+function Metric({ label, value, sub, mono }) {
+  return (
+    <div>
+      <div className="eyebrow" style={{ marginBottom:8 }}>{label}</div>
+      <div className={(mono ? 'f-mono ' : 'f-display ') + 'tnum'} style={{ fontSize: mono ? 22 : 28, lineHeight:1 }}>{value || '—'}</div>
+      {sub && <div style={{ fontSize:12, color:'var(--muted)', marginTop:6, letterSpacing:'.06em' }}>{sub}</div>}
+    </div>
+  );
+}
+
+function LastRace({ antispoiler, lastRace, scheduleByRound }) {
+  if (!lastRace) return null;
+  const results = lastRace.results || [];
+  if (results.length < 3) return null;
+  const podium = results.slice(0, 3);
+  const winner = podium[0];
+  const fromSched = scheduleByRound[lastRace.round];
+  const short = shortName(fromSched || { name: lastRace.name });
+  const fastestRow = results.find(r => r.fastest_lap_rank === 1);
+
+  if (antispoiler) {
+    return (
+      <section style={{ padding:'88px 0', borderBottom:'1px solid var(--line)' }}>
+        <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+          <SectionHeader num="01" title="Прошлая гонка" kicker={short} />
+          <div style={{ border:'1px dashed var(--line-strong)', padding:'80px 32px',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:14, textAlign:'center' }}>
+            <div className="eyebrow" style={{ color:'var(--accent)' }}>Антиспойлер активен</div>
+            <div className="f-display" style={{ fontSize:42 }}>Результат скрыт</div>
+            <div className="f-italic text-muted" style={{ fontSize:18, maxWidth:520 }}>
+              Включите показ результатов или откройте страницу гонки, когда будете готовы.
+            </div>
+            <button className="btn btn-ghost" style={{ marginTop:10 }}>Показать результат</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section style={{ padding:'88px 0', borderBottom:'1px solid var(--line)' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+        <SectionHeader num="01" title="Прошлая гонка" kicker={short}
+          right={<a href="#" className="nav-link" style={{ color:'var(--text)' }}>Все результаты →</a>} />
+        <div className="lastrace-grid" style={{ display:'grid', gridTemplateColumns:'minmax(280px,1fr) 1.6fr', gap:32 }}>
+          <article style={{ background:'var(--surface)', border:'1px solid var(--line)',
+            padding:24, position:'relative', overflow:'hidden', minHeight:480,
+            display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:4, background: winner.team_color }} />
+            <div>
+              <div className="eyebrow eyebrow-accent">Победитель · P1</div>
+              <div className="f-display" style={{ fontSize:'clamp(54px,6vw,84px)', lineHeight:.86, marginTop:10 }}>
+                {winner.first_name}<br/>{winner.last_name}
+              </div>
+              <div style={{ marginTop:14, display:'flex', alignItems:'center', gap:10,
+                color:'var(--muted)', fontSize:12, textTransform:'uppercase', letterSpacing:'.16em', fontWeight:700 }}>
+                <span style={{ width:10, height:10, background: winner.team_color }} />
+                {winner.team}<span className="dot-sep" />№{winner.driver_number}
+              </div>
+            </div>
+            <div style={{ position:'relative', marginTop:24, height:280, background:'#0e0e14', overflow:'hidden' }}>
+              <F1Img src={winner.card_photo_url || winner.photo_url} w={600} label={`фото · ${winner.last_name}`}
+                style={{ width:'100%', height:'100%', objectPosition: winner.card_photo_position || 'top center' }} />
+              <div style={{ position:'absolute', left:14, bottom:10, color:'#fff',
+                fontFamily:"'Anton',sans-serif", fontSize:72, lineHeight:.85, textShadow:'0 4px 24px rgba(0,0,0,.6)' }}>P1</div>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginTop:16, fontSize:12,
+              letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', fontWeight:600 }}>
+              <span>{fullDate(lastRace.date)}</span>
+              <span className="f-mono tnum" style={{ color:'var(--text)' }}>{winner.time || '—'}</span>
+            </div>
+          </article>
+          <div style={{ display:'flex', flexDirection:'column' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, alignItems:'end', minHeight:320 }}>
+              {[1,0,2].map(orderIdx => {
+                const i = orderIdx === 0 ? 0 : orderIdx === 1 ? 1 : 2;
+                const p = podium[i];
+                const heightCls = i===0?'podium-p1':i===1?'podium-p2':'podium-p3';
+                const medal = i===0?'var(--gold)':i===1?'var(--silver)':'var(--bronze)';
+                const gap = i === 0 ? '—' : (p.time && p.time.startsWith('+') ? p.time : (p.time || '—'));
+                return (
+                  <div key={p.driver_number} className={heightCls} style={{
+                    background:'var(--surface)', border:'1px solid var(--line)',
+                    position:'relative', overflow:'hidden', display:'flex',
+                    flexDirection:'column', justifyContent:'flex-end',
+                    borderTop:`3px solid ${p.team_color}` }}>
+                    {/* Driver photo fill */}
+                    <div style={{ position:'absolute', inset:0, background:`linear-gradient(180deg, ${p.team_color}22 0%, var(--surface) 70%)` }}>
+                      <F1Img src={p.card_photo_url || p.photo_url} w={320} label={p.code}
+                        style={{ width:'100%', height:'100%', objectPosition:'top center', opacity:0.85 }} />
+                      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 30%, rgba(10,10,12,.95) 95%)' }} />
+                    </div>
+                    <div style={{ position:'absolute', top:12, left:14, right:14, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                      <div style={{ fontFamily:"'Anton',sans-serif", fontSize:i===0?52:38, color: medal, lineHeight:1, textShadow:'0 2px 8px rgba(0,0,0,.6)' }}>P{i+1}</div>
+                      <div style={{ width:8, height:32, background: p.team_color }} />
+                    </div>
+                    <div style={{ position:'relative', padding:'0 14px 14px' }}>
+                      <div className="f-display" style={{ fontSize:i===0?28:22, lineHeight:.95, color:'#fff', textShadow:'0 2px 8px rgba(0,0,0,.6)' }}>{p.last_name}</div>
+                      <div className="f-mono tnum" style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>{p.code} · {gap}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop:20, padding:'18px 0', borderTop:'1px solid var(--line)', borderBottom:'1px solid var(--line)',
+              display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:24 }}>
+              <Metric label="Поул-позиция" value={results.find(r => r.grid === 1)?.code || '—'} sub={results.find(r => r.grid === 1)?.last_name || ''} />
+              <Metric label="Быстрый круг" value={fastestRow?.code || '—'} sub={fastestRow?.fastest_lap_time || ''} mono />
+              <Metric label="Финишировало" value={results.filter(r => !r.is_dnf).length + ' / ' + results.length} sub="" />
+              <Metric label="Победитель" value={winner.code} sub={winner.team} />
+            </div>
+            <div style={{ marginTop:18 }}>
+              <div className="f-italic" style={{ fontSize:18, color:'var(--text)' }}>
+                «{winner.first_name} {winner.last_name} забирает победу {short ? 'в ' + short.toLowerCase() : ''} — старт-в-старт со второго ряда, чистая стратегия и ни одной ошибки на 22 кругах под давлением.»
+              </div>
+              <div className="eyebrow" style={{ marginTop:10, color:'var(--muted)' }}>— редакция F1·HUB</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============== 02 STANDINGS ==============
+function Stat({ n, l, accent }) {
+  return (
+    <div>
+      <div className="f-display tnum" style={{ fontSize:38, lineHeight:1, color: accent ? 'var(--accent)' : 'var(--text)' }}>{n}</div>
+      <div style={{ fontSize:11, color:'var(--muted)', marginTop:6, letterSpacing:'.14em', textTransform:'uppercase', fontWeight:600 }}>{l}</div>
+    </div>
+  );
+}
+
+function StandingsPreview({ standings, racesCompleted }) {
+  if (!standings || standings.length < 5) return null;
+  const top5 = standings.slice(0, 5);
+  const leader = top5[0];
+  const others = top5.slice(1);
+  return (
+    <section style={{ padding:'88px 0', borderBottom:'1px solid var(--line)' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+        <SectionHeader num="02" title="Чемпионат пилотов" kicker={`после ${racesCompleted} раундов`}
+          right={<a href="#" className="nav-link" style={{ color:'var(--text)' }}>Вся таблица →</a>} />
+        <div className="standings-grid" style={{ display:'grid', gridTemplateColumns:'minmax(320px,1fr) 1.4fr', gap:32 }}>
+          <article style={{ position:'relative', overflow:'hidden', border:'1px solid var(--line)',
+            background:`linear-gradient(135deg, ${leader.team_color}22 0%, var(--surface) 60%)`,
+            minHeight:620, display:'grid', gridTemplateRows:'auto 1fr auto' }}>
+            {/* Team color stripe */}
+            <div style={{ position:'absolute', top:0, left:0, bottom:0, width:4, background: leader.team_color, zIndex:3 }} />
+            {/* Watermark "01" */}
+            <div style={{ position:'absolute', right:-20, bottom:80, fontFamily:"'Anton',sans-serif",
+              fontSize:280, lineHeight:.78, color:'rgba(255,255,255,.04)', pointerEvents:'none', zIndex:1 }}>01</div>
+
+            {/* TOP: name + team — no photo behind */}
+            <div style={{ position:'relative', zIndex:2, padding:'24px 24px 18px' }}>
+              <div className="eyebrow eyebrow-accent">Лидер чемпионата</div>
+              <div className="f-display" style={{ fontSize:'clamp(44px,4.8vw,68px)', lineHeight:.9, marginTop:10 }}>
+                {leader.first_name}<br/>{leader.last_name}
+              </div>
+              <div style={{ marginTop:12, fontSize:12, color:'var(--muted)', textTransform:'uppercase',
+                letterSpacing:'.16em', fontWeight:700, display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ width:10, height:10, background: leader.team_color }} />
+                {leader.team} <span className="dot-sep" /> №{leader.driver_number}
+              </div>
+            </div>
+
+            {/* MIDDLE: full photo, no text overlay */}
+            <div style={{ position:'relative', overflow:'hidden', minHeight:280,
+              background:`linear-gradient(180deg, transparent, ${leader.team_color}11)` }}>
+              <F1Img src={leader.photo_url_large || leader.card_photo_url || leader.photo_url} w={900}
+                label={`фото · ${leader.last_name}`}
+                style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+              {/* Soft bottom fade so stats below feel connected */}
+              <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+                background:'linear-gradient(180deg, transparent 75%, rgba(10,10,12,.6))' }} />
+            </div>
+
+            {/* BOTTOM: stats */}
+            <div style={{ position:'relative', zIndex:2, padding:'18px 24px 22px',
+              borderTop:'1px solid var(--line)', background:'var(--bg)' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18 }}>
+                <Stat n={Math.round(leader.points)} l="очков" />
+                <Stat n={leader.wins || 0} l="победы" />
+                <Stat n={`+${Math.round(leader.points - (top5[1]?.points || 0))}`} l="отрыв" accent />
+              </div>
+            </div>
+          </article>
+          <div style={{ display:'flex', flexDirection:'column' }}>
+            <div style={{ borderTop:'1px solid var(--line)' }} />
+            {others.map((d, i) => {
+              return (
+                <DriverRow key={d.driver_number} place={i+2} driver={d}
+                  right={
+                    <div style={{ display:'flex', alignItems:'center', gap:22 }}>
+                      <div style={{ textAlign:'right' }}>
+                        <div className="eyebrow" style={{ color:'var(--muted-2)' }}>Победы</div>
+                        <div className="f-display tnum" style={{ fontSize:22, color: (d.wins||0) > 0 ? 'var(--gold)' : 'var(--muted)' }}>{d.wins || 0}</div>
+                      </div>
+                      <div style={{ textAlign:'right' }}>
+                        <div className="eyebrow" style={{ color:'var(--muted-2)' }}>Отрыв</div>
+                        <div className="f-mono tnum" style={{ fontSize:14, color:'var(--muted)' }}>−{Math.round(leader.points - d.points)}</div>
+                      </div>
+                      <div style={{ minWidth:80, textAlign:'right' }}>
+                        <div className="eyebrow" style={{ color:'var(--muted-2)' }}>Очки</div>
+                        <div className="f-display tnum" style={{ fontSize:30 }}>{Math.round(d.points)}</div>
+                      </div>
+                    </div>
+                  } />
+              );
+            })}
+            <div style={{ borderTop:'1px solid var(--line)' }} />
+            {/* Kubok teaser */}
+            <div style={{ marginTop:24, padding:'18px 22px', background:'var(--surface)',
+              border:'1px solid var(--line)', borderLeft:'3px solid var(--accent)',
+              display:'flex', alignItems:'center', justifyContent:'space-between', gap:18, flexWrap:'wrap' }}>
+              <div>
+                <div className="eyebrow eyebrow-accent">Кубок конструкторов</div>
+                <div className="f-display" style={{ fontSize:22, marginTop:6 }}>Mercedes удерживает первую строчку</div>
+              </div>
+              <button className="btn btn-ghost">Кубок →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============== 03 CALENDAR ==============
+function CalendarStrip({ antispoiler, schedule, pastWinners }) {
+  if (!schedule?.length) return null;
+  const upcoming = schedule.filter(r => !r.is_past);
+  const past = schedule.filter(r => r.is_past).slice().reverse();
+  const feature = upcoming[0];
+  const restNext = upcoming.slice(1, 4);
+  // Map round -> winner from lastRaceResults if available; otherwise null
+  // The /api/season/{season}/results would give winners, but here just use last_race for the last GP
+  if (!feature) return null;
+  return (
+    <section style={{ padding:'88px 0', borderBottom:'1px solid var(--line)' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+        <SectionHeader num="03" title="Календарь" kicker="следующие · и прошедшие"
+          right={<a href="#" className="nav-link" style={{ color:'var(--text)' }}>Сезон 2026 →</a>} />
+        <div className="calendar-grid" style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:28 }}>
+          <article style={{ position:'relative', overflow:'hidden', border:'1px solid var(--line)', minHeight:520,
+            background:'var(--surface)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+            <div style={{ position:'absolute', inset:0 }}>
+              <F1Img src={feature.circuit_image} w={1600} label={`track · ${shortName(feature)}`} className="hero-photo"
+                     style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              <div style={{ position:'absolute', inset:0,
+                background:'linear-gradient(180deg,rgba(10,10,12,.2) 0%,rgba(10,10,12,.85) 80%)' }} />
+            </div>
+            <div style={{ position:'relative', padding:'28px 32px 0',
+              display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div>
+                <div className="eyebrow eyebrow-accent">Следующая</div>
+                <div style={{ marginTop:8, color:'var(--muted)', fontSize:12, letterSpacing:'.16em',
+                  fontWeight:700, textTransform:'uppercase' }}>
+                  Раунд {String(feature.round).padStart(2,'0')} · {dayMonth(feature.date)}
+                </div>
+              </div>
+              <div className="f-display tnum" style={{ fontSize:80, color:'rgba(255,255,255,.1)', lineHeight:.85 }}>
+                {String(feature.round).padStart(2,'0')}
+              </div>
+            </div>
+            <div style={{ position:'relative', padding:'0 32px 28px' }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap:14, marginBottom:10 }}>
+                <FlagImg code={feature.country_code} size={48} />
+                {feature.sprint && <span className="badge-sprint">Спринт</span>}
+              </div>
+              <div className="f-display" style={{ fontSize:'clamp(54px,7vw,108px)', lineHeight:.86, letterSpacing:'-.01em' }}>
+                {shortName(feature)}
+              </div>
+              <div style={{ marginTop:10, fontSize:14, color:'var(--muted)',
+                textTransform:'uppercase', letterSpacing:'.14em', fontWeight:600 }}>{feature.circuit}</div>
+            </div>
+          </article>
+          <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+            <div className="eyebrow" style={{ marginBottom:14 }}>Затем</div>
+            {restNext.map(r => (
+              <div key={r.round} className="row-hover" style={{ borderTop:'1px solid var(--line)',
+                padding:'14px 4px', display:'flex', alignItems:'center', gap:14, position:'relative', overflow:'hidden' }}>
+                {/* Circuit thumb */}
+                <div style={{ width:64, height:48, overflow:'hidden', background:'#13131a', flexShrink:0, position:'relative' }}>
+                  {r.circuit_image ? (
+                    <F1Img src={r.circuit_image} w={200} label={shortName(r)}
+                      style={{ width:'100%', height:'100%' }} />
+                  ) : (
+                    <div className="ph" style={{ position:'absolute', inset:0 }}><span>circuit</span></div>
+                  )}
+                </div>
+                <FlagImg code={r.country_code} size={28} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap' }}>
+                    <span className="f-display tnum" style={{ fontSize:18, color:'var(--muted)' }}>R{String(r.round).padStart(2,'0')}</span>
+                    <span className="f-display" style={{ fontSize:22, lineHeight:1 }}>{shortName(r)}</span>
+                    {r.sprint && <span className="badge-sprint" style={{ marginLeft:6 }}>Спринт</span>}
+                  </div>
+                  <div style={{ marginTop:4, fontSize:11, color:'var(--muted)',
+                    letterSpacing:'.12em', textTransform:'uppercase', fontWeight:600 }}>{dayMonth(r.date)}</div>
+                </div>
+                <div style={{ color:'var(--muted)', fontSize:20 }}>→</div>
+              </div>
+            ))}
+            <div style={{ borderTop:'1px solid var(--line)' }} />
+          </div>
+        </div>
+        <div style={{ marginTop:64 }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:14, marginBottom:16 }}>
+            <span className="eyebrow">Архив сезона</span>
+            <span className="f-italic text-muted" style={{ fontSize:16 }}>· {past.length} пройдено</span>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px,1fr))',
+            gap:0, borderTop:'1px solid var(--line)' }}>
+            {past.map(r => {
+              const winner = (pastWinners || {})[r.round] || null;
+              return (
+                <div key={r.round} className="row-hover" style={{
+                  borderBottom:'1px solid var(--line)', borderRight:'1px solid var(--line)',
+                  position:'relative', overflow:'hidden', minHeight:160 }}>
+                  {/* Circuit photo background */}
+                  {r.circuit_image && (
+                    <div style={{ position:'absolute', inset:0, opacity:0.18 }}>
+                      <F1Img src={r.circuit_image} w={400} label={shortName(r)}
+                        style={{ width:'100%', height:'100%' }} />
+                    </div>
+                  )}
+                  <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background: winner?.team_color || 'var(--line)' }} />
+                  <div style={{ position:'relative', padding:'14px 16px 14px 22px', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                    <div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                        <span className="f-display tnum" style={{ fontSize:18, color:'var(--muted)' }}>R{String(r.round).padStart(2,'0')}</span>
+                        <span style={{ fontSize:11, color:'var(--muted)', letterSpacing:'.14em', textTransform:'uppercase', fontWeight:600 }}>{dayMonth(r.date)}</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:8 }}>
+                        <FlagImg code={r.country_code} size={28} />
+                        <div className="f-display" style={{ fontSize:26, lineHeight:1 }}>{shortName(r)}</div>
+                      </div>
+                    </div>
+                    {antispoiler ? (
+                      <div style={{ marginTop:14, fontSize:11, color:'var(--muted-2)',
+                        letterSpacing:'.14em', textTransform:'uppercase', fontWeight:600 }}>результат скрыт</div>
+                    ) : winner ? (
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14, paddingTop:10, borderTop:'1px solid var(--line)' }}>
+                        <div style={{ width:32, height:32, overflow:'hidden', background:'#13131a', flexShrink:0 }}>
+                          <F1Img src={winner.photo_url} w={120} label={winner.code} style={{ width:'100%', height:'100%' }} />
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700 }}>{winner.last_name}</div>
+                          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'.1em', textTransform:'uppercase', fontWeight:600 }}>{winner.code} · {winner.team?.split(' ')[0]}</div>
+                        </div>
+                        <span className="f-mono tnum" style={{ fontSize:11, color:'var(--muted)' }}>{winner.time || ''}</span>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop:14, fontSize:11, color:'var(--muted-2)',
+                        letterSpacing:'.14em', textTransform:'uppercase', fontWeight:600 }}>результаты загружаются</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============== 04 NEWS ==============
+function NewsEditorial({ news }) {
+  if (!news?.length) return null;
+  const items = news.slice(0, 3);
+  return (
+    <section style={{ padding:'88px 0 100px' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+        <SectionHeader num="04" title="Хроника" kicker="неделя на трассе"
+          right={<a href="#" className="nav-link" style={{ color:'var(--text)' }}>Все новости →</a>} />
+        <div className="news-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:24 }}>
+          {items.map((n, i) => (
+            <article key={i} className="news-card" style={{
+              background:'var(--surface)', border:'1px solid var(--line)',
+              display:'flex', flexDirection:'column', cursor:'pointer' }}>
+              <div style={{ position:'relative', aspectRatio:'16/10' }}>
+                {n.photo || n.image ? (
+                  <img src={n.photo || n.image} alt="" loading="lazy"
+                    style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}
+                    onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                ) : null}
+                <div className="ph" style={{ position:'absolute', inset:0, display: (n.photo || n.image) ? 'none' : 'flex' }}>
+                  <span>фото новости</span>
+                </div>
+                <div style={{ position:'absolute', top:14, left:14, fontFamily:"'Anton',sans-serif",
+                  fontSize:34, color:'#fff', textShadow:'0 4px 16px rgba(0,0,0,.6)' }}>{String(i+1).padStart(2,'0')}</div>
+                <div style={{ position:'absolute', bottom:12, left:14 }}>
+                  <span className="badge-outline" style={{ background:'rgba(10,10,12,.55)' }}>
+                    {n.source || 'Новости'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ padding:'22px 22px 24px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11,
+                  color:'var(--muted)', letterSpacing:'.14em', textTransform:'uppercase',
+                  fontWeight:600, marginBottom:14 }}>
+                  <span>{n.source || 'championat.com'}</span><span>{n.date_text || n.published || ''}</span>
+                </div>
+                <h3 className="f-display" style={{ margin:0, fontSize:24, lineHeight:1.05, letterSpacing:'-.005em' }}>{n.title}</h3>
+                {n.preview && (
+                  <p className="f-italic" style={{ margin:'14px 0 0', color:'var(--muted)', fontSize:15, lineHeight:1.5 }}>{n.preview}</p>
+                )}
+                <div style={{ marginTop:18, fontSize:12, color:'var(--accent)',
+                  letterSpacing:'.14em', textTransform:'uppercase', fontWeight:700 }}>Читать →</div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer style={{ padding:'28px 0', borderTop:'1px solid var(--line)', background:'var(--bg)' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        gap:18, fontSize:11, letterSpacing:'.16em', textTransform:'uppercase',
+        color:'var(--muted)', fontWeight:600, flexWrap:'wrap' }}>
+        <span>
+          F1<span style={{ color:'var(--accent)' }}>·</span>HUB<span className="dot-sep" />
+          trackside&nbsp;edition<span className="dot-sep" />2026
+        </span>
+        <span className="f-italic" style={{ letterSpacing:0, textTransform:'none', color:'var(--muted)', fontSize:13 }}>
+          Фанатский ресурс · данные из открытых источников
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+function PageStub({ title, kicker }) {
+  return (
+    <section style={{ padding:'140px 0', borderBottom:'1px solid var(--line)' }}>
+      <div style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+        <div className="eyebrow eyebrow-accent">{kicker}</div>
+        <div className="f-display" style={{ fontSize:'clamp(72px,10vw,148px)', marginTop:14 }}>{title}</div>
+        <div className="f-italic text-muted" style={{ fontSize:18, marginTop:20, maxWidth:560 }}>
+          Эта страница в разработке. Сначала устаканиваем визуальный язык на главной — дальше расширяем по одной.
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const ACCENTS = ['#E10600', '#E8C547', '#FF8000', '#27F4D2'];
+function Tweaks({ values, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Fragment>
+      <button className="tweaks-fab" onClick={() => setOpen(o => !o)} aria-label="Tweaks">
+        {open ? '✕' : '⚙'}
+      </button>
+      {open && (
+        <div className="tweaks-panel">
+          <div className="sect">Контент</div>
+          <div className="row">
+            <span>Антиспойлер</span>
+            <button className="toggle" data-on={values.antispoiler ? '1' : '0'}
+              onClick={() => onChange('antispoiler', !values.antispoiler)}><i/></button>
+          </div>
+          <div className="sect">Hero</div>
+          <div className="chips">
+            <button className="chip" data-on={values.heroVariant === 'photo' ? '1' : '0'}
+              onClick={() => onChange('heroVariant', 'photo')}>Фото</button>
+            <button className="chip" data-on={values.heroVariant === 'typography' ? '1' : '0'}
+              onClick={() => onChange('heroVariant', 'typography')}>Типо</button>
+          </div>
+          <div className="sect">Акцент</div>
+          <div className="chips">
+            {ACCENTS.map(c => (
+              <button key={c} className="swatch" data-on={values.accent === c ? '1' : '0'}
+                style={{ background: c }} onClick={() => onChange('accent', c)} />
+            ))}
+          </div>
+        </div>
+      )}
+    </Fragment>
+  );
+}
+
+// ============== APP ==============
+function App() {
+  const [values, setValues] = useState({
+    accent: '#E10600',
+    heroVariant: 'photo',
+    antispoiler: false,
+  });
+  const setTweak = (k, v) => setValues(s => ({ ...s, [k]: v }));
+  const [page, setPage] = useState('home');
+
+  const [home, setHome] = useState(null);
+  const [standings, setStandings] = useState(null);
+  const [schedule, setSchedule] = useState(null);
+  const [news, setNews] = useState(null);
+  const [pastWinners, setPastWinners] = useState({}); // round -> winner driver row
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', values.accent);
+  }, [values.accent]);
+  useEffect(() => { window.scrollTo({ top:0, behavior:'instant' }); }, [page]);
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/home?season=2026'),
+      apiGet('/api/standings/drivers?season=2026'),
+      apiGet('/api/schedule?season=2026'),
+      apiGet('/api/news'),
+    ]).then(([h, st, sc, n]) => {
+      setHome(h);
+      setStandings(st?.standings || []);
+      const races = sc?.races || [];
+      setSchedule(races);
+      const newsList = n?.posts || n?.articles || (Array.isArray(n) ? n : []) || [];
+      // Filter to F1-related news (title or preview mentioning F1/Формул/гонщ/болид/гран-при)
+      const f1Keywords = /формул|f1|гонщ|болид|гран-при|гран при|трас|пилот|чемпион|квалиф|подиум|сезон|спринт|маклар|феррар|мерседес|ред булл|астон|вильямс|альпин|сауб|хаас/i;
+      const filtered = newsList.filter(p => f1Keywords.test(p.title || '') || f1Keywords.test(p.preview || ''));
+      setNews(filtered.length ? filtered : newsList);
+      setLoading(false);
+
+      // Fetch past race winners in parallel (light hit; cached on backend)
+      const pastRounds = races.filter(r => r.is_past).map(r => r.round);
+      Promise.all(pastRounds.map(rn =>
+        apiGet(`/api/race/${rn}/results?season=2026`).then(d => [rn, d?.results?.[0] || null])
+      )).then(pairs => {
+        const map = {};
+        pairs.forEach(([rn, w]) => { if (w) map[rn] = w; });
+        setPastWinners(map);
+      });
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight:'80vh', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontFamily:"'JetBrains Mono',monospace", fontSize:12, letterSpacing:'.3em', textTransform:'uppercase' }}>
+        Загрузка данных...
+      </div>
+    );
+  }
+
+  // Build round -> race map from schedule (for name + country_code lookup)
+  const scheduleByRound = {};
+  (schedule || []).forEach(r => { scheduleByRound[r.round] = r; });
+
+  // For the next race, prefer schedule data (has circuit_image guaranteed)
+  let nextRace = home?.next_race;
+  if (nextRace && schedule) {
+    const fromSched = schedule.find(r => r.round === nextRace.round);
+    if (fromSched) nextRace = { ...fromSched, ...nextRace, circuit_image: nextRace.circuit_image || fromSched.circuit_image };
+  }
+
+  const racesCompleted = (schedule || []).filter(r => r.is_past).length;
+
+  return (
+    <Fragment>
+      <TopNav active={page} onNavigate={setPage}
+        antispoiler={values.antispoiler}
+        onToggleSpoiler={() => setTweak('antispoiler', !values.antispoiler)} />
+      {page === 'home' && (
+        <main className="fade-up" key={'home-' + values.heroVariant}>
+          <HeroCountdown heroVariant={values.heroVariant} nextRace={nextRace} />
+          <LastRace antispoiler={values.antispoiler} lastRace={home?.last_race} scheduleByRound={scheduleByRound} />
+          <StandingsPreview standings={standings} racesCompleted={racesCompleted} />
+          <CalendarStrip antispoiler={values.antispoiler} schedule={schedule} pastWinners={pastWinners} />
+          <NewsEditorial news={news} />
+        </main>
+      )}
+      {page === 'calendar'    && <PageStub kicker="Раздел 02" title="Календарь" />}
+      {page === 'standings'   && <PageStub kicker="Раздел 03" title="Чемпионат" />}
+      {page === 'predictions' && <PageStub kicker="Раздел 04" title="Прогнозы" />}
+      {page === 'games'       && <PageStub kicker="Раздел 05" title="Игры" />}
+      {page === 'news'        && <PageStub kicker="Раздел 06" title="Хроника" />}
+      {page === 'profile'     && <PageStub kicker="Раздел 07" title="Профиль" />}
+      <SiteFooter />
+      <Tweaks values={values} onChange={setTweak} />
+    </Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

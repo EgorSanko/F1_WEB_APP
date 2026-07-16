@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-f1-bg: #09090b;
-  --color-f1-surface: #111118;
-  --color-f1-card: #16161e;
-  --color-f1-card-hover: #1e1e2a;
-  --color-f1-border: rgba(255,255,255,0.06);
-  --color-f1-border-light: rgba(255,255,255,0.1);
+  --color-f1-bg: #0f0f13;
+  --color-f1-surface: #181820;
+  --color-f1-card: #1e1e28;
+  --color-f1-card-hover: #282836;
+  --color-f1-border: rgba(255,255,255,0.08);
+  --color-f1-border-light: rgba(255,255,255,0.14);
   --color-f1-red: #E10600;
   --color-f1-red-dark: #B00500;
   --color-f1-muted: #8585a0;

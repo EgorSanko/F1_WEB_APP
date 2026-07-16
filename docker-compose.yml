@@ -15,6 +15,9 @@ services:
       - ./settle_predictions.py:/app/settle_predictions.py:ro
       - ./webapp.html:/app/webapp.html:ro
       - ./public.html:/app/public.html:ro
+      - ./public-v2.html:/app/public-v2.html:ro
+      - ./redesign-v2-embed.html:/app/redesign-v2-embed.html:ro
+      - ./redesign-calendar-embed.html:/app/redesign-calendar-embed.html:ro
       - ./static:/app/static:ro
     env_file: .env
     healthcheck:
@@ -38,3 +41,5 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    extra_hosts:
+      - "api.telegram.org:149.154.167.220"

@@ -40,12 +40,19 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_name=user.last_name,
     )
 
-    keyboard = [[
-        InlineKeyboardButton(
-            "🏎️ Открыть F1 Hub",
-            web_app={"url": WEBAPP_URL}
+    # Auto-send login code if deep link is /start code
+    if context.args and context.args[0] == 'code':
+        code = db.create_auth_code(user.id)
+        await update.message.reply_text(
+        "🔑 Ваш код:\n\n<code>" + code + "</code>\n\nВведите его на f1hub.lead-seek.ru\nКод действителен 5 минут.",
+            parse_mode=ParseMode.HTML,
         )
-    ]]
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL})],
+        [InlineKeyboardButton("🔑 Код для сайта", callback_data="get_code")],
+    ]
 
     welcome_text = (
         "🏎️ *F1 Hub* — твой пит\\-уолл в Telegram\n\n"
@@ -124,6 +131,39 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
+
+async def cmd_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /code command — generate a one-time login code for the website."""
+    user = update.effective_user
+    db.get_or_create_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+    )
+    code = db.create_auth_code(user.id)
+    await update.message.reply_text(
+        f"🔑 Ваш код для входа на сайт:\n\n"
+        f"<code>{code}</code>\n\n"
+        f"Введите его на <a href=\"https://f1hub.lead-seek.ru\">f1hub.lead-seek.ru</a>\n"
+        f"Код действителен 5 минут.",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+
+
+async def cb_get_code(update, context):
+    """Send a fresh login code when user taps inline button."""
+    q = update.callback_query
+    await q.answer()
+    user = q.from_user
+    db.get_or_create_user(user_id=user.id, username=user.username, first_name=user.first_name, last_name=user.last_name)
+    code = db.create_auth_code(user.id)
+    await q.message.reply_text(
+        "🔑 Ваш код:\n\n<code>"+ code + "</code>\n\nВведите его на f1hub.lead-seek.ru\nКод действителен 5 минут.",
+        parse_mode=ParseMode.HTML,
+    )
 
 async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin commands."""
@@ -361,6 +401,7 @@ async def post_init(app: Application):
     """Set bot commands after initialization."""
     await app.bot.set_my_commands([
         BotCommand("start", "Открыть F1 Hub"),
+        BotCommand("code", "Получить код для входа на сайт"),
         BotCommand("stats", "Моя статистика"),
         BotCommand("help", "Помощь"),
     ])
@@ -382,6 +423,9 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("code", cmd_code))
+    from telegram.ext import CallbackQueryHandler
+    app.add_handler(CallbackQueryHandler(cb_get_code, pattern="^get_code$"))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CommandHandler("notify_test", cmd_notify_test))
 

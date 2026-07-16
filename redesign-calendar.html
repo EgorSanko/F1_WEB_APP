@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>F1 HUB — Календарь</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Titillium+Web:wght@300;400;600;700;900&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0a0a0c; --surface:#16161c; --surface-2:#1f1f28;
+  --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.18);
+  --text:#fafafa; --muted:#8a8a98; --muted-2:#5a5a66;
+  --red:#E10600; --accent:var(--red);
+  --gold:#E8C547; --silver:#C8CCD2; --bronze:#C68A4E;
+  --cool:#27F4D2;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:'Titillium Web',ui-sans-serif,system-ui,sans-serif;
+  font-weight:400;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{overflow-x:hidden}
+img{display:block;max-width:100%}
+.f-display{font-family:'Anton',Impact,sans-serif;font-weight:400;letter-spacing:.005em;line-height:.9;text-transform:uppercase}
+.f-mono{font-family:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.f-italic{font-family:'Fraunces',Georgia,serif;font-style:italic;font-variation-settings:"opsz" 144}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyebrow-accent{color:var(--accent)}
+.sect-num{font-family:'Anton',sans-serif;color:var(--accent);letter-spacing:.02em;line-height:1;font-size:14px}
+.sect-num::after{content:" — "}
+.tnum{font-variant-numeric:tabular-nums}
+.dot-sep{display:inline-block;width:3px;height:3px;border-radius:50%;background:currentColor;margin:0 8px;vertical-align:middle;opacity:.55}
+
+/* Topnav */
+.topnav{position:sticky;top:0;z-index:50;backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);background:rgba(10,10,12,.78);
+  border-bottom:1px solid var(--line);padding:14px 0}
+.nav-link{position:relative;padding:6px 0;color:var(--muted);font-size:13px;letter-spacing:.04em;
+  text-transform:uppercase;font-weight:600;transition:color .2s;text-decoration:none;cursor:pointer}
+.nav-link:hover{color:var(--text)}
+.nav-link[data-active="true"]{color:var(--text)}
+.nav-link[data-active="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;font-family:'Titillium Web',sans-serif;
+  font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.1em;border:1px solid var(--line-strong);
+  background:transparent;color:var(--text);cursor:pointer;border-radius:0;transition:all .2s ease}
+.btn:hover{background:rgba(255,255,255,.04);border-color:var(--text)}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn-ghost{border-color:var(--line)}
+
+/* Live dot */
+@keyframes pulseRed{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#fff;
+  animation:pulseRed 1.6s ease-in-out infinite;display:inline-block}
+
+/* Fade up stagger */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{opacity:0;animation:fadeUp .55s cubic-bezier(.2,.7,.2,1) forwards}
+
+/* Placeholder image */
+.ph{position:relative;overflow:hidden;background:#13131a;
+  background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 14px,transparent 14px 28px);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;
+  color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.12em;text-align:center;padding:8px}
+
+/* Race card */
+.race-card{position:relative;overflow:hidden;background:var(--surface);
+  border:1px solid var(--line);cursor:pointer;
+  transition:transform .22s ease-out, border-color .22s ease-out}
+.race-card:hover{transform:translateY(-2px);border-color:var(--line-strong)}
+.race-card .race-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:.32;transition:opacity .4s ease, transform .6s ease}
+.race-card:hover .race-photo{opacity:.48;transform:scale(1.03)}
+.race-card .photo-overlay{position:absolute;inset:0;
+  background:linear-gradient(180deg, rgba(10,10,12,.4) 0%, rgba(10,10,12,.78) 70%, rgba(10,10,12,.96) 100%)}
+
+/* Feature bar (next race) */
+.feature-bar{position:relative;overflow:hidden;
+  border:1px solid var(--line);min-height:480px}
+.feature-bar .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:.42;filter:contrast(1.06) saturate(.95) brightness(.7)}
+.feature-bar .overlay{position:absolute;inset:0;
+  background:linear-gradient(90deg, rgba(10,10,12,.95) 0%, rgba(10,10,12,.6) 35%, rgba(10,10,12,.2) 100%),
+             linear-gradient(180deg, rgba(10,10,12,.4) 0%, rgba(10,10,12,.85) 100%)}
+
+/* Countdown digits */
+.cd-digit{font-family:'Anton',sans-serif;font-size:clamp(48px,6vw,88px);line-height:.86;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.cd-label{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-top:6px}
+
+/* Badge */
+.badge-sprint{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;font-weight:700;
+  text-transform:uppercase;padding:4px 8px;background:var(--accent);color:#fff;border-radius:0}
+.badge-next{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;background:var(--accent);
+  font-size:10px;letter-spacing:.25em;font-weight:700;color:#fff;text-transform:uppercase}
+
+/* Filter bar */
+.filter-bar{position:sticky;top:62px;z-index:40;
+  background:rgba(10,10,12,.85);backdrop-filter:blur(16px) saturate(140%);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);
+  border-bottom:1px solid var(--line);padding:14px 0}
+.tab-btn{padding:8px 16px;background:transparent;border:1px solid var(--line);
+  font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;transition:all .18s ease}
+.tab-btn:hover{color:var(--text);border-color:var(--line-strong)}
+.tab-btn[data-on="1"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+/* Spoiler toggle */
+.spoiler-toggle{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:transparent;
+  cursor:pointer;padding:7px 11px;color:var(--muted);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;font-weight:600;font-family:inherit;transition:color .2s}
+.spoiler-toggle[data-on="1"]{color:var(--text)}
+.spoiler-toggle .pill{width:18px;height:10px;border-radius:6px;background:rgba(255,255,255,.12);
+  position:relative;transition:background .2s ease;display:inline-block}
+.spoiler-toggle[data-on="1"] .pill{background:var(--accent)}
+.spoiler-toggle .pill i{position:absolute;top:1px;left:1px;width:8px;height:8px;border-radius:50%;
+  background:#fff;transition:left .2s ease;display:block}
+.spoiler-toggle[data-on="1"] .pill i{left:9px}
+
+/* Horizontal timeline */
+.timeline{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:4px 28px 16px;margin:0 -28px;scroll-padding-left:28px}
+.timeline > *{scroll-snap-align:start;flex:0 0 280px}
+.timeline::-webkit-scrollbar{height:6px}
+.timeline::-webkit-scrollbar-track{background:transparent}
+.timeline::-webkit-scrollbar-thumb{background:#23232c}
+
+/* Scrollbar global */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#23232c;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#33333d}
+
+/* Stats strip */
+.stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat-strip > div{padding:32px 24px;border-right:1px solid var(--line)}
+.stat-strip > div:last-child{border-right:0}
+.stat-strip .num{font-family:'Anton',sans-serif;font-size:clamp(48px,5vw,72px);line-height:.9;color:var(--text)}
+.stat-strip .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-top:8px}
+
+/* Flag */
+.flag-img{display:inline-block;object-fit:cover;border:1px solid rgba(255,255,255,.12)}
+
+/* Mobile */
+@media (max-width:1100px){
+  .upcoming-grid{grid-template-columns:repeat(2,1fr) !important}
+  .feature-grid{grid-template-columns:1fr !important}
+  .feature-grid .countdown-wrap{order:2}
+  .feature-grid .feature-text{order:1}
+}
+@media (max-width:700px){
+  .upcoming-grid{grid-template-columns:1fr !important}
+  .timeline{padding:4px 16px 16px;margin:0 -16px;scroll-padding-left:16px}
+  .timeline > *{flex:0 0 260px}
+  .stat-strip{grid-template-columns:repeat(2,1fr)}
+  .stat-strip > div:nth-child(2){border-right:0}
+  .stat-strip > div:nth-child(1),
+  .stat-strip > div:nth-child(2){border-bottom:1px solid var(--line)}
+  .filter-bar .tabs{flex-wrap:wrap;gap:6px !important}
+  .feature-bar .race-name{font-size:clamp(56px,16vw,140px) !important}
+  .sessions-strip{flex-wrap:wrap}
+  body .container{padding:0 16px !important}
+}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, Fragment } = React;
+
+// ============== HELPERS ==============
+const apiGet = (p) => fetch(p).then(r => r.ok ? r.json() : null).catch(() => null);
+
+function hiResImg(url, w = 800) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('media.formula1.com/image/upload/')) return url;
+  return url.replace(/w_\d+/g, 'w_' + w).replace(/h_\d+/g, 'h_' + Math.round(w * 0.75));
+}
+
+const COUNTRY_RU = {
+  AU:'Австралия', CN:'Китай', JP:'Япония', US:'США', CA:'Канада', MC:'Монако',
+  ES:'Испания', AT:'Австрия', GB:'Британия', HU:'Венгрия', BE:'Бельгия',
+  NL:'Нидерланды', IT:'Италия', AZ:'Азербайджан', SG:'Сингапур', MX:'Мексика',
+  BR:'Бразилия', QA:'Катар', AE:'ОАЭ', SA:'Саудия', BH:'Бахрейн',
+};
+const shortName = (r) => {
+  if (!r) return '';
+  if (typeof r === 'string') return r.replace(/^Гран-при\s+/i, '');
+  const cc = (r.country_code || '').toUpperCase();
+  if (COUNTRY_RU[cc]) return COUNTRY_RU[cc];
+  return (r.name || '').replace(/^Гран-при\s+/i, '');
+};
+
+const monthShort = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+const monthFull  = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const weekdayShort = ['вс','пн','вт','ср','чт','пт','сб'];
+const dayMonth = (iso) => { if (!iso) return ''; const d=new Date(iso); return `${String(d.getDate()).padStart(2,'0')} ${monthShort[d.getMonth()]}`; };
+const fullDate = (iso) => { if (!iso) return ''; const d=new Date(iso); return `${d.getDate()} ${monthFull[d.getMonth()]} ${d.getFullYear()}`; };
+
+// Format UTC time to MSK (UTC+3)
+const mskTime = (dateIso, timeIso) => {
+  if (!dateIso) return '';
+  const t = timeIso || '00:00:00Z';
+  const dt = new Date(`${dateIso}T${t.replace('Z','')}Z`);
+  if (isNaN(dt.getTime())) return '';
+  const msk = new Date(dt.getTime() + 3 * 3600 * 1000);
+  return `${String(msk.getUTCHours()).padStart(2,'0')}:${String(msk.getUTCMinutes()).padStart(2,'0')}`;
+};
+const sessionDay = (dateIso) => {
+  if (!dateIso) return '';
+  const d = new Date(dateIso + 'T00:00:00Z');
+  return weekdayShort[d.getUTCDay()].toUpperCase();
+};
+
+// ============== FLAG IMG ==============
+function FlagImg({ code, size=32 }) {
+  if (!code) return null;
+  const c = code.toLowerCase();
+  const h = Math.round(size * 0.75);
+  return (
+    <img src={`https://flagcdn.com/${size*2}x${h*2}/${c}.png`}
+      className="flag-img" alt={code}
+      style={{ width:size, height:h }}
+      onError={(e) => { e.target.style.display = 'none'; }}
+      loading="lazy" />
+  );
+}
+
+// ============== F1 IMG WITH FALLBACK ==============
+function F1Img({ src, w=800, label='image', className='', style={} }) {
+  const [failed, setFailed] = useState(!src);
+  const finalSrc = src ? hiResImg(src, w) : '';
+  if (failed || !finalSrc) {
+    return <div className={"ph " + className} style={style}><span>{label}</span></div>;
+  }
+  return <img src={finalSrc} alt={label} className={className}
+    style={{ objectFit:'cover', ...style }} onError={() => setFailed(true)} loading="lazy" />;
+}
+
+// ============== TOP NAV ==============
+function TopNav({ active='calendar' }) {
+  const links = [
+    { id:'home', label:'Главная', href:'/redesign' },
+    { id:'calendar', label:'Календарь', href:'/redesign/calendar' },
+    { id:'standings', label:'Чемпионат', href:'#' },
+    { id:'predictions', label:'Прогнозы', href:'#' },
+    { id:'games', label:'Игры', href:'#' },
+    { id:'news', label:'Новости', href:'#' },
+    { id:'profile', label:'Профиль', href:'#' },
+  ];
+  return (
+    <header className="topnav">
+      <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', gap:32, flexWrap:'wrap' }}>
+        <a href="/redesign" style={{ textDecoration:'none', color:'inherit', display:'flex', alignItems:'baseline', gap:8 }}>
+          <span className="f-display" style={{ fontSize:22, letterSpacing:'-.01em' }}>
+            F1<span style={{ color:'var(--accent)' }}>·</span>HUB
+          </span>
+          <span className="f-italic" style={{ fontSize:11, color:'var(--muted)' }}>trackside&nbsp;edition</span>
+        </a>
+        <nav style={{ display:'flex', gap:22, marginLeft:18, flexWrap:'wrap' }}>
+          {links.map(l => (
+            <a key={l.id} href={l.href} className="nav-link" data-active={active === l.id}>{l.label}</a>
+          ))}
+        </nav>
+        <div style={{ flex:1 }} />
+        <button className="btn btn-accent" style={{ padding:'8px 14px', fontSize:11 }}>Войти&nbsp;через&nbsp;Telegram</button>
+      </div>
+    </header>
+  );
+}
+
+// ============== COUNTDOWN ==============
+function Countdown({ iso }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  if (!iso) return null;
+  const ms = Math.max(0, new Date(iso).getTime() - now);
+  const days  = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const mins  = Math.floor((ms % 3600000) / 60000);
+  const secs  = Math.floor((ms % 60000) / 1000);
+  const pad = n => String(n).padStart(2, '0');
+  const units = [[pad(days),'дней'], [pad(hours),'часов'], [pad(mins),'минут'], [pad(secs),'секунд']];
+  return (
+    <div style={{ display:'flex', gap:'clamp(14px,3vw,32px)', alignItems:'flex-end' }}>
+      {units.map(([v,l], i) => (
+        <Fragment key={l}>
+          <div>
+            <div className="cd-digit">{v}</div>
+            <div className="cd-label">{l}</div>
+          </div>
+          {i < units.length - 1 && <div className="cd-digit" style={{ color:'var(--accent)', opacity:.8 }}>:</div>}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ============== SESSIONS STRIP (for feature bar) ==============
+function SessionsStrip({ sessions }) {
+  const SESSION_ORDER = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
+  const LABELS = { fp1:'FP1', fp2:'FP2', fp3:'FP3', qualifying:'QUAL', sprint_qualifying:'SQ', sprint:'SPRINT', race:'RACE' };
+  if (!sessions || typeof sessions !== 'object') return null;
+  const entries = SESSION_ORDER.filter(k => sessions[k]).map(k => [k, sessions[k]]);
+  if (!entries.length) return null;
+  return (
+    <div className="sessions-strip" style={{ display:'flex', gap:0, flexWrap:'wrap', marginTop:24,
+      borderTop:'1px solid rgba(255,255,255,.12)', paddingTop:18 }}>
+      {entries.map(([key, s], i) => {
+        const isRace = key === 'race';
+        return (
+          <div key={key} style={{
+            flex:'1 1 110px', padding:'10px 16px',
+            borderRight: i < entries.length-1 ? '1px solid rgba(255,255,255,.08)' : 'none',
+            background: isRace ? 'rgba(225,6,0,.12)' : 'transparent'
+          }}>
+            <div className="eyebrow" style={{ color: isRace ? 'var(--accent)' : 'var(--muted)' }}>
+              {LABELS[key] || key}
+            </div>
+            <div className="f-mono" style={{ fontSize:18, marginTop:6, fontWeight:600 }}>
+              {mskTime(s.date, s.time)} <span style={{ fontSize:11, color:'var(--muted)', marginLeft:4 }}>МСК</span>
+            </div>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'.16em', marginTop:2, fontWeight:600 }}>
+              {sessionDay(s.date)} {String(new Date(s.date).getDate()).padStart(2,'0')}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============== FEATURE BAR (next race) ==============
+function FeatureBar({ race }) {
+  if (!race) return null;
+  return (
+    <section className="feature-bar fade-up" style={{ animationDelay:'.05s' }}>
+      <F1Img src={race.circuit_image} w={1800} label={`track · ${shortName(race)}`}
+        className="bg" style={{ position:'absolute', inset:0 }} />
+      <div className="overlay" />
+      <div className="container" style={{ position:'relative', maxWidth:1440, margin:'0 auto', padding:'40px 28px 32px' }}>
+        <div className="feature-grid" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr', gap:40, alignItems:'center', minHeight:340 }}>
+          <div className="feature-text">
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18, flexWrap:'wrap' }}>
+              <span className="badge-next">
+                <span className="live-dot" />NEXT
+              </span>
+              <span className="eyebrow">Раунд {String(race.round).padStart(2,'0')} · сезон 2026</span>
+              <span className="dot-sep text-muted" />
+              <span className="eyebrow">{fullDate(race.date)}</span>
+              {race.sprint && <span className="badge-sprint">Спринт</span>}
+            </div>
+            <div style={{ display:'flex', alignItems:'baseline', gap:18, flexWrap:'wrap' }}>
+              <h1 className="f-display race-name" style={{ margin:0, fontSize:'clamp(64px,9vw,144px)', letterSpacing:'-.015em', lineHeight:.88 }}>
+                {shortName(race)}
+              </h1>
+              <FlagImg code={race.country_code} size={52} />
+            </div>
+            <div style={{ marginTop:14, fontSize:14, color:'rgba(255,255,255,.85)',
+              letterSpacing:'.14em', textTransform:'uppercase', fontWeight:600 }}>
+              {race.circuit} <span className="dot-sep" /> {race.locality || race.country}
+            </div>
+          </div>
+          <div className="countdown-wrap" style={{ display:'flex', flexDirection:'column', gap:18, alignItems:'flex-start' }}>
+            <span className="eyebrow eyebrow-accent">До первого выезда</span>
+            <Countdown iso={race.race_datetime} />
+            <div style={{ display:'flex', gap:10, marginTop:6, flexWrap:'wrap' }}>
+              <button className="btn btn-accent">Открыть гран-при →</button>
+              <button className="btn btn-ghost">Антиспойлер</button>
+            </div>
+          </div>
+        </div>
+        <SessionsStrip sessions={race.sessions} />
+      </div>
+    </section>
+  );
+}
+
+// ============== RACE CARD (upcoming/past universal) ==============
+function RaceCard({ race, winner, variant='normal', antispoiler, onClick, delay=0 }) {
+  const isPast = race.is_past;
+  const isNext = race.is_next;
+  const featureSize = variant === 'feature';
+  const minH = featureSize ? 360 : 200;
+  return (
+    <article className="race-card fade-up"
+      onClick={onClick}
+      style={{
+        minHeight: minH,
+        animationDelay: `${delay}ms`,
+        '--team': winner?.team_color || 'transparent',
+      }}>
+      {race.circuit_image && (
+        <F1Img src={race.circuit_image} w={featureSize ? 1000 : 600} label={shortName(race)}
+          className="race-photo" style={{}} />
+      )}
+      <div className="photo-overlay" />
+      {/* Watermark round number */}
+      <div className="f-display" style={{
+        position:'absolute', top:8, right:14, fontSize: featureSize ? 96 : 72,
+        color:'rgba(255,255,255,.08)', lineHeight:1, pointerEvents:'none'
+      }}>{String(race.round).padStart(2,'0')}</div>
+      {/* Team stripe */}
+      {winner && (
+        <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background: winner.team_color, zIndex:2 }} />
+      )}
+      {/* NEXT badge */}
+      {isNext && (
+        <div className="badge-next" style={{ position:'absolute', top:14, left:14, zIndex:3 }}>
+          <span className="live-dot" />NEXT
+        </div>
+      )}
+      {/* Content */}
+      <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between',
+        padding: featureSize ? '24px 24px 22px' : '18px 18px 16px', zIndex:2 }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:8, flexWrap:'wrap' }}>
+            <span className="f-mono" style={{ fontSize:11, letterSpacing:'.22em', color:'var(--muted)' }}>
+              R{String(race.round).padStart(2,'0')}
+            </span>
+            {race.sprint && <span className="badge-sprint">Спринт</span>}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+            <FlagImg code={race.country_code} size={featureSize ? 36 : 24} />
+            <h3 className="f-display" style={{
+              margin:0, fontSize: featureSize ? 'clamp(40px,5vw,68px)' : 'clamp(22px,2.6vw,34px)',
+              lineHeight:.9 }}>{shortName(race)}</h3>
+          </div>
+          <div className="f-italic" style={{ fontSize:13, color:'rgba(255,255,255,.65)' }}>
+            {race.circuit}
+          </div>
+        </div>
+        <footer style={{ marginTop:14, display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:12 }}>
+          <div>
+            <div className="f-mono" style={{ fontSize:featureSize?32:22, lineHeight:1 }}>{String(new Date(race.date).getDate()).padStart(2,'0')}</div>
+            <div className="eyebrow" style={{ marginTop:4 }}>{monthShort[new Date(race.date).getMonth()]}</div>
+          </div>
+          {isPast && !antispoiler && winner && (
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 10px',
+              background:'rgba(0,0,0,.45)', backdropFilter:'blur(8px)' }}>
+              <div style={{ width:36, height:36, overflow:'hidden', background:'#13131a', flexShrink:0 }}>
+                <F1Img src={winner.photo_url} w={120} label={winner.code} style={{ width:'100%', height:'100%' }} />
+              </div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700 }}>{winner.last_name}</div>
+                <div className="f-mono" style={{ fontSize:10, color:'var(--muted)' }}>{winner.time || winner.code}</div>
+              </div>
+            </div>
+          )}
+          {isPast && antispoiler && (
+            <div className="eyebrow" style={{ color:'var(--muted-2)' }}>результат скрыт</div>
+          )}
+          {!isPast && !isNext && (
+            <div className="eyebrow" style={{ color:'var(--muted)' }}>предстоит</div>
+          )}
+        </footer>
+      </div>
+    </article>
+  );
+}
+
+// ============== SECTION HEADER ==============
+function SectionHeader({ num, title, kicker, right }) {
+  return (
+    <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, marginBottom:24, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', alignItems:'baseline', gap:18, flexWrap:'wrap' }}>
+        <span className="sect-num">{num}</span>
+        <h2 className="f-display" style={{ margin:0, fontSize:'clamp(28px,3.6vw,46px)', letterSpacing:'-.005em' }}>{title}</h2>
+        {kicker && <span className="f-italic" style={{ color:'var(--muted)', fontSize:16 }}>{kicker}</span>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+// ============== FILTER BAR ==============
+function FilterBar({ filter, setFilter, antispoiler, setAntispoiler, counts }) {
+  const tabs = [
+    { id:'all', label:'Все', count: counts.all },
+    { id:'future', label:'Будущие', count: counts.future },
+    { id:'past', label:'Прошедшие', count: counts.past },
+    { id:'sprint', label:'Только спринт', count: counts.sprint },
+  ];
+  return (
+    <div className="filter-bar">
+      <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px',
+        display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
+        <div className="tabs" style={{ display:'flex', gap:8 }}>
+          {tabs.map(t => (
+            <button key={t.id} className="tab-btn" data-on={filter === t.id ? '1' : '0'}
+              onClick={() => setFilter(t.id)}>
+              {t.label} <span style={{ opacity:.55, marginLeft:6, fontFamily:'JetBrains Mono', fontSize:10 }}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+        <button className="spoiler-toggle" data-on={antispoiler ? '1' : '0'} onClick={() => setAntispoiler(!antispoiler)}>
+          <span className="pill"><i/></span>
+          Антиспойлер
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============== APP ==============
+function App() {
+  const [schedule, setSchedule] = useState(null);
+  const [pastWinners, setPastWinners] = useState({});
+  const [filter, setFilter] = useState('all');
+  const [antispoiler, setAntispoiler] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet('/api/schedule?season=2026').then(d => {
+      const races = d?.races || [];
+      setSchedule(races);
+      setLoading(false);
+      // Fetch winners for past races
+      const pastRounds = races.filter(r => r.is_past).map(r => r.round);
+      Promise.all(pastRounds.map(rn =>
+        apiGet(`/api/race/${rn}/results?season=2026`).then(d => [rn, d?.results?.[0] || null])
+      )).then(pairs => {
+        const map = {};
+        pairs.forEach(([rn, w]) => { if (w) map[rn] = w; });
+        setPastWinners(map);
+      });
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <Fragment>
+        <TopNav active="calendar"/>
+        <div style={{ minHeight:'70vh', display:'flex', alignItems:'center', justifyContent:'center',
+          color:'var(--muted)', fontFamily:"'JetBrains Mono',monospace", fontSize:12, letterSpacing:'.3em', textTransform:'uppercase' }}>
+          Загрузка календаря...
+        </div>
+      </Fragment>
+    );
+  }
+
+  if (!schedule?.length) {
+    return (
+      <Fragment>
+        <TopNav active="calendar"/>
+        <div style={{ minHeight:'50vh', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)' }}>
+          Нет данных о календаре.
+        </div>
+      </Fragment>
+    );
+  }
+
+  const nextRace = schedule.find(r => r.is_next) || schedule.find(r => !r.is_past);
+  const past = schedule.filter(r => r.is_past);
+  const future = schedule.filter(r => !r.is_past && !r.is_next);
+  const sprintAll = schedule.filter(r => r.sprint);
+
+  const counts = {
+    all: schedule.length,
+    future: schedule.filter(r => !r.is_past).length,
+    past: past.length,
+    sprint: sprintAll.length,
+  };
+
+  // Decide which races to show in upcoming grid based on filter
+  let upcomingRaces = [];
+  let pastRaces = [];
+  if (filter === 'all') {
+    upcomingRaces = future;
+    pastRaces = past;
+  } else if (filter === 'future') {
+    upcomingRaces = future;
+    pastRaces = [];
+  } else if (filter === 'past') {
+    upcomingRaces = [];
+    pastRaces = past;
+  } else if (filter === 'sprint') {
+    upcomingRaces = sprintAll.filter(r => !r.is_past && !r.is_next);
+    pastRaces = sprintAll.filter(r => r.is_past);
+  }
+
+  const winnersCount = new Set(Object.values(pastWinners).filter(Boolean).map(w => w.code)).size;
+  // Approximate "continents covered"
+  const continentsByCC = (cc) => ({
+    AU:'Океания', NZ:'Океания',
+    CN:'Азия', JP:'Азия', SG:'Азия', QA:'Азия', AE:'Азия', SA:'Азия', BH:'Азия', AZ:'Азия',
+    US:'Северная Америка', CA:'Северная Америка', MX:'Северная Америка',
+    BR:'Южная Америка',
+    GB:'Европа', MC:'Европа', ES:'Европа', AT:'Европа', NL:'Европа', BE:'Европа', IT:'Европа', HU:'Европа',
+  })[cc] || null;
+  const continents = new Set(past.map(r => continentsByCC(r.country_code)).filter(Boolean));
+
+  return (
+    <Fragment>
+      <TopNav active="calendar"/>
+
+      {/* Section header */}
+      <section style={{ padding:'48px 0 32px' }}>
+        <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, flexWrap:'wrap' }}>
+            <div>
+              <div className="eyebrow eyebrow-accent">01 — СЕЗОН 2026</div>
+              <h1 className="f-display fade-up" style={{ margin:'12px 0 8px', fontSize:'clamp(56px,9vw,144px)', letterSpacing:'-.02em', animationDelay:'.05s' }}>
+                Календарь
+              </h1>
+              <p className="f-italic" style={{ margin:0, color:'var(--muted)', fontSize:18 }}>
+                {schedule.length} этапов · с марта по декабрь
+              </p>
+            </div>
+            <div style={{ textAlign:'right', display:'flex', flexDirection:'column', gap:6 }}>
+              <div className="eyebrow">Прогресс сезона</div>
+              <div className="f-display tnum" style={{ fontSize:36 }}>
+                {counts.past}<span style={{ color:'var(--muted)' }}>/{counts.all}</span>
+              </div>
+              <div className="eyebrow" style={{ color:'var(--muted)' }}>проведено</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature bar (next race) */}
+      {nextRace && (
+        <section style={{ padding:'0 0 56px' }}>
+          <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+            <FeatureBar race={nextRace} />
+          </div>
+        </section>
+      )}
+
+      <FilterBar filter={filter} setFilter={setFilter} antispoiler={antispoiler} setAntispoiler={setAntispoiler} counts={counts} />
+
+      {/* Upcoming grid */}
+      {upcomingRaces.length > 0 && (
+        <section style={{ padding:'56px 0 24px' }}>
+          <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+            <SectionHeader num="02" title="Предстоящие" kicker={`${upcomingRaces.length} этап${upcomingRaces.length === 1 ? '' : upcomingRaces.length < 5 ? 'а' : 'ов'}`} />
+            <div className="upcoming-grid" style={{
+              display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:18, gridAutoRows:'minmax(220px, auto)',
+            }}>
+              {upcomingRaces.slice(0, 1).map((r, i) => (
+                <div key={r.round} style={{ gridColumn:'span 1', gridRow:'span 2' }}>
+                  <RaceCard race={r} variant="feature" delay={i*60} />
+                </div>
+              ))}
+              {upcomingRaces.slice(1).map((r, i) => (
+                <RaceCard key={r.round} race={r} variant="normal" delay={(i+1)*60} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Past timeline */}
+      {pastRaces.length > 0 && (
+        <section style={{ padding:'56px 0 24px' }}>
+          <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+            <SectionHeader num="03" title="Архив сезона" kicker="лента результатов"
+              right={<span className="eyebrow">← листайте →</span>} />
+          </div>
+          <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+            <div className="timeline">
+              {pastRaces.slice().reverse().map((r, i) => (
+                <RaceCard key={r.round} race={r} variant="normal"
+                  winner={pastWinners[r.round]}
+                  antispoiler={antispoiler}
+                  delay={i*40} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Stats strip */}
+      <section style={{ padding:'56px 0 24px' }}>
+        <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px' }}>
+          <SectionHeader num="04" title="Сезон в цифрах" />
+          <div className="stat-strip">
+            <div>
+              <div className="num">{counts.past}<span style={{ color:'var(--muted)', fontSize:'.55em' }}>/{counts.all}</span></div>
+              <div className="lbl">этапов проведено</div>
+            </div>
+            <div>
+              <div className="num">{sprintAll.length}</div>
+              <div className="lbl">спринт-уикенда</div>
+            </div>
+            <div>
+              <div className="num">{winnersCount || '—'}</div>
+              <div className="lbl">разных победителей</div>
+            </div>
+            <div>
+              <div className="num">{continents.size}</div>
+              <div className="lbl">континент{continents.size === 1 ? '' : continents.size < 5 ? 'а' : 'ов'}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ padding:'40px 0 36px', borderTop:'1px solid var(--line)' }}>
+        <div className="container" style={{ maxWidth:1440, margin:'0 auto', padding:'0 28px',
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:18, flexWrap:'wrap' }}>
+          <div style={{ fontSize:11, letterSpacing:'.16em', textTransform:'uppercase', color:'var(--muted)', fontWeight:600 }}>
+            F1<span style={{ color:'var(--accent)' }}>·</span>HUB <span className="dot-sep" /> trackside&nbsp;edition <span className="dot-sep" /> 2026
+          </div>
+          <div style={{ display:'flex', gap:18, fontSize:11, letterSpacing:'.16em', textTransform:'uppercase', color:'var(--muted)', fontWeight:600 }}>
+            <a href="/redesign" className="nav-link" style={{ padding:0 }}>Главная</a>
+            <a href="#" className="nav-link" style={{ padding:0 }}>Чемпионат →</a>
+          </div>
+        </div>
+      </footer>
+    </Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

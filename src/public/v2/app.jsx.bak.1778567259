@@ -1,0 +1,1359 @@
+// F1 Hub v2 — Public site redesign (in progress)
+// First migrated page: Race Detail. Other routes show a stub linking back to old site.
+const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React;
+
+// ============ CONSTANTS ============
+const TEAMS = {
+  'McLaren':          { short:'MCL', color:'#FF8000', dark:'#A55200' },
+  'Ferrari':          { short:'FER', color:'#E8002D', dark:'#9B001E' },
+  'Mercedes':         { short:'MER', color:'#27F4D2', dark:'#0F8A77' },
+  'Red Bull':         { short:'RBR', color:'#3671C6', dark:'#1F3F73' },
+  'Red Bull Racing':  { short:'RBR', color:'#3671C6', dark:'#1F3F73' },
+  'Aston Martin':     { short:'AMR', color:'#229971', dark:'#13593F' },
+  'Williams':         { short:'WIL', color:'#64C4FF', dark:'#3A85B6' },
+  'RB':               { short:'RB',  color:'#6692FF', dark:'#395CB6' },
+  'Racing Bulls':     { short:'RB',  color:'#6692FF', dark:'#395CB6' },
+  'Sauber':           { short:'SAU', color:'#52E252', dark:'#2A8A2A' },
+  'Kick Sauber':      { short:'SAU', color:'#52E252', dark:'#2A8A2A' },
+  'Haas':             { short:'HAS', color:'#B6BABD', dark:'#737578' },
+  'Haas F1 Team':     { short:'HAS', color:'#B6BABD', dark:'#737578' },
+  'Alpine':           { short:'ALP', color:'#0093CC', dark:'#005C80' },
+  'Alpine F1 Team':   { short:'ALP', color:'#0093CC', dark:'#005C80' },
+  'Audi':             { short:'AUD', color:'#E63946', dark:'#7A1B25' },
+  'Audi F1 Team':     { short:'AUD', color:'#E63946', dark:'#7A1B25' },
+  'Cadillac':         { short:'CAD', color:'#F0F0F0', dark:'#5B5B5B' },
+  'Cadillac F1 Team': { short:'CAD', color:'#F0F0F0', dark:'#5B5B5B' },
+};
+const teamInfo = (name) => TEAMS[name] || { short: (name||'').slice(0,3).toUpperCase(), color:'#888', dark:'#444' };
+
+const FLAG_MAP = {
+  albert_park:'au',shanghai:'cn',suzuka:'jp',miami:'us',villeneuve:'ca',monaco:'mc',
+  catalunya:'es',red_bull_ring:'at',silverstone:'gb',spa:'be',hungaroring:'hu',
+  zandvoort:'nl',monza:'it',madring:'es',baku:'az',marina_bay:'sg',americas:'us',
+  rodriguez:'mx',interlagos:'br',vegas:'us',losail:'qa',yas_marina:'ae',
+  bahrain:'bh',jeddah:'sa',sakhir:'bh',imola:'it',
+  australia:'au',japan:'jp',china:'cn',spain:'es',canada:'ca',austria:'at',
+  great_britain:'gb',hungary:'hu',belgium:'be',netherlands:'nl',italy:'it',
+  azerbaijan:'az',singapore:'sg',united_states:'us',mexico:'mx',brazil:'br',
+  las_vegas:'us',qatar:'qa',abu_dhabi:'ae',saudi_arabia:'sa',emilia_romagna:'it',
+  us:'us',gb:'gb',ae:'ae',usa:'us',uk:'gb',uae:'ae',
+  au:'au',cn:'cn',jp:'jp',ca:'ca',mc:'mc',es:'es',at:'at',be:'be',hu:'hu',
+  nl:'nl',it:'it',az:'az',sg:'sg',mx:'mx',br:'br',qa:'qa',sa:'sa',bh:'bh',
+};
+const flagUrl = (code) => {
+  if (!code) return null;
+  const iso = FLAG_MAP[String(code).toLowerCase().replace(/[\s-]+/g,'_')];
+  return iso ? 'https://flagcdn.com/w80/' + iso + '.png' : null;
+};
+
+const COUNTRY_RU = {
+  AU:'Австралия', CN:'Китай', JP:'Япония', US:'США', CA:'Канада', MC:'Монако',
+  ES:'Испания', AT:'Австрия', GB:'Британия', HU:'Венгрия', BE:'Бельгия',
+  NL:'Нидерланды', IT:'Италия', AZ:'Азербайджан', SG:'Сингапур', MX:'Мексика',
+  BR:'Бразилия', QA:'Катар', AE:'ОАЭ', SA:'Саудия', BH:'Бахрейн',
+};
+const shortRaceName = (r) => {
+  if (!r) return '';
+  const cc = (r.country_code || '').toUpperCase();
+  if (COUNTRY_RU[cc]) return COUNTRY_RU[cc];
+  return (r.name || '').replace(/^Гран-при\s+/i, '');
+};
+
+const SESSION_ORDER = ['sprint_qualifying','sprint','qualifying','race','review'];
+const SESSION_LABELS = { sprint_qualifying:'Спринт-квалификация', sprint:'Спринт', qualifying:'Квалификация', race:'Гонка', review:'Обзор' };
+const SESSION_ICONS  = { sprint_qualifying:'⚡', sprint:'🏁', qualifying:'⏱️', race:'🏆', review:'📺' };
+
+// ============ AUTH ============
+const _getAuthHeaders = () => {
+  const token = localStorage.getItem('f1hub_auth_token');
+  return token ? { 'Authorization': 'TgLogin ' + token } : {};
+};
+const api = {
+  get: async (url) => {
+    try {
+      const res = await fetch(url, { headers: _getAuthHeaders() });
+      if (res.status === 401) { window.dispatchEvent(new CustomEvent('f1:auth-expired')); return null; }
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) { console.error('GET ' + url, err); return null; }
+  },
+  post: async (url, body) => {
+    try {
+      const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', ..._getAuthHeaders() }, body:JSON.stringify(body || {}) });
+      if (res.status === 401) { window.dispatchEvent(new CustomEvent('f1:auth-expired')); return null; }
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) { console.error('POST ' + url, err); return null; }
+  },
+};
+
+// ============ HELPERS ============
+// Bumps F1 CDN image to higher resolution + forces best-quality auto-encoding.
+// Cloudinary URL params: ...c_fill,g_north,ar_1:1,w_200/q_auto/v.../path.webp
+const hiResImg = (url, targetW = 800) => {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('media.formula1.com/image/upload/')) return url;
+  let out = url.replace(/w_\d+/g, 'w_' + targetW).replace(/h_\d+/g, 'h_' + Math.round(targetW * 0.75));
+  out = out.replace(/\/q_auto(\/|,)/g, '/q_auto:best$1');
+  return out;
+};
+
+// Tight face crop for small round avatars (Cloudinary g_face + z_ zoom).
+// Replaces `c_fill,g_north,ar_1:1,w_X` (or similar) with `c_thumb,g_face,z_0.75,ar_1:1,w_W`.
+const faceImg = (url, targetW = 400) => {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('media.formula1.com/image/upload/')) return url;
+  let out = url
+    .replace(/c_fill[^/]*?(?=\/)/g, `c_thumb,g_face,z_0.75,ar_1:1,w_${targetW}`)
+    .replace(/c_thumb[^/]*?(?=\/)/g, `c_thumb,g_face,z_0.75,ar_1:1,w_${targetW}`);
+  out = out.replace(/\/q_auto(\/|,)/g, '/q_auto:best$1');
+  return out;
+};
+
+const FlagImg = ({ code, size = 48 }) => {
+  const src = flagUrl(code);
+  if (!src) return <span style={{ fontSize: size * 0.55 }}>🏁</span>;
+  return <img src={src} alt="" loading="lazy" style={{ width: size, height: size * 0.75, objectFit:'cover', borderRadius:4 }}/>;
+};
+
+const DriverPhoto = ({ url, size = 42, stripe }) => {
+  const src = url ? (size >= 28 ? faceImg(url, Math.max(400, size * 6)) : url) : null;
+  return (
+    <div style={{ width:size, height:size, borderRadius:'50%', overflow:'hidden', background:'#13131a', position:'relative', flexShrink:0 }}>
+      {src
+        ? <img src={src} alt="" loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top center' }}/>
+        : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted-2)', fontSize: size * 0.4 }}>?</div>
+      }
+      {stripe && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background: stripe }}/>}
+    </div>
+  );
+};
+
+const Loader = () => (
+  <div className="loader"><div className="dot"/><div className="dot"/><div className="dot"/></div>
+);
+
+const Empty = ({ children }) => <div className="empty">{children}</div>;
+
+// ============ COUNTDOWN ============
+const useCountdown = (targetDate) => {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const iv = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(iv); }, []);
+  if (!targetDate) return null;
+  const target = new Date(targetDate);
+  const diff = Math.max(0, Math.floor((target.getTime() - now) / 1000));
+  return { total: diff, days: Math.floor(diff/86400), hours: Math.floor((diff%86400)/3600), minutes: Math.floor((diff%3600)/60), seconds: diff%60 };
+};
+
+// ============ VIDEO ============
+const buildEmbedSrc = (embedUrl, videoUrl) => {
+  const direct = embedUrl || videoUrl || '';
+  if (!direct) return null;
+  if (/\/embed\/|video_ext\.php|play\/embed/.test(direct)) return { src: direct, kind:'iframe' };
+  const yt = direct.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
+  if (yt) return { src: `https://www.youtube.com/embed/${yt[1]}?rel=0&playsinline=1&autoplay=1`, kind:'iframe', provider:'youtube', id: yt[1], thumb: `https://i.ytimg.com/vi/${yt[1]}/hqdefault.jpg` };
+  const rt = direct.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+  if (rt) return { src: `https://rutube.ru/play/embed/${rt[1]}?autoStart=true`, kind:'iframe', provider:'rutube', id: rt[1] };
+  const vk = direct.match(/(?:vk\.com|vkvideo\.ru)\/(?:[^?]*[?&]z=)?video(-?\d+)_(\d+)/);
+  if (vk) return { src: `https://vk.com/video_ext.php?oid=${vk[1]}&id=${vk[2]}&hd=2&autoplay=1`, kind:'iframe', provider:'vk', id:`${vk[1]}_${vk[2]}` };
+  return { src: direct, kind:'external' };
+};
+
+const VideoPlayer = ({ embedUrl, videoUrl, title }) => {
+  const [playing, setPlaying] = useState(false);
+  const resolved = buildEmbedSrc(embedUrl, videoUrl);
+  if (!resolved) return null;
+  if (resolved.kind === 'external') {
+    return <a href={resolved.src} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ marginTop:4 }}>▶ Смотреть запись</a>;
+  }
+  if (!playing) {
+    const prov = resolved.provider === 'youtube' ? 'YouTube' : resolved.provider === 'rutube' ? 'Rutube' : resolved.provider === 'vk' ? 'VK' : 'Видео';
+    return (
+      <button className="vplayer" onClick={() => setPlaying(true)}>
+        <div className="ratio"/>
+        {resolved.thumb && <img src={resolved.thumb} alt="" loading="lazy"/>}
+        <div className="grad"/>
+        <div className="play"><div className="circle"><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div></div>
+        <div className="meta">
+          <span className="prov">{prov}</span>
+          {title && <span className="title">{title}</span>}
+        </div>
+      </button>
+    );
+  }
+  return (
+    <div className="vframe">
+      <div className="ratio"/>
+      <iframe src={resolved.src} allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock; accelerometer; gyroscope" allowFullScreen title={title || 'Video'}/>
+    </div>
+  );
+};
+
+// ============ BROADCAST ACCORDION ============
+const BroadcastList = ({ broadcasts, hasSprint }) => {
+  const [openIdx, setOpenIdx] = useState(null);
+  const types = hasSprint ? SESSION_ORDER : SESSION_ORDER.filter(t => t !== 'sprint_qualifying' && t !== 'sprint');
+  const byType = {};
+  (broadcasts || []).forEach(b => { byType[b.session_type] = b; });
+  const items = types.map(t => ({ type:t, broadcast: byType[t] || null }));
+
+  useEffect(() => {
+    const first = items.findIndex(i => i.broadcast);
+    if (openIdx === null && first >= 0) setOpenIdx(first);
+  }, [broadcasts]);
+
+  if (broadcasts && broadcasts.length === 0) return <Empty>Записей пока нет</Empty>;
+
+  return (
+    <div className="brdc">
+      {items.map((it, i) => {
+        const b = it.broadcast;
+        const open = openIdx === i;
+        return (
+          <div key={it.type} className="item" data-empty={b ? '0' : '1'} data-open={open ? '1' : '0'}>
+            <div className="head" onClick={() => b && setOpenIdx(open ? null : i)}>
+              <span className="icon">{SESSION_ICONS[it.type]}</span>
+              <div>
+                <div className="label">{SESSION_LABELS[it.type]}</div>
+                {b?.title && b.title !== SESSION_LABELS[it.type] && <div className="sub">{b.title}</div>}
+              </div>
+              {b?.is_live ? <span className="live-tag">LIVE</span> : (!b ? <span className="missing">Скоро</span> : <span/>)}
+              {b ? <span className="toggle">▾</span> : <span/>}
+            </div>
+            {b && open && (
+              <div className="body">
+                <div style={{ maxWidth:760 }}>
+                  <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={b.title}/>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============ SPOILER CARD ============
+const SpoilerCard = ({ onReveal, label = 'Результаты скрыты' }) => (
+  <div className="spoiler">
+    <div className="icon">🙈</div>
+    <div className="title">Антиспойлер включён</div>
+    <div className="sub">{label}</div>
+    <button className="btn btn-red btn-sm" onClick={onReveal}>Показать</button>
+  </div>
+);
+
+// ============ LOGIN MODAL ============
+const TG_BOT_NAME = 'F1_egor_bot';
+const LoginModal = ({ onClose, onLoggedIn }) => {
+  const [mode, setMode] = useState('widget');
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const widgetRef = useRef(null);
+
+  // Telegram Login Widget
+  useEffect(() => {
+    if (!widgetRef.current) return;
+    window.onTelegramAuth = (user) => {
+      const params = new URLSearchParams();
+      Object.keys(user).forEach(k => params.append(k, user[k]));
+      localStorage.setItem('f1hub_auth_token', params.toString());
+      onLoggedIn && onLoggedIn();
+    };
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-widget.js?22';
+    s.async = true;
+    s.setAttribute('data-telegram-login', TG_BOT_NAME);
+    s.setAttribute('data-size', 'large');
+    s.setAttribute('data-radius', '10');
+    s.setAttribute('data-userpic', 'false');
+    s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    s.setAttribute('data-request-access', 'write');
+    widgetRef.current.innerHTML = '';
+    widgetRef.current.appendChild(s);
+    return () => { delete window.onTelegramAuth; };
+  }, [onLoggedIn]);
+
+  const submitCode = async (e) => {
+    e?.preventDefault();
+    const c = code.trim();
+    if (!/^\d{6}$/.test(c)) { setErr('Введите 6-значный код из бота'); return; }
+    setSubmitting(true); setErr('');
+    const res = await api.post('/api/auth/code', { code: c });
+    if (res?.token) {
+      localStorage.setItem('f1hub_auth_token', res.token);
+      onLoggedIn && onLoggedIn();
+    } else {
+      setErr(res?.error || 'Неверный или истёкший код');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <button className="close" onClick={onClose}>✕</button>
+        <h2>Вход в F1 HUB</h2>
+        <div className="lead">Открой Telegram-бот <a href={'https://t.me/' + TG_BOT_NAME} target="_blank" rel="noreferrer" style={{ color:'#ff5050', fontWeight:700 }}>@{TG_BOT_NAME}</a>, отправь команду <code style={{ background:'rgba(255,255,255,.08)', padding:'1px 6px', borderRadius:4 }}>/code</code> и вставь полученный 6-значный код.</div>
+        <form onSubmit={submitCode}>
+          <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="000000" inputMode="numeric" maxLength={6} disabled={submitting}/>
+          <div className="err">{err}</div>
+          <button type="submit" className="btn btn-red" style={{ width:'100%', justifyContent:'center' }} disabled={submitting}>{submitting ? 'Проверка…' : 'Войти по коду'}</button>
+        </form>
+        <div className="or">или</div>
+        <div className="tg-widget" ref={widgetRef}/>
+      </div>
+    </div>
+  );
+};
+
+// ============ TOP NAV ============
+const NAV_LINKS = [
+  { id:'home',      label:'Главная',    href:'/redesign/v2',           internal:true  },
+  { id:'calendar',  label:'Календарь',  href:'/',                      internal:false },
+  { id:'standings', label:'Чемпионат',  href:'/redesign/v2/standings', internal:true  },
+  { id:'predict',   label:'Прогнозы',   href:'/redesign/v2/predict',   internal:true  },
+  { id:'games',     label:'Игры',       href:'/',                      internal:false },
+  { id:'news',      label:'Новости',    href:'/',                      internal:false },
+  { id:'profile',   label:'Профиль',    href:'/',                      internal:false },
+];
+const TopNav = ({ activeId, user, spoilerFree, onToggleSpoiler, onLogin, onLogout, onNavigate }) => {
+  const handleClick = (e, link) => {
+    if (link.internal) {
+      e.preventDefault();
+      onNavigate(link.href);
+    }
+  };
+  return (
+    <header className="topnav">
+      <div className="cnt row">
+        <a href="/redesign/v2" className="logo" onClick={e => { e.preventDefault(); onNavigate('/redesign/v2'); }}>F1<span className="dot">·</span>HUB</a>
+        <nav>
+          {NAV_LINKS.map(l => (
+            <a key={l.id} href={l.href} data-active={activeId === l.id ? 'true' : 'false'} onClick={e => handleClick(e, l)}>{l.label}</a>
+          ))}
+        </nav>
+        <div style={{ flex:1 }}/>
+        <button className="spoiler-tog" data-on={spoilerFree ? '1' : '0'} onClick={onToggleSpoiler} title="Антиспойлер">
+          <span className="pill"/><span>Спойлеры</span>
+        </button>
+        {user
+          ? <button className="btn btn-ghost btn-sm" onClick={onLogout} title="Выйти">@{user.username || user.first_name || 'me'}</button>
+          : <button className="btn btn-red btn-sm" onClick={onLogin}>Войти</button>}
+      </div>
+    </header>
+  );
+};
+
+// ============ RACE DETAIL PAGE ============
+const RaceHero = ({ race, isPast, sessionStart, onBack }) => {
+  const cd = useCountdown(isPast ? null : sessionStart);
+  return (
+    <section className="race-hero fade-up">
+      {race?.circuit_image && <img className="bg" src={hiResImg(race.circuit_image, 1800)} alt=""/>}
+      <div className="overlay"/>
+      <div className="cnt content">
+        <a className="back" onClick={onBack}>← Назад</a>
+        {cd && cd.total > 0 && (
+          <div className="countdown-block">
+            <span className="live-dot"/>
+            <span className="eyebrow" style={{ color:'#fff', opacity:.85 }}>Старт через</span>
+            <span className="num">{cd.days}д · {String(cd.hours).padStart(2,'0')}:{String(cd.minutes).padStart(2,'0')}:{String(cd.seconds).padStart(2,'0')}</span>
+          </div>
+        )}
+        <div className="eyebrow eyebrow-red">{isPast ? 'РАУНД ' + String(race?.round || '').padStart(2,'0') + ' / ' + (race?.season || '2026') : 'СЛЕДУЮЩИЙ ГРАН-ПРИ · РАУНД ' + String(race?.round || '').padStart(2,'0')}</div>
+        <div style={{ display:'flex', alignItems:'flex-end', gap:18, flexWrap:'wrap' }}>
+          <FlagImg code={race?.country_code || race?.circuit_id} size={56}/>
+          <h1>{race?.name}</h1>
+        </div>
+        <div className="sub">
+          {race?.circuit && <span>{race.circuit}</span>}
+          {race?.locality && <><span className="dot"/><span>{race.locality}</span></>}
+          {race?.date && <><span className="dot"/><span>{formatDateRu(race.date)}</span></>}
+        </div>
+        <div className="chips">
+          {race?.sprint && <span className="chip chip-red">⚡ Спринт-уикенд</span>}
+          {race?.is_night && <span className="chip">Ночная гонка</span>}
+          {isPast && <span className="chip chip-gold">🏆 Архив</span>}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const formatDateRu = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', { day:'2-digit', month:'long', year:'numeric' });
+  } catch (e) { return iso; }
+};
+const formatTimeRu = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  } catch (e) { return ''; }
+};
+const formatDayRu = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', { weekday:'short', day:'2-digit', month:'short' });
+  } catch (e) { return iso; }
+};
+
+const PodiumThree = ({ results }) => {
+  if (!results || results.length < 3) return null;
+  // Display: 2nd, 1st, 3rd visually but reorder to keep visual hierarchy
+  const order = [1, 0, 2];
+  const medals = ['🥈', '🥇', '🥉'];
+  return (
+    <div className="podium-3">
+      {order.map((idx, i) => {
+        const r = results[idx];
+        if (!r) return <div key={i}/>;
+        const ti = teamInfo(r.team);
+        const grad = `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0) 35%, ${ti.dark}cc 80%, ${ti.dark} 100%)`;
+        return (
+          <div key={i} className={'card ' + (i === 1 ? 'card-2' : '')} style={{ background: ti.dark }}>
+            <div className="photo">
+              {r.photo_url && <img src={hiResImg(r.photo_url, 800)} alt="" loading="lazy"/>}
+            </div>
+            <div className="grad" style={{ background: grad }}/>
+            <div className="pos">{idx + 1}</div>
+            <div className="medal">{medals[i]}</div>
+            <div className="content">
+              <div style={{ minWidth:0 }}>
+                <div className="first">{r.first_name || (r.name || '').split(' ').slice(0, -1).join(' ')}</div>
+                <h4>{r.last_name || (r.name || '').split(' ').slice(-1)[0]}</h4>
+                <span className="team-pill" style={{ background: ti.color, color:'#000' }}>{r.team}</span>
+              </div>
+              <div className="stat">
+                <div className="num">{r.points || 0}</div>
+                <div className="l">очков</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ResultsTable = ({ results, mode }) => {
+  // mode: 'race' | 'qualifying' | 'sprint' | 'sprint_qualifying'
+  const isQual = mode === 'qualifying' || mode === 'sprint_qualifying';
+  return (
+    <div className="r-table">
+      <div className="head">
+        <span>Поз</span>
+        <span className="h-num">№</span>
+        <span>Пилот</span>
+        <span className="h-team">Команда</span>
+        <span style={{ textAlign:'right' }}>{isQual ? 'Лучший круг' : 'Время / отставание'}</span>
+        <span style={{ textAlign:'right' }}>{isQual ? '' : 'Очки'}</span>
+      </div>
+      {results.map((r, i) => {
+        const ti = teamInfo(r.team);
+        const pos = r.position || (i + 1);
+        const time = isQual
+          ? (r.q3 || r.q2 || r.q1 || r.Q3 || r.Q2 || r.Q1 || r.time || '—')
+          : (r.time || r.status || '—');
+        const isStatus = !isQual && !r.time && r.status;
+        return (
+          <div key={i} className="row" data-top={i < 3 ? '1' : '0'}>
+            <span className="pos">{pos}</span>
+            <span className="num-cell">{r.number || ''}</span>
+            <div className="driver">
+              <DriverPhoto url={r.photo_url} size={42} stripe={ti.color}/>
+              <div className="name">
+                <span className="first">{r.first_name || (r.name||'').split(' ').slice(0,-1).join(' ')}</span>
+                <span>{r.last_name || (r.name||'').split(' ').slice(-1)[0] || r.name}</span>
+              </div>
+            </div>
+            <div className="team"><span className="swatch" style={{ background: ti.color }}/>{r.team}</div>
+            <span className={'time' + (isStatus ? ' status' : '')}>{time}</span>
+            {isQual ? <span/> : <span className={'pts ' + (!r.points ? 'zero' : '')}>{r.points || 0}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const sessionIso = (s) => {
+  if (!s) return null;
+  if (typeof s === 'string') return s;
+  if (s.date && s.time) return s.date + 'T' + s.time;
+  if (s.date) return s.date + 'T12:00:00Z';
+  return null;
+};
+const SessionScheduleList = ({ sessions }) => {
+  if (!sessions) return <Empty>Расписание сессий появится ближе к уикенду</Empty>;
+  const order = [
+    ['fp1', 'Свободная практика 1', 'FP1'],
+    ['fp2', 'Свободная практика 2', 'FP2'],
+    ['fp3', 'Свободная практика 3', 'FP3'],
+    ['sprint_qualifying', 'Спринт-квалификация', 'SQ'],
+    ['sprint', 'Спринт', 'SPR'],
+    ['qualifying', 'Квалификация', 'QUAL'],
+    ['race', 'Гонка', 'RACE'],
+  ];
+  const now = Date.now();
+  const upcoming = order
+    .map(([k, label, sub]) => ({ k, label, sub, iso: sessionIso(sessions[k]) }))
+    .filter(x => x.iso);
+  if (upcoming.length === 0) return <Empty>Расписание сессий появится ближе к уикенду</Empty>;
+  const nextIdx = upcoming.findIndex(x => new Date(x.iso).getTime() > now);
+  return (
+    <div className="sess-list">
+      {upcoming.map((x, i) => (
+        <div key={x.k} className="item" data-soon={i === nextIdx ? '1' : '0'}>
+          <div className="lbl">{x.label}<span className="sub">{x.sub}</span></div>
+          <div className="when">
+            <div className="day">{formatDayRu(x.iso)}</div>
+            <div className="time">{formatTimeRu(x.iso)}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const RaceDetailPage = ({ round, season, spoilerFree, onBack }) => {
+  const [loading, setLoading] = useState(true);
+  const [race, setRace] = useState(null);
+  const [raceRes, setRaceRes] = useState(null);
+  const [qualRes, setQualRes] = useState(null);
+  const [broadcasts, setBroadcasts] = useState(null);
+  const [tab, setTab] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    const s = season || new Date().getFullYear();
+    setLoading(true);
+    (async () => {
+      const sched = await api.get('/api/schedule?season=' + s);
+      if (cancel) return;
+      const list = sched?.races || sched || [];
+      const r = list.find(x => Number(x.round) === Number(round));
+      if (!r) { setRace(null); setLoading(false); return; }
+      setRace({ ...r, season: s });
+      setTab(r.is_past ? 'race' : 'schedule');
+      setLoading(false);
+      const bcRes = await api.get('/api/broadcasts?race_round=' + round + '&season=' + s);
+      if (!cancel) setBroadcasts(bcRes?.broadcasts || []);
+      if (r.is_past) {
+        const [rr, qq] = await Promise.all([
+          api.get('/api/race/' + round + '/results?season=' + s),
+          api.get('/api/race/' + round + '/qualifying?season=' + s),
+        ]);
+        if (cancel) return;
+        setRaceRes(rr || { results: [] });
+        setQualRes(qq || { results: [] });
+      }
+    })();
+    return () => { cancel = true; };
+  }, [round, season]);
+
+  if (loading) return (
+    <div className="cnt section">
+      <a className="btn-link" onClick={onBack} style={{ marginBottom:24, cursor:'pointer' }}>Назад</a>
+      <Loader/>
+    </div>
+  );
+  if (!race) return (
+    <div className="cnt section">
+      <Empty>Гонка не найдена</Empty>
+      <div style={{ textAlign:'center', marginTop:18 }}><a className="btn btn-ghost btn-sm" onClick={onBack} style={{ cursor:'pointer' }}>← К календарю</a></div>
+    </div>
+  );
+
+  const isPast = !!race.is_past;
+  const hasSprint = !!race.sprint;
+  const showSpoiler = spoilerFree && isPast && !revealed;
+  const sessionsObj = race.sessions || {};
+  const firstSession = ['fp1','sprint_qualifying','qualifying','sprint','race']
+    .map(k => sessionIso(sessionsObj[k])).find(Boolean) || race.race_datetime || race.date;
+
+  const tabs = isPast
+    ? [['qualifying', 'Квалификация'], ['race', 'Гонка'], ['broadcasts', 'Записи']]
+    : [['schedule', 'Расписание'], ['broadcasts', 'Записи']];
+
+  const renderTab = () => {
+    if (tab === 'schedule') return <SessionScheduleList sessions={sessionsObj}/>;
+    if (tab === 'broadcasts') {
+      if (broadcasts === null) return <Loader/>;
+      return <BroadcastList broadcasts={broadcasts} hasSprint={hasSprint}/>;
+    }
+    if (showSpoiler) return <SpoilerCard onReveal={() => setRevealed(true)}/>;
+    const res = tab === 'race' ? raceRes : qualRes;
+    if (res === null) return <Loader/>;
+    const list = res?.results || [];
+    if (list.length === 0) return <Empty>Результаты пока не опубликованы</Empty>;
+    return (
+      <Fragment>
+        {tab === 'race' && list.length >= 3 && <PodiumThree results={list.slice(0, 3)}/>}
+        <ResultsTable results={list} mode={tab}/>
+      </Fragment>
+    );
+  };
+
+  return (
+    <Fragment>
+      <RaceHero race={race} isPast={isPast} sessionStart={firstSession} onBack={onBack}/>
+      <section className="section">
+        <div className="cnt">
+          <div className="tabs">
+            {tabs.map(([k, label]) => (
+              <button key={k} data-on={tab === k ? '1' : '0'} onClick={() => setTab(k)}>{label}</button>
+            ))}
+          </div>
+          {renderTab()}
+        </div>
+      </section>
+    </Fragment>
+  );
+};
+
+// ============ STANDINGS PAGE ============
+const StandingsPage = ({ season, spoilerFree }) => {
+  const [tab, setTab] = useState('drivers');
+  const [revealed, setRevealed] = useState(false);
+  const [drivers, setDrivers] = useState(null);
+  const [constructors, setConstructors] = useState(null);
+  const [h2h, setH2h] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const [allDrivers, setAllDrivers] = useState(null);
+  const [teamsData, setTeamsData] = useState(null);
+  const chartRef = useRef(null);
+  const chartInst = useRef(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/api/standings/drivers?season=' + season),
+      api.get('/api/standings/constructors?season=' + season),
+    ]).then(([d, c]) => {
+      setDrivers(d?.standings || []);
+      setConstructors(c?.standings || []);
+    });
+  }, [season]);
+
+  useEffect(() => {
+    if (tab === 'h2h' && !h2h) api.get('/api/head-to-head?season=' + season).then(d => setH2h(d || { head_to_head: [] }));
+    if (tab === 'progress' && !progress) api.get('/api/standings/points-progression?season=' + season).then(d => setProgress(d || { drivers: [] }));
+    if (tab === 'cards' && !allDrivers) api.get('/api/drivers?season=' + season).then(d => setAllDrivers(d?.drivers || []));
+    if (tab === 'teams' && !teamsData) api.get('/api/teams?season=' + season).then(d => setTeamsData(d?.teams || []));
+  }, [tab, season]);
+
+  // Chart.js init for progress tab
+  useEffect(() => {
+    if (tab !== 'progress' || !progress?.drivers?.length || !chartRef.current || typeof Chart === 'undefined') return;
+    if (chartInst.current) chartInst.current.destroy();
+    const ctx = chartRef.current.getContext('2d');
+    chartInst.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: progress.drivers.map(d => ({
+          label: d.code,
+          data: d.progression.map(p => ({ x: p.round, y: p.cumulative })),
+          borderColor: d.team_color || '#888',
+          backgroundColor: d.team_color || '#888',
+          borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.15, fill: false,
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, labels: { color: '#a0a0b0', boxWidth: 12, font: { size: 11, family: 'Manrope' } } },
+          tooltip: { mode: 'nearest', intersect: false, backgroundColor: '#1c1c28', titleColor: '#fafafa', bodyColor: '#a0a0b0', borderColor: 'rgba(255,255,255,.1)', borderWidth: 1 },
+        },
+        scales: {
+          x: { type: 'linear', title: { display: true, text: 'Раунд', color: '#6b6b7b', font: { family: 'Manrope' } }, ticks: { color: '#6b6b7b', stepSize: 1, font: { family: 'Manrope' } }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { title: { display: true, text: 'Очки', color: '#6b6b7b', font: { family: 'Manrope' } }, ticks: { color: '#6b6b7b', font: { family: 'Manrope' } }, grid: { color: 'rgba(255,255,255,.04)' }, min: 0 },
+        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      },
+    });
+    return () => { if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null; } };
+  }, [tab, progress]);
+
+  const tabs = [
+    ['drivers',      'Пилоты'],
+    ['constructors', 'Кубок'],
+    ['cards',        'Карточки'],
+    ['teams',        'Команды'],
+    ['h2h',          'H2H'],
+    ['progress',     'Прогресс'],
+  ];
+
+  const renderContent = () => {
+    if (spoilerFree && !revealed) return <SpoilerCard onReveal={() => setRevealed(true)} label={`Чемпионат ${season} скрыт`}/>;
+    if (tab === 'drivers') {
+      if (drivers === null) return <Loader/>;
+      if (!drivers.length) return <Empty>Стандинги недоступны</Empty>;
+      return <DriversBoard drivers={drivers}/>;
+    }
+    if (tab === 'constructors') {
+      if (constructors === null) return <Loader/>;
+      if (!constructors.length) return <Empty>Стандинги недоступны</Empty>;
+      return <ConstructorsBoard constructors={constructors} drivers={drivers || []}/>;
+    }
+    if (tab === 'h2h') {
+      if (h2h === null) return <Loader/>;
+      if (!h2h.head_to_head?.length) return <Empty>Нет данных для H2H</Empty>;
+      return <H2HBoard pairs={h2h.head_to_head}/>;
+    }
+    if (tab === 'cards') {
+      if (allDrivers === null) return <Loader/>;
+      if (!allDrivers.length) return <Empty>Карточки недоступны</Empty>;
+      return <DriverCardsGrid drivers={allDrivers}/>;
+    }
+    if (tab === 'teams') {
+      if (teamsData === null) return <Loader/>;
+      if (!teamsData.length) return <Empty>Данные команд недоступны</Empty>;
+      return <TeamsBoard teams={teamsData} constructors={constructors || []}/>;
+    }
+    if (tab === 'progress') {
+      if (progress === null) return <Loader/>;
+      if (!progress.drivers?.length) return <Empty>Прогресс будет доступен после первой гонки</Empty>;
+      return (
+        <Fragment>
+          <div className="progress-wrap"><canvas ref={chartRef}/></div>
+          <div className="st-list" style={{ marginTop:16 }}>
+            {progress.drivers.map((d, i) => (
+              <div key={d.driver_number} className="row" data-top={i < 3 ? '1' : '0'}>
+                <span className="pos">{i + 1}</span>
+                <div className="driver">
+                  <div className="stripe" style={{ background: d.team_color || '#888', height:28 }}/>
+                  <div className="nm"><span className="f" style={{ color: d.team_color }}>{d.code}</span><span className="l">{d.name}</span></div>
+                </div>
+                <div className="team"><span className="swatch" style={{ background: d.team_color }}/>{d.team}</div>
+                <div className="pts-col"><div className="v">{d.total_points}</div></div>
+              </div>
+            ))}
+          </div>
+        </Fragment>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <section className="standings-page fade-up">
+      <div className="cnt">
+        <div className="standings-hero">
+          <div className="lead">
+            <div className="eyebrow eyebrow-red">РАЗДЕЛ 03 · ЧЕМПИОНАТ</div>
+            <h1>Сезон <span className="yr">{season}</span></h1>
+          </div>
+        </div>
+        <div className="tabs">
+          {tabs.map(([k, l]) => (
+            <button key={k} data-on={tab === k ? '1' : '0'} onClick={() => setTab(k)}>{l}</button>
+          ))}
+        </div>
+        {renderContent()}
+      </div>
+    </section>
+  );
+};
+
+const DriversBoard = ({ drivers }) => {
+  const leaderPts = drivers[0]?.points || 1;
+  const top3 = drivers.slice(0, 3);
+  const rest = drivers.slice(3);
+  const medals = ['🥇', '🥈', '🥉'];
+  return (
+    <Fragment>
+      <div className="drv-podium-3">
+        {top3.map((d, i) => {
+          const ti = teamInfo(d.team);
+          const color = d.team_color || ti.color;
+          const dark = ti.dark;
+          const grad = `linear-gradient(180deg, rgba(0,0,0,.18) 0%, transparent 25%, ${dark}aa 55%, ${dark} 85%)`;
+          return (
+            <div key={i} className="card" style={{ background: dark }}>
+              <div className="photo">{d.photo_url && <img src={hiResImg(d.card_photo_url || d.photo_url, 700)} alt="" loading="lazy" style={{ objectPosition: d.card_photo_position || 'top center' }}/>}</div>
+              <div className="grad" style={{ background: grad }}/>
+              <div className="pos">{i + 1}</div>
+              <div className="medal">{medals[i]}</div>
+              <div className="content">
+                <div className="first">{d.first_name}</div>
+                <h4>{d.last_name}</h4>
+                <span className="team-pill" style={{ background: color, color:'#000' }}>{d.team}</span>
+                <div className="pts-row">
+                  <div>
+                    <div className="num">{d.points}</div>
+                    <div style={{ fontSize:10, opacity:.8, letterSpacing:'.14em', textTransform:'uppercase', marginTop:3 }}>очков</div>
+                  </div>
+                  {i > 0 && <div className="l" style={{ textAlign:'right' }}>{leaderPts - d.points} от 1-го</div>}
+                </div>
+                <div className="bar"><div className="fill" style={{ width: Math.max(8, (d.points / leaderPts) * 100) + '%', background: color }}/></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="st-list">
+        {rest.map((d, i) => {
+          const ti = teamInfo(d.team);
+          const color = d.team_color || ti.color;
+          return (
+            <div key={d.driver_number || i} className="row">
+              <span className="pos">{i + 4}</span>
+              <div className="driver">
+                <div className="stripe" style={{ background: color }}/>
+                <DriverPhoto url={d.photo_url} size={56} stripe={null}/>
+                <div className="nm"><span className="f">{d.first_name}</span><span className="l">{d.last_name}</span></div>
+              </div>
+              <div className="team"><span className="swatch" style={{ background: color }}/>{d.team}</div>
+              <div className="pts-col">
+                <div className="v">{d.points}</div>
+                {d.gap_to_leader > 0 && <div className="gap">−{d.gap_to_leader}</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Fragment>
+  );
+};
+
+const ConstructorsBoard = ({ constructors, drivers }) => {
+  const leaderPts = constructors[0]?.points || 1;
+  return (
+    <div className="con-list">
+      {constructors.map((c, i) => {
+        const ti = teamInfo(c.team);
+        const color = c.team_color || ti.color;
+        const carDrivers = (c.drivers || []).map(cd => {
+          const matched = drivers.find(x => x.driver_number === cd.driver_number);
+          return { ...cd, points: matched?.points || cd.points || 0 };
+        });
+        const total = carDrivers.reduce((s, x) => s + (x.points || 0), 0) || 1;
+        return (
+          <div key={i} className="con-card" data-top={i < 3 ? '1' : '0'} style={{ borderLeftColor: color }}>
+            <div className="row">
+              <div className="pos">{i + 1}</div>
+              <div className="body">
+                <div className="team-name">
+                  {c.logo_url && <img className="logo" src={hiResImg(c.logo_url, 64)} alt="" loading="lazy" onError={e => e.target.style.display='none'}/>}
+                  <span style={{ color }}>{c.team}</span>
+                </div>
+                {carDrivers.length > 0 && (
+                  <div className="drvs">
+                    {carDrivers.map((d, j) => (
+                      <div key={j} className="drv-pill">
+                        <div className="ph">{d.photo_url && <img src={faceImg(d.photo_url, 320)} alt="" loading="lazy"/>}</div>
+                        <div className="lbl">
+                          <span className="code">{d.code || d.last_name?.toUpperCase().slice(0,3)}</span>
+                          <span className="pp">{d.points} очк.</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {c.points > 0 && carDrivers.length > 0 && (
+                  <div className="bar">
+                    {carDrivers.map((d, j) => (
+                      <div key={j} className="seg" style={{ width: Math.max(4, (d.points / total) * 100) + '%', background: j === 0 ? color : color + '99' }}/>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="pts-col">
+                <div className="v">{c.points}</div>
+                {i > 0 && <div className="gap">−{leaderPts - c.points}</div>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const H2HBoard = ({ pairs }) => (
+  <div className="h2h-grid">
+    {pairs.map((p, i) => {
+      const d1 = p.driver1, d2 = p.driver2;
+      const totalPts = (d1.points + d2.points) || 1;
+      const d1Pct = (d1.points / totalPts) * 100;
+      const d2Pct = (d2.points / totalPts) * 100;
+      const totalW = (d1.wins + d2.wins) || 1;
+      const d1WPct = (d1.wins / totalW) * 100;
+      return (
+        <div key={i} className="h2h-card" style={{ borderLeftColor: p.color }}>
+          <div className="head" style={{ color: p.color }}>{p.team}</div>
+          <div className="body">
+            <div className="pair-row">
+              <div className="who">
+                <div className="ph" style={{ borderColor: p.color }}>{d1.photo_url && <img src={faceImg(d1.photo_url, 500)} alt="" loading="lazy"/>}</div>
+                <div>
+                  <div className="name">{d1.name}</div>
+                  <div className="sub">{d1.full_name}</div>
+                </div>
+              </div>
+              <div className="vs">VS</div>
+              <div className="who right">
+                <div>
+                  <div className="name">{d2.name}</div>
+                  <div className="sub">{d2.full_name}</div>
+                </div>
+                <div className="ph" style={{ borderColor: p.color }}>{d2.photo_url && <img src={faceImg(d2.photo_url, 500)} alt="" loading="lazy"/>}</div>
+              </div>
+            </div>
+            <div className="metric">
+              <div className="lbl-row"><span>{d1.points} очков</span><span className="mid">Очки</span><span>{d2.points} очков</span></div>
+              <div className="bar"><div className="seg" style={{ width: d1Pct + '%', background: p.color }}/><div className="seg" style={{ width: d2Pct + '%', background: p.color + '55' }}/></div>
+            </div>
+            {(d1.wins > 0 || d2.wins > 0) && (
+              <div className="metric">
+                <div className="lbl-row"><span>{d1.wins} побед</span><span className="mid">Победы</span><span>{d2.wins} побед</span></div>
+                <div className="bar"><div className="seg" style={{ width: d1WPct + '%', background: '#FFD700' }}/><div className="seg" style={{ width: (100 - d1WPct) + '%', background: '#FFD70044' }}/></div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const DriverCardsGrid = ({ drivers }) => (
+  <div className="drv-cards">
+    {drivers.map(d => {
+      const ti = teamInfo(d.team);
+      const color = d.team_color || ti.color;
+      const big = hiResImg(d.card_photo_url || d.photo_url, 800);
+      return (
+        <div key={d.driver_number} className="drv-card">
+          <div className="photo" style={{ background: 'linear-gradient(180deg, ' + color + '22, ' + color + '08)' }}>
+            <div className="num" style={{ color }}>{d.driver_number}</div>
+            {big && <img src={big} alt="" loading="lazy" style={{ objectPosition: d.card_photo_position || 'top center' }} onError={e => e.target.style.display='none'}/>}
+            <div className="grad" style={{ background: 'linear-gradient(180deg, transparent 45%, ' + color + 'DD)' }}/>
+            <div className="info">
+              <div className="first">{d.first_name || (d.name || '').split(' ')[0]}</div>
+              <div className="last">{d.last_name || (d.name || '').split(' ').slice(1).join(' ')}</div>
+            </div>
+          </div>
+          <div className="foot">
+            <span style={{ color }}>{(d.team || '').replace(/F1 Team/, '').trim()}</span>
+            {d.points != null && <span className="pp" style={{ background: color + '22', color }}>{d.points} очк.</span>}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const TeamsBoard = ({ teams, constructors }) => {
+  const ptsByTeam = {};
+  const posByTeam = {};
+  (constructors || []).forEach((c, ci) => {
+    ptsByTeam[c.team] = c.points;
+    posByTeam[c.team] = c.position || (ci + 1);
+  });
+  const sorted = [...teams].sort((a, b) => (posByTeam[a.name || a.team] || 99) - (posByTeam[b.name || b.team] || 99));
+  return (
+    <div className="team-cards">
+    {sorted.map((t, i) => {
+      const ti = teamInfo(t.name || t.team);
+      const color = t.color || t.team_color || ti.color;
+      const tname = t.name || t.team;
+      const pts = ptsByTeam[tname] ?? t.points;
+      const pos = posByTeam[tname] || t.position || (i + 1);
+      return (
+        <div key={i} className="team-card">
+          {t.car_url && (
+            <div className="car" style={{ background: 'linear-gradient(135deg, ' + color + '22, var(--surface-2))' }}>
+              <img src={hiResImg(t.car_url, 1000)} alt="" loading="lazy" onError={e => e.target.style.display='none'}/>
+            </div>
+          )}
+          <div className="body">
+            <div className="top-row">
+              {t.logo_url && <img className="logo" src={hiResImg(t.logo_url, 128)} alt="" loading="lazy" onError={e => e.target.style.display='none'}/>}
+              <div className="name" style={{ color }}>{tname}</div>
+              <div className="pts-col">
+                <div className="v">{pts != null ? pts : '—'}</div>
+                <div className="pp">P{pos}</div>
+              </div>
+            </div>
+            <div className="drv-row">
+              {(t.drivers || []).map((d, j) => (
+                <div key={j} className="drv">
+                  <div className="ph" style={{ borderColor: color }}>{d.photo_url && <img src={faceImg(d.photo_url, 400)} alt="" loading="lazy"/>}</div>
+                  <div className="nm">
+                    <span className="c">{d.code}</span>
+                    <span className="l">{d.last_name || (d.name || '').split(' ').pop()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    })}
+    </div>
+  );
+};
+
+// ============ PREDICTIONS PAGE ============
+const PRED_ICONS = { winner:'🏆', podium:'🥇', fastest_lap:'⚡', safety_car:'🚗', dnf_count:'💥' };
+const PRED_TYPE_LABELS = { winner:'Победитель', podium:'Подиум', fastest_lap:'Быстрый круг', safety_car:'Safety Car', dnf_count:'Сходы' };
+
+const DriverPickButton = ({ d, selected, idx, onClick, disabled }) => (
+  <button onClick={() => onClick(d.driver_number)} disabled={disabled} data-sel={selected || idx ? '1' : '0'}>
+    <span className="stripe" style={{ background: d.team_color || '#888' }}/>
+    <div className="ph">{d.photo_url && <img src={faceImg(d.photo_url, 240)} alt="" loading="lazy"/>}</div>
+    <span className="code">{d.code || d.last_name?.toUpperCase().slice(0, 3) || d.name?.split(' ').pop()?.toUpperCase()}</span>
+    {idx && <span className="idx">{idx}</span>}
+  </button>
+);
+
+const PredictionsPage = ({ user, onLogin }) => {
+  const [avail, setAvail] = useState(null);
+  const [myPredictions, setMyPredictions] = useState(null);
+  const [podiumPicks, setPodiumPicks] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null); // { ok, msg }
+
+  const showToast = (msg, ok = true) => {
+    setToast({ ok, msg });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const refreshMine = () => api.get('/api/user/predictions').then(d => setMyPredictions(d?.predictions || []));
+
+  useEffect(() => {
+    if (!user) return;
+    api.get('/api/predictions/available').then(d => { if (d) setAvail(d); });
+    refreshMine();
+  }, [user?.user_id || user?.id]);
+
+  if (!user) return (
+    <section className="predict-page fade-up">
+      <div className="cnt">
+        <div className="predict-hero">
+          <div className="eyebrow eyebrow-red">РАЗДЕЛ 04 · ПРОГНОЗЫ</div>
+          <h1>Прогнозы</h1>
+        </div>
+        <div className="auth-gate">
+          <div className="ic">🎯</div>
+          <h2>Войдите, чтобы делать прогнозы</h2>
+          <p>Угадывайте победителя гонки, подиум, быстрый круг, шансы safety car и количество сходов. Очки добавляются в общий рейтинг.</p>
+          <button className="btn btn-red" onClick={onLogin}>Войти через Telegram</button>
+        </div>
+      </div>
+    </section>
+  );
+
+  if (!avail) return (
+    <section className="predict-page">
+      <div className="cnt"><Loader/></div>
+    </section>
+  );
+
+  if (!avail.available) return (
+    <section className="predict-page fade-up">
+      <div className="cnt">
+        <div className="predict-hero">
+          <div className="eyebrow eyebrow-red">РАЗДЕЛ 04 · ПРОГНОЗЫ</div>
+          <h1>Прогнозы</h1>
+        </div>
+        <div className="auth-gate">
+          <div className="ic">⏳</div>
+          <h2>{avail.message || 'Прогнозы временно закрыты'}</h2>
+          {avail.race && <p>Следующая гонка: <b>{avail.race.name}</b></p>}
+        </div>
+        {myPredictions?.length > 0 && <PredictionsHistory items={myPredictions}/>}
+      </div>
+    </section>
+  );
+
+  const race = avail.race || {};
+  const drivers = avail.drivers || [];
+  const types = avail.predictions || [];
+  const driverByNum = Object.fromEntries(drivers.map(d => [d.driver_number, d]));
+
+  const submit = async (type, value) => {
+    setSubmitting(true);
+    const res = await api.post('/api/predictions/make', {
+      race_round: race.round, season: race.season || new Date().getFullYear(),
+      prediction_type: type, prediction_value: value,
+    });
+    if (res && !res.error) {
+      showToast('✓ Прогноз принят', true);
+      if (type === 'podium') setPodiumPicks([]);
+      refreshMine();
+    } else {
+      showToast(res?.error || 'Не удалось сохранить', false);
+    }
+    setSubmitting(false);
+  };
+
+  const togglePodium = (num) => {
+    setPodiumPicks(p => {
+      if (p.includes(num)) return p.filter(x => x !== num);
+      if (p.length >= 3) return p;
+      return [...p, num];
+    });
+  };
+
+  const existingByType = {};
+  (myPredictions || []).filter(p => p.race_round === race.round).forEach(p => { existingByType[p.prediction_type] = p; });
+
+  const displayValue = (type, value) => {
+    if (Array.isArray(value)) return value.map(n => driverByNum[n]?.code || n).join(' → ');
+    if (type === 'safety_car') return (value === true || value === 'yes') ? 'Да' : 'Нет';
+    if (type === 'winner' || type === 'fastest_lap') return driverByNum[value]?.name || value;
+    return String(value ?? '');
+  };
+
+  return (
+    <Fragment>
+      <section className="predict-page fade-up">
+        <div className="cnt">
+          <div className="predict-hero">
+            <div className="eyebrow eyebrow-red">РАЗДЕЛ 04 · ПРОГНОЗЫ</div>
+            <h1>Прогнозы</h1>
+            <div className="race-sub">
+              <span>{race.name}</span>
+              <span className="dot"/>
+              <span>Раунд {String(race.round || '').padStart(2, '0')}</span>
+              {race.date && <><span className="dot"/><span>{formatDateRu(race.date)}</span></>}
+            </div>
+          </div>
+
+          <div className="pred-list">
+            {types.map(pt => {
+              const existing = existingByType[pt.type];
+              const done = pt.already_predicted || !!existing;
+              return (
+                <div key={pt.type} className="pred-card">
+                  <div className="head">
+                    <span className="ic">{PRED_ICONS[pt.type] || '🎯'}</span>
+                    <span className="label">{pt.label}</span>
+                    <span className="max">макс. {pt.max_points} очк.</span>
+                    {done && <span className="done-tag">сделан</span>}
+                  </div>
+                  <div className="desc">{pt.description}</div>
+
+                  {done ? (
+                    <div className="your-pick">
+                      <span className="lbl">Ваш выбор:</span>
+                      <span className="val">{displayValue(pt.type, existing?.prediction_value)}</span>
+                    </div>
+                  ) : pt.type === 'safety_car' ? (
+                    <div className="yn-row">
+                      <button onClick={() => submit('safety_car', 'yes')} disabled={submitting}>Да</button>
+                      <button onClick={() => submit('safety_car', 'no')} disabled={submitting}>Нет</button>
+                    </div>
+                  ) : pt.type === 'dnf_count' ? (
+                    <div className="num-row">
+                      {[0,1,2,3,4,5,6].map(n => (
+                        <button key={n} onClick={() => submit('dnf_count', n)} disabled={submitting}>{n}</button>
+                      ))}
+                    </div>
+                  ) : pt.type === 'podium' ? (
+                    <Fragment>
+                      <div className="drv-pick">
+                        {drivers.map(d => {
+                          const idx = podiumPicks.indexOf(d.driver_number);
+                          return <DriverPickButton key={d.driver_number} d={d} idx={idx >= 0 ? idx + 1 : null} onClick={togglePodium} disabled={submitting}/>;
+                        })}
+                      </div>
+                      <div className="podium-confirm">
+                        <div className="info">
+                          Выбрано <b>{podiumPicks.length}/3</b>
+                          {podiumPicks.length > 0 && ' — ' + podiumPicks.map(n => driverByNum[n]?.code || n).join(' → ')}
+                        </div>
+                        <button className="btn btn-red btn-sm" onClick={() => submit('podium', podiumPicks)} disabled={submitting || podiumPicks.length !== 3}>Подтвердить</button>
+                      </div>
+                    </Fragment>
+                  ) : (
+                    <div className="drv-pick">
+                      {drivers.map(d => (
+                        <DriverPickButton key={d.driver_number} d={d} onClick={(n) => submit(pt.type, n)} disabled={submitting}/>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {myPredictions?.length > 0 && <PredictionsHistory items={myPredictions} driverByNum={driverByNum}/>}
+        </div>
+      </section>
+      {toast && <div className={'toast ' + (toast.ok ? 'ok' : 'err')}>{toast.msg}</div>}
+    </Fragment>
+  );
+};
+
+const PredictionsHistory = ({ items, driverByNum = {} }) => {
+  const grouped = {};
+  items.filter(p => p.status !== 'pending').forEach(p => { (grouped[p.race_round] = grouped[p.race_round] || []).push(p); });
+  const rounds = Object.keys(grouped).map(Number).sort((a, b) => b - a);
+  if (!rounds.length) return null;
+
+  const displayValue = (type, value) => {
+    if (Array.isArray(value)) return value.map(n => driverByNum[n]?.code || n).join(' → ');
+    if (type === 'safety_car') return (value === true || value === 'yes') ? 'Да' : 'Нет';
+    if (type === 'winner' || type === 'fastest_lap') return driverByNum[value]?.name || value;
+    return String(value ?? '');
+  };
+
+  return (
+    <div className="hist-section">
+      <div className="h-section" style={{ marginBottom:18 }}>История прогнозов</div>
+      <div className="hist-list">
+        {rounds.map(r => {
+          const list = grouped[r];
+          const raceName = list[0]?.race_name || ('Гран-при · Раунд ' + r);
+          const total = list.reduce((s, p) => s + (p.points_won ?? p.points_earned ?? 0), 0);
+          const correct = list.filter(p => p.status === 'correct').length;
+          return (
+            <div key={r} className="hist-card">
+              <div className="head">
+                <div className="r-tag">R{r}</div>
+                <div className="title">
+                  <div className="nm">{raceName}</div>
+                  <div className="sub">{correct}/{list.length} угадано</div>
+                </div>
+                <div className="total">
+                  <div className="num" style={{ color: total > 0 ? '#27F4D2' : 'var(--muted-2)' }}>{total}</div>
+                  <div className="lbl">очков</div>
+                </div>
+              </div>
+              {list.map((p, i) => {
+                const pts = p.points_won ?? p.points_earned ?? 0;
+                const color = p.status === 'correct' ? '#27F4D2' : p.status === 'partial' ? '#FFD700' : p.status === 'incorrect' ? '#E10600' : 'var(--muted-2)';
+                return (
+                  <div key={i} className="item">
+                    <span className="ic">{PRED_ICONS[p.prediction_type] || '•'}</span>
+                    <div className="descr">
+                      <span className="ptype">{PRED_TYPE_LABELS[p.prediction_type] || p.prediction_type}</span>
+                      <span className="val">{displayValue(p.prediction_type, p.prediction_value)}</span>
+                    </div>
+                    <span className="pts" style={{ color }}>{pts > 0 ? '+' + pts : '—'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============ STUB PAGE ============
+const StubPage = ({ kicker, title, hint }) => (
+  <section className="stub fade-up">
+    <div className="cnt">
+      <div className="kk">{kicker}</div>
+      <h1>{title}</h1>
+      <p>Эта страница пока в разработке в новом дизайне. Перейди на старую версию сайта или подожди — мы переносим всё постранично.</p>
+      <a href="/" className="ghost-link">← К старой версии</a>
+    </div>
+  </section>
+);
+
+// ============ ROUTING ============
+const parseRoute = (path) => {
+  const clean = path.replace(/^\/redesign\/v2\/?/, '');
+  if (!clean) return { name:'home' };
+  const parts = clean.split('/').filter(Boolean);
+  if (parts[0] === 'race' && parts[1]) return { name:'race', round: parseInt(parts[1], 10), season: parts[2] ? parseInt(parts[2], 10) : null };
+  if (parts[0] === 'standings') return { name:'standings', season: parts[1] ? parseInt(parts[1], 10) : null };
+  if (parts[0] === 'calendar') return { name:'calendar' };
+  if (parts[0] === 'predict') return { name:'predict' };
+  if (parts[0] === 'profile') return { name:'profile' };
+  if (parts[0] === 'games') return { name:'games' };
+  if (parts[0] === 'news') return { name:'news' };
+  if (parts[0] === 'article') return { name:'article' };
+  return { name:'home' };
+};
+
+// ============ APP ============
+const App = () => {
+  const [route, setRoute] = useState(() => parseRoute(window.location.pathname));
+  const [user, setUser] = useState(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
+
+  // Browser nav
+  useEffect(() => {
+    const onPop = () => setRoute(parseRoute(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Auth init + 401 handler
+  useEffect(() => {
+    const token = localStorage.getItem('f1hub_auth_token');
+    if (token) {
+      api.get('/api/user/me').then(u => {
+        if (u?.user_id || u?.id) setUser(u);
+        else localStorage.removeItem('f1hub_auth_token');
+      });
+    }
+    const onExpired = () => { localStorage.removeItem('f1hub_auth_token'); setUser(null); };
+    window.addEventListener('f1:auth-expired', onExpired);
+    return () => window.removeEventListener('f1:auth-expired', onExpired);
+  }, []);
+
+  const toggleSpoiler = () => {
+    const nv = !spoilerFree;
+    setSpoilerFree(nv);
+    localStorage.setItem('f1hub_spoiler_free', String(nv));
+  };
+
+  const onLoggedIn = () => {
+    setShowLogin(false);
+    api.get('/api/user/me').then(u => { if (u?.user_id || u?.id) setUser(u); });
+  };
+  const onLogout = () => {
+    localStorage.removeItem('f1hub_auth_token');
+    setUser(null);
+  };
+
+  const goBack = () => {
+    if (window.history.length > 1) window.history.back();
+    else { window.history.pushState({}, '', '/redesign/v2'); setRoute({ name:'home' }); }
+  };
+
+  return (
+    <Fragment>
+      <TopNav
+        activeId={route.name}
+        user={user}
+        spoilerFree={spoilerFree}
+        onToggleSpoiler={toggleSpoiler}
+        onLogin={() => setShowLogin(true)}
+        onLogout={onLogout}
+        onNavigate={(href) => { window.history.pushState({}, '', href); setRoute(parseRoute(href)); }}
+      />
+      <main key={route.name + ':' + (route.round || '')}>
+        {route.name === 'race' && <RaceDetailPage round={route.round} season={route.season} spoilerFree={spoilerFree} onBack={goBack}/>}
+        {route.name === 'home' && <StubPage kicker="Раздел 01" title="Главная" hint="Прототип готов на /redesign/v2 (старая страница). Переносим в этот SPA на следующих итерациях."/>}
+        {route.name === 'calendar' && <StubPage kicker="Раздел 02" title="Календарь"/>}
+        {route.name === 'standings' && <StandingsPage season={route.season || new Date().getFullYear()} spoilerFree={spoilerFree}/>}
+        {route.name === 'predict' && <PredictionsPage user={user} onLogin={() => setShowLogin(true)}/>}
+        {route.name === 'games' && <StubPage kicker="Раздел 05" title="Игры"/>}
+        {route.name === 'news' && <StubPage kicker="Раздел 06" title="Новости"/>}
+        {route.name === 'profile' && <StubPage kicker="Раздел 07" title="Профиль"/>}
+        {route.name === 'article' && <StubPage kicker="Статья" title="Хроника"/>}
+      </main>
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoggedIn={onLoggedIn}/>}
+    </Fragment>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);

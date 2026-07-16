@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>F1 HUB</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="/static/fonts/manrope.css">
+<style>
+:root{
+  --bg:#15151E;            /* dark navy base, not pure black */
+  --surface:#1c1c28;       /* surface 1 */
+  --surface-2:#262633;     /* surface 2 — cards */
+  --surface-3:#2f2f3e;     /* hover */
+  --line:rgba(255,255,255,.06);
+  --line-strong:rgba(255,255,255,.12);
+  --text:#fafafa;
+  --muted:#a0a0b0;
+  --muted-2:#6b6b7b;
+  --red:#E10600;
+  --red-hover:#FF1A0D;
+  --gold:#FFCB05;
+  --silver:#C0C0C0;
+  --bronze:#CD7F32;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;color:var(--text);
+  font-family:'Manrope',ui-sans-serif,system-ui,sans-serif;
+  font-weight:400;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+body{overflow-x:hidden;
+  background:
+    radial-gradient(ellipse 1200px 800px at 20% 0%, rgba(225,6,0,.06) 0%, transparent 50%),
+    radial-gradient(ellipse 1000px 600px at 100% 50%, rgba(80,80,200,.04) 0%, transparent 50%),
+    radial-gradient(ellipse 800px 600px at 0% 100%, rgba(225,6,0,.04) 0%, transparent 50%),
+    var(--bg);
+  background-attachment:fixed}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+/* Container */
+.cnt{max-width:1280px;margin:0 auto;padding:0 24px}
+@media(max-width:720px){.cnt{padding:0 16px}}
+
+/* Headings — all Manrope, just weight + size */
+.h-display{font-weight:800;letter-spacing:-.025em;line-height:1.02}
+.h-section{font-weight:800;font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.eyebrow-red{color:var(--red)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;font-weight:700;font-size:13px;
+  border-radius:999px;transition:all .18s ease;letter-spacing:-.005em}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{background:var(--red-hover);transform:translateY(-1px)}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--line-strong)}
+.btn-ghost:hover{background:rgba(255,255,255,.1)}
+.btn-link{padding:6px 0;font-size:13px;font-weight:700;color:var(--text);display:inline-flex;gap:8px;align-items:center}
+.btn-link::after{content:'→';transition:transform .18s}
+.btn-link:hover::after{transform:translateX(3px)}
+
+/* Top nav */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(21,21,30,.85);backdrop-filter:blur(20px) saturate(140%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);border-bottom:1px solid var(--line);padding:14px 0}
+.topnav .row{display:flex;align-items:center;gap:32px}
+.topnav .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+.topnav .logo .dot{color:var(--red)}
+.topnav nav{display:flex;gap:6px;flex-wrap:wrap}
+.topnav nav a{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);border-radius:999px;transition:all .18s}
+.topnav nav a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.topnav nav a[data-active="true"]{color:var(--text);background:rgba(255,255,255,.08)}
+
+/* Live indicator */
+@keyframes pulseRed{0%,100%{opacity:1}50%{opacity:.4}}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulseRed 1.6s ease-in-out infinite;display:inline-block}
+
+/* Fade up */
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{opacity:0;animation:fadeUp .55s cubic-bezier(.2,.7,.2,1) forwards}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;min-height:620px;border-radius:0}
+.hero .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:saturate(1.1) contrast(1.08) brightness(.7)}
+.hero .overlay{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 30% 60%, rgba(225,6,0,.18) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(21,21,30,.35) 0%, rgba(21,21,30,.65) 50%, rgba(21,21,30,.98) 95%),
+    linear-gradient(90deg, rgba(21,21,30,.85) 0%, rgba(21,21,30,.35) 45%, transparent 70%)}
+.hero .content{position:relative;padding:80px 0 80px;display:flex;flex-direction:column;justify-content:flex-end;min-height:620px}
+.hero h1{margin:0;font-weight:800;font-size:clamp(36px,5.5vw,68px);line-height:1.02;letter-spacing:-.028em;max-width:780px}
+.hero .meta{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.hero .ctas{margin-top:28px;display:flex;gap:10px;flex-wrap:wrap}
+
+/* Drift car overlay (transparent animated WebP) */
+.hero .drift-car{position:absolute;right:-3%;bottom:90px;width:54%;max-width:720px;
+  pointer-events:none;z-index:1;
+  filter:drop-shadow(0 30px 40px rgba(0,0,0,.55));
+  animation:drift-float 6s ease-in-out infinite alternate;
+  user-select:none;-webkit-user-drag:none;
+  /* Crop the Kling AI watermark from the bottom-right of the source frame */
+  clip-path:inset(0 3% 7% 0)}
+@keyframes drift-float{
+  0%{transform:translate(0,0) rotate(-1deg)}
+  50%{transform:translate(-12px,-6px) rotate(0deg)}
+  100%{transform:translate(8px,-10px) rotate(1deg)}
+}
+@media (max-width:900px){
+  .hero .drift-car{
+    /* На мобиле: сажаем в верхнюю часть hero (небо/трибуны), не перекрывая заголовок и CTA */
+    width:130%;max-width:none;
+    top:-10px;bottom:auto;
+    right:-25%;
+    z-index:1;opacity:.95;
+    clip-path:inset(0 3% 7% 0);
+    animation:drift-float-m 7s ease-in-out infinite alternate;
+  }
+  @keyframes drift-float-m{
+    0%{transform:translate(0,0) rotate(-1deg)}
+    50%{transform:translate(-10px,-4px) rotate(0deg)}
+    100%{transform:translate(6px,-8px) rotate(1deg)}
+  }
+}
+
+/* Sponsor banner strip (bottom of hero) */
+.sponsor-strip{position:absolute;left:0;right:0;bottom:0;height:42px;z-index:2;
+  background:linear-gradient(90deg, var(--red) 0%, #b00500 50%, var(--red) 100%);
+  display:flex;align-items:center;overflow:hidden;border-top:1px solid rgba(255,255,255,.18);
+  border-bottom:1px solid rgba(0,0,0,.3)}
+.sponsor-strip .scroll-track{display:flex;gap:48px;white-space:nowrap;
+  animation:scrollX 40s linear infinite;will-change:transform;padding-left:0}
+@keyframes scrollX{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.sponsor-strip .item{font-weight:800;font-size:12px;letter-spacing:.28em;color:#fff;
+  text-transform:uppercase;display:flex;align-items:center;gap:48px}
+.sponsor-strip .item::after{content:'●';color:rgba(255,255,255,.6);font-size:8px;margin-left:48px}
+
+/* Ticker strip between sections */
+.ticker{background:linear-gradient(90deg, transparent, rgba(255,255,255,.025) 50%, transparent);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  overflow:hidden;padding:14px 0}
+.ticker .track{display:flex;gap:48px;white-space:nowrap;animation:scrollX 60s linear infinite;
+  font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.ticker .track .red{color:var(--red)}
+
+/* Section dark + alternate atmosphere */
+.atmos-track{position:relative}
+.atmos-track::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg, transparent, var(--red), transparent);opacity:.4;pointer-events:none}
+
+/* News grid */
+.news-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media(max-width:1000px){.news-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.news-grid{grid-template-columns:1fr}}
+.news-card{background:var(--surface-2);border-radius:12px;overflow:hidden;cursor:pointer;
+  transition:transform .22s ease, background .22s ease;display:flex;flex-direction:column}
+.news-card:hover{transform:translateY(-3px);background:var(--surface-3)}
+.news-card .thumb{position:relative;aspect-ratio:16/10;overflow:hidden;background:#13131a}
+.news-card .thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.news-card:hover .thumb img{transform:scale(1.04)}
+.news-card .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.2)}
+.news-card .play svg{width:48px;height:48px;opacity:.85}
+.news-card .body{padding:14px 16px 18px}
+.news-card .body h3{margin:0 0 8px;font-weight:700;font-size:15px;line-height:1.3;color:var(--text)}
+.news-card .body .kicker{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+
+/* Quick-link buttons row (4) */
+.quick-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.quick-row{grid-template-columns:repeat(2,1fr)}}
+.quick-row a{padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:13px;
+  letter-spacing:.04em;text-transform:uppercase;transition:all .18s}
+.quick-row a:hover{background:var(--surface-2);border-color:var(--line-strong)}
+.quick-row a::after{content:'→';color:var(--muted)}
+
+/* Editor's pick */
+.editor-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px}
+@media(max-width:900px){.editor-grid{grid-template-columns:1fr}}
+.editor-feature{position:relative;overflow:hidden;aspect-ratio:16/10;border-radius:12px;cursor:pointer}
+.editor-feature img{width:100%;height:100%;object-fit:cover;transition:transform .6s}
+.editor-feature:hover img{transform:scale(1.03)}
+.editor-feature .ov{position:absolute;inset:0;
+  background:linear-gradient(180deg, transparent 40%, rgba(0,0,0,.85))}
+.editor-feature .txt{position:absolute;bottom:0;left:0;right:0;padding:24px}
+.editor-feature h3{margin:0;font-weight:800;font-size:24px;line-height:1.15;letter-spacing:-.015em}
+.editor-list{display:flex;flex-direction:column;gap:14px}
+.editor-list .it{display:grid;grid-template-columns:140px 1fr;gap:14px;background:var(--surface-2);border-radius:10px;overflow:hidden;cursor:pointer;transition:background .22s}
+.editor-list .it:hover{background:var(--surface-3)}
+.editor-list .it img{width:140px;height:100%;object-fit:cover;aspect-ratio:1}
+.editor-list .it .body{padding:12px 14px 12px 0}
+.editor-list .it h4{margin:0 0 6px;font-size:14px;font-weight:700;line-height:1.3}
+.editor-list .it .kk{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
+
+/* Team tabs */
+.team-tabs{display:flex;gap:6px;margin-bottom:24px;overflow-x:auto;padding-bottom:4px}
+.team-tabs button{flex-shrink:0;padding:9px 16px;background:var(--surface);border:1px solid var(--line);
+  border-radius:999px;font-size:12px;font-weight:700;color:var(--muted);transition:all .18s;display:flex;align-items:center;gap:8px}
+.team-tabs button:hover{color:var(--text);border-color:var(--line-strong)}
+.team-tabs button[data-on="1"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.team-tabs button .swatch{width:8px;height:8px;border-radius:50%}
+
+/* Driver pair (within selected team) */
+.driver-pair{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:700px){.driver-pair{grid-template-columns:1fr}}
+.driver-pair .card{position:relative;overflow:hidden;border-radius:14px;aspect-ratio:1.1;cursor:pointer;
+  transition:transform .25s}
+.driver-pair .card:hover{transform:translateY(-3px)}
+.driver-pair .card .photo{position:absolute;inset:0}
+.driver-pair .card .photo img{width:100%;height:100%;object-fit:cover;object-position:top center}
+.driver-pair .card .grad{position:absolute;inset:0}
+.driver-pair .card .info{position:absolute;bottom:0;left:0;right:0;padding:18px;display:flex;justify-content:space-between;align-items:flex-end;color:#fff}
+.driver-pair .card .info h4{margin:0;font-weight:800;font-size:22px;line-height:1.05;letter-spacing:-.015em}
+.driver-pair .card .info .first{font-size:13px;opacity:.8;font-weight:500;margin-bottom:2px}
+.driver-pair .card .info .pts{text-align:right;font-weight:800}
+.driver-pair .card .info .pts .num{font-size:24px;line-height:1}
+.driver-pair .card .info .pts .l{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;margin-top:2px}
+.driver-pair .card .no{position:absolute;top:12px;right:14px;font-weight:800;font-size:48px;opacity:.6;color:#fff;line-height:1}
+
+/* Podium 3 cards */
+.podium-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:32px}
+@media(max-width:800px){.podium-3{grid-template-columns:1fr}}
+.podium-3 .card{position:relative;overflow:hidden;border-radius:14px;aspect-ratio:1.45;cursor:pointer;color:#fff}
+.podium-3 .card .photo{position:absolute;inset:0}
+.podium-3 .card .photo img{width:100%;height:100%;object-fit:cover;object-position:top center}
+.podium-3 .card .grad{position:absolute;inset:0}
+.podium-3 .card .info{position:absolute;bottom:0;left:0;right:0;padding:18px;display:flex;justify-content:space-between;align-items:flex-end}
+.podium-3 .card .pos{position:absolute;top:14px;left:18px;font-weight:800;font-size:36px;line-height:1}
+.podium-3 .card .info h4{margin:0;font-size:18px;font-weight:800;letter-spacing:-.015em}
+.podium-3 .card .info .first{font-size:12px;opacity:.85;font-weight:500}
+.podium-3 .card .info .pts{text-align:right}
+.podium-3 .card .info .pts .num{font-size:22px;font-weight:800}
+.podium-3 .card .info .pts .l{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-top:2px}
+
+/* Standings table */
+.standings-table{background:var(--surface-2);border-radius:12px;overflow:hidden}
+.standings-table .head, .standings-table .row{display:grid;grid-template-columns:54px 1fr 54px 1.2fr 80px;align-items:center;gap:18px;padding:14px 22px}
+.standings-table .head{background:rgba(255,255,255,.03);border-bottom:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2)}
+.standings-table .row{border-bottom:1px solid var(--line);transition:background .15s}
+.standings-table .row:last-child{border-bottom:0}
+.standings-table .row:hover{background:rgba(255,255,255,.025)}
+.standings-table .pos{font-weight:800;font-size:18px;color:var(--muted)}
+.standings-table .driver{display:flex;align-items:center;gap:12px}
+.standings-table .photo{width:42px;height:42px;border-radius:50%;overflow:hidden;background:#13131a;flex-shrink:0}
+.standings-table .photo img{width:100%;height:100%;object-fit:cover;object-position:top center}
+.standings-table .name{font-weight:700;font-size:15px}
+.standings-table .name .first{font-weight:400;color:var(--muted);margin-right:5px}
+.standings-table .teamlogo{width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.04);border-radius:8px;font-size:10px;font-weight:800}
+.standings-table .team{font-size:13px;color:var(--muted)}
+.standings-table .pts{text-align:right;font-weight:800;font-size:18px}
+@media(max-width:720px){
+  .standings-table .head, .standings-table .row{grid-template-columns:32px 1fr 60px;gap:10px;padding:12px 14px}
+  .standings-table .teamlogo, .standings-table .team, .standings-table .head .h-team, .standings-table .head .h-tl{display:none}
+}
+
+/* Highlights videos */
+.video-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:1000px){.video-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.video-grid{grid-template-columns:1fr}}
+.video-card{position:relative;border-radius:10px;overflow:hidden;cursor:pointer;background:var(--surface-2)}
+.video-card .thumb{position:relative;aspect-ratio:16/10;overflow:hidden}
+.video-card .thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.video-card:hover .thumb img{transform:scale(1.04)}
+.video-card .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,.65))}
+.video-card .play svg{width:46px;height:46px;opacity:.92}
+.video-card .body{padding:12px 14px 14px}
+.video-card .body h4{margin:0;font-size:13px;font-weight:700;line-height:1.3}
+
+/* Footer CTA - night track motion blur */
+.foot-cta{position:relative;overflow:hidden;border-radius:14px;min-height:340px;
+  background:
+    radial-gradient(ellipse at 80% 50%, rgba(255,180,50,.18) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 70%, rgba(225,6,0,.15) 0%, transparent 55%),
+    linear-gradient(180deg, #0a0a14 0%, #1a1525 60%, #0d0a18 100%)}
+.foot-cta .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:brightness(.55) saturate(1.2) contrast(1.1);opacity:.85}
+.foot-cta .ov{position:absolute;inset:0;
+  background:linear-gradient(90deg, rgba(10,10,20,.92) 0%, rgba(10,10,20,.4) 60%, transparent 100%)}
+/* Motion light streaks */
+.foot-cta .streaks{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(85deg, transparent 0, transparent 30px,
+    rgba(255,200,80,.12) 30px, rgba(255,200,80,.12) 32px,
+    transparent 32px, transparent 80px,
+    rgba(225,6,0,.1) 80px, rgba(225,6,0,.1) 82px);
+  mix-blend-mode:screen;opacity:.6;filter:blur(.6px)}
+.foot-cta .content{position:relative;padding:48px 40px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;min-height:340px;z-index:2}
+.foot-cta h2{margin:0;font-weight:800;font-size:clamp(28px,3.5vw,44px);line-height:1.05;letter-spacing:-.02em;max-width:560px;color:#fff;text-shadow:0 2px 20px rgba(0,0,0,.6)}
+.foot-cta .right{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+
+/* Section spacer */
+.section{padding:48px 0}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:24px;flex-wrap:wrap}
+.section-head h2{margin:0;font-weight:800;font-size:clamp(22px,2.6vw,32px);letter-spacing:-.02em}
+
+/* Skeleton */
+.sk{background:linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size:200% 100%;animation:sk 1.4s infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+::-webkit-scrollbar{width:10px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2a2a35;border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:#3a3a48}
+</style>
+<script src="/static/vendor/react.min.js" crossorigin></script>
+<script src="/static/vendor/react-dom.min.js" crossorigin></script>
+<script src="/static/vendor/babel.min.js" crossorigin></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, Fragment } = React;
+
+const apiGet = (p) => fetch(p).then(r => r.ok ? r.json() : null).catch(() => null);
+
+function hiResImg(url, w = 800) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('media.formula1.com/image/upload/')) return url;
+  return url.replace(/w_\d+/g, 'w_' + w).replace(/h_\d+/g, 'h_' + Math.round(w * 0.75));
+}
+
+const COUNTRY_RU = {
+  AU:'Австралия', CN:'Китай', JP:'Япония', US:'США', CA:'Канада', MC:'Монако',
+  ES:'Испания', AT:'Австрия', GB:'Британия', HU:'Венгрия', BE:'Бельгия',
+  NL:'Нидерланды', IT:'Италия', AZ:'Азербайджан', SG:'Сингапур', MX:'Мексика',
+  BR:'Бразилия', QA:'Катар', AE:'ОАЭ', SA:'Саудия', BH:'Бахрейн',
+};
+const shortName = (r) => {
+  if (!r) return '';
+  const cc = (r.country_code || '').toUpperCase();
+  if (COUNTRY_RU[cc]) return COUNTRY_RU[cc];
+  return (r.name || '').replace(/^Гран-при\s+/i, '');
+};
+
+const TEAMS = {
+  'McLaren':       { short:'MCL', color:'#FF8000', dark:'#A55200' },
+  'Ferrari':       { short:'FER', color:'#E8002D', dark:'#9B001E' },
+  'Mercedes':      { short:'MER', color:'#27F4D2', dark:'#0F8A77' },
+  'Red Bull Racing':{ short:'RBR', color:'#3671C6', dark:'#1F3F73' },
+  'Aston Martin':  { short:'AMR', color:'#229971', dark:'#13593F' },
+  'Williams':      { short:'WIL', color:'#64C4FF', dark:'#3A85B6' },
+  'Racing Bulls':  { short:'RB',  color:'#6692FF', dark:'#395CB6' },
+  'Sauber':        { short:'SAU', color:'#52E252', dark:'#2A8A2A' },
+  'Kick Sauber':   { short:'SAU', color:'#52E252', dark:'#2A8A2A' },
+  'Haas':          { short:'HAS', color:'#B6BABD', dark:'#737578' },
+  'Haas F1 Team':  { short:'HAS', color:'#B6BABD', dark:'#737578' },
+  'Alpine':        { short:'ALP', color:'#0093CC', dark:'#005C80' },
+  'Alpine F1 Team':{ short:'ALP', color:'#0093CC', dark:'#005C80' },
+};
+const teamInfo = (name) => TEAMS[name] || { short: name?.slice(0,3).toUpperCase(), color:'#888', dark:'#444' };
+
+function Countdown({ iso }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  if (!iso) return null;
+  const ms = Math.max(0, new Date(iso).getTime() - now);
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const pad = n => String(n).padStart(2, '0');
+  const secs = Math.floor((ms % 60000) / 1000);
+  return (
+    <div className="hero-cd-wrap" style={{ display:'flex', alignItems:'center', gap:14, color:'#fff' }}>
+      <div className="eyebrow" style={{ display:'flex', alignItems:'center', gap:8, color:'#fff', opacity:.95 }}>
+        <span className="live-dot"/><span>Старт через</span>
+      </div>
+      <div style={{ display:'flex', gap:10 }}>
+        {[{v:days,l:'дн'},{v:pad(hours),l:'ч'},{v:pad(mins),l:'мин'},{v:pad(secs),l:'сек'}].map((b,i) => (
+          <div key={i} style={{ minWidth:54, padding:'8px 12px', background:'rgba(0,0,0,.42)', backdropFilter:'blur(10px)', border:'1px solid rgba(255,255,255,.14)', borderRadius:10, textAlign:'center' }}>
+            <div style={{ fontWeight:800, fontSize:22, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{b.v}</div>
+            <div style={{ fontSize:9, letterSpacing:'.15em', textTransform:'uppercase', color:'rgba(255,255,255,.65)', marginTop:4, fontWeight:600 }}>{b.l}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlayIcon() {
+  return <svg viewBox="0 0 48 48" fill="rgba(255,255,255,.95)"><circle cx="24" cy="24" r="22" fill="rgba(0,0,0,.35)"/><path d="M19 16l14 8-14 8z" fill="#fff"/></svg>;
+}
+
+function TopNav({ active='home' }) {
+  const links = [
+    { id:'home', label:'Главная', href:'/' },
+    { id:'calendar', label:'Календарь', href:'/calendar' },
+    { id:'standings', label:'Чемпионат', href:'#' },
+    { id:'drivers', label:'Пилоты', href:'#' },
+    { id:'predict', label:'Прогнозы', href:'#' },
+    { id:'news', label:'Новости', href:'#' },
+  ];
+  return (
+    <header className="topnav">
+      <div className="cnt row">
+        <a href="/" className="logo"><img src="/static/logo-f1hub.png" alt="F1 HUB" style={{ height:28, width:"auto", display:"block" }}/></a>
+        <nav>
+          {links.map(l => (
+            <a key={l.id} href={l.href} data-active={active === l.id}>{l.label}</a>
+          ))}
+        </nav>
+        <div style={{ flex:1 }}/>
+        <button className="btn btn-red" style={{ padding:'8px 16px', fontSize:12 }}>Войти</button>
+      </div>
+    </header>
+  );
+}
+
+// ============ HERO ============
+function SponsorStrip() {
+  const items = ['F1 HUB · TRACKSIDE EDITION', 'СЕЗОН 2026', 'СЛЕДУЮЩИЙ ЭТАП', '24 ГРАН-ПРИ', '6 СПРИНТ-УИКЕНДОВ', 'ЖИВЫЕ ДАННЫЕ', 'F1 HUB · TRACKSIDE EDITION', 'СЕЗОН 2026', 'СЛЕДУЮЩИЙ ЭТАП', '24 ГРАН-ПРИ', '6 СПРИНТ-УИКЕНДОВ', 'ЖИВЫЕ ДАННЫЕ'];
+  return (
+    <div className="sponsor-strip">
+      <div className="scroll-track">
+        {items.map((t,i) => <div key={i} className="item">{t}</div>)}
+      </div>
+    </div>
+  );
+}
+
+function Ticker() {
+  return (
+    <div className="ticker">
+      <div className="track">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Fragment key={i}>
+            <span>F1 HUB</span><span className="red">●</span>
+            <span>TRACKSIDE EDITION</span><span className="red">●</span>
+            <span>СЕЗОН 2026</span><span className="red">●</span>
+            <span>22 ЭТАПА · МАРТ — ДЕКАБРЬ</span><span className="red">●</span>
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Hero({ nextRace, lastRace, scheduleByRound }) {
+  if (!nextRace) {
+    return <section className="hero" style={{ minHeight:620, background:'var(--surface)' }}><div className="cnt content"><div className="sk" style={{ height:280, borderRadius:12 }}/></div></section>;
+  }
+  return (
+    <section className="hero fade-up">
+      <img src={hiResImg(nextRace.circuit_image, 1800) || 'https://media.formula1.com/image/upload/c_lfill,w_1800/q_auto/v1740000000/fom-website/2018-redesign-assets/Circuit%20maps%2016x9/Spain_Circuit'}
+           className="bg" alt=""/>
+      <div className="overlay"/>
+      <div className="cnt content">
+        <div className="meta">
+          <Countdown iso={nextRace.race_datetime}/>
+        </div>
+        <div className="eyebrow eyebrow-red" style={{ marginBottom:14 }}>
+          СЛЕДУЮЩИЙ ГРАН-ПРИ · РАУНД {String(nextRace.round).padStart(2,'0')} / 2026
+        </div>
+        <h1>Гран-при {shortName(nextRace)}: что нужно знать перед уикендом</h1>
+        <div className="ctas">
+          <a className="btn btn-red" href="#" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/race/"+nextRace.round}, "*"); } catch(_){} }}>Открыть гран-при</a>
+          <a className="btn btn-ghost" href="/calendar" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/calendar"}, "*"); } catch(_){} }}>Полный календарь</a>
+        </div>
+      </div>
+      <img src="/static/car-drift.webp" className="drift-car" alt="" loading="eager"/>
+      <SponsorStrip/>
+    </section>
+  );
+}
+
+// ============ NEWS GRID ============
+function NewsGrid({ news }) {
+  if (!news?.length) return null;
+  const items = news.slice(0, 4);
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Главное о сезоне</h2>
+          <a href="/news" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/news"}, "*"); } catch(_){} }}>Все новости</a>
+        </div>
+        <div className="news-grid">
+          {items.map((n, i) => (
+            <article key={i} className="news-card" onClick={() => n.url && window.open(n.url, '_blank')}>
+              <div className="thumb">
+                {(n.photo || n.image) ? (
+                  <img src={n.photo || n.image} alt="" loading="lazy"
+                    onError={(e) => { e.target.style.display='none'; }}/>
+                ) : null}
+                {i === 0 && <div className="play"><PlayIcon/></div>}
+              </div>
+              <div className="body">
+                <div className="kicker">{n.source || 'Новости'}</div>
+                <h3>{n.title}</h3>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ QUICK LINKS ============
+function QuickLinks() {
+  const links = [
+    { id:'calendar', label:'Календарь сезона', href:'/calendar' },
+    { id:'standings', label:'Чемпионат', href:'/standings' },
+    { id:'predictions', label:'Сделать прогноз', href:'/predict' },
+    { id:'highlights', label:'Видео-обзоры', href:'/highlights' },
+  ];
+  const nav = (e, href) => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:href}, "*"); } catch(_){} };
+  return (
+    <section className="section fade-up" style={{ paddingTop:0 }}>
+      <div className="cnt">
+        <div className="quick-row">
+          {links.map(l => <a key={l.id} href={l.href} onClick={e => nav(e, l.href)}>{l.label}</a>)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ EDITOR'S PICKS ============
+function EditorsPicks({ lastRace, news }) {
+  if (!lastRace?.results?.length || !news?.length) return null;
+  const winner = lastRace.results[0];
+  const ti = teamInfo(winner.team);
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Выбор редакции</h2>
+          <a href="/news" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/news"}, "*"); } catch(_){} }}>Все материалы</a>
+        </div>
+        <div className="editor-grid">
+          <div className="editor-feature" style={{ background:`linear-gradient(135deg, ${ti.color}33, ${ti.dark}99)` }}>
+            <img src={hiResImg(winner.card_photo_url || winner.photo_url, 1200)} alt=""/>
+            <div className="ov"/>
+            <div className="txt">
+              <div className="eyebrow eyebrow-red" style={{ marginBottom:10, color:'#fff', opacity:.9 }}>
+                Победитель · {lastRace.name}
+              </div>
+              <h3>{winner.first_name} {winner.last_name} забирает победу — что стоит за решением {winner.team}</h3>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:14 }}>
+                <span style={{ width:8, height:8, background:ti.color, display:'inline-block' }}/>
+                <span style={{ fontSize:11, letterSpacing:'.16em', fontWeight:700, textTransform:'uppercase', opacity:.85 }}>{winner.team}</span>
+              </div>
+            </div>
+          </div>
+          <div className="editor-list">
+            {news.slice(1, 4).map((n, i) => (
+              <div key={i} className="it" onClick={() => n.url && window.open(n.url, '_blank')}>
+                {(n.photo || n.image) ? (
+                  <img src={n.photo || n.image} alt="" loading="lazy"/>
+                ) : <div style={{ width:140, background:'#13131a' }}/>}
+                <div className="body">
+                  <div className="kk">{n.source || 'Новости'}</div>
+                  <h4>{n.title}</h4>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ DRIVERS BY TEAM ============
+function DriversByTeam({ standings }) {
+  const byTeam = useMemo(() => {
+    const m = {};
+    (standings || []).forEach(d => { (m[d.team] = m[d.team] || []).push(d); });
+    return m;
+  }, [standings]);
+  const teams = Object.keys(byTeam);
+  const [active, setActive] = useState(teams[0]);
+  useEffect(() => { if (!active && teams[0]) setActive(teams[0]); }, [teams.join(',')]);
+  if (!teams.length) return null;
+  const drivers = byTeam[active] || [];
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Пилоты</h2>
+          <a href="/standings" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/standings"}, "*"); } catch(_){} }}>Все пилоты</a>
+        </div>
+        <div className="team-tabs">
+          {teams.map(t => {
+            const ti = teamInfo(t);
+            return (
+              <button key={t} data-on={active === t ? '1' : '0'} onClick={() => setActive(t)}>
+                <span className="swatch" style={{ background: ti.color }}/>
+                {t.replace(' F1 Team','').replace('Racing','').trim()}
+              </button>
+            );
+          })}
+        </div>
+        <div className="driver-pair">
+          {drivers.slice(0, 2).map(d => {
+            const ti = teamInfo(d.team);
+            return (
+              <div key={d.driver_number} className="card" style={{ background:`linear-gradient(180deg, ${ti.color}44 0%, ${ti.dark} 100%)` }}>
+                <div className="photo">
+                  <img src={hiResImg(d.card_photo_url || d.photo_url, 800)} alt={d.last_name}/>
+                </div>
+                <div className="grad" style={{ background:'linear-gradient(180deg, transparent 40%, rgba(0,0,0,.85))' }}/>
+                <div className="no">{String(d.driver_number).padStart(2,'0')}</div>
+                <div className="info">
+                  <div>
+                    <div className="first">{d.first_name}</div>
+                    <h4>{d.last_name}</h4>
+                  </div>
+                  <div className="pts">
+                    <div className="num">{Math.round(d.points)}</div>
+                    <div className="l">очков</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ PODIUM TOP 3 ============
+function PodiumTop3({ standings }) {
+  if (!standings || standings.length < 3) return null;
+  const top3 = standings.slice(0, 3);
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Сезон 2026 · Лидеры</h2>
+          <a href="/standings" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/standings"}, "*"); } catch(_){} }}>Полная таблица</a>
+        </div>
+        <div className="podium-3">
+          {top3.map((d, i) => {
+            const ti = teamInfo(d.team);
+            return (
+              <div key={d.driver_number} className="card"
+                style={{ background:`linear-gradient(135deg, ${ti.color}55, ${ti.dark})` }}>
+                <div className="photo">
+                  <img src={hiResImg(d.card_photo_url || d.photo_url, 800)} alt={d.last_name}/>
+                </div>
+                <div className="grad" style={{ background:'linear-gradient(180deg, transparent 30%, rgba(0,0,0,.85))' }}/>
+                <div className="pos">{i+1}</div>
+                <div className="info">
+                  <div>
+                    <div className="first">{d.first_name}</div>
+                    <h4>{d.last_name}</h4>
+                  </div>
+                  <div className="pts">
+                    <div className="num">{Math.round(d.points)}</div>
+                    <div className="l">очков</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ STANDINGS TABLE ============
+function StandingsTable({ standings }) {
+  if (!standings?.length) return null;
+  const rows = standings.slice(0, 10);
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Чемпионат пилотов</h2>
+          <a href="/standings" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/standings"}, "*"); } catch(_){} }}>Кубок конструкторов</a>
+        </div>
+        <div className="standings-table">
+          <div className="head">
+            <div>#</div>
+            <div>Пилот</div>
+            <div className="h-tl"></div>
+            <div className="h-team">Команда</div>
+            <div style={{ textAlign:'right' }}>Очки</div>
+          </div>
+          {rows.map((d, i) => {
+            const ti = teamInfo(d.team);
+            return (
+              <div key={d.driver_number} className="row">
+                <div className="pos" style={{ color: i < 3 ? (i===0?'var(--gold)':i===1?'var(--silver)':'var(--bronze)') : 'var(--muted)' }}>
+                  {String(i+1).padStart(2,'0')}
+                </div>
+                <div className="driver">
+                  <div className="photo"><img src={hiResImg(d.photo_url, 200)} alt={d.last_name} loading="lazy"/></div>
+                  <div className="name"><span className="first">{d.first_name}</span>{d.last_name}</div>
+                </div>
+                <div className="teamlogo" style={{ background: ti.color + '22', color: ti.color }}>{ti.short}</div>
+                <div className="team">{d.team}</div>
+                <div className="pts">{Math.round(d.points)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ HIGHLIGHTS VIDEOS ============
+function Highlights({ broadcasts, onPlay, scheduleByRound }) {
+  if (!broadcasts?.length) return null;
+  const items = broadcasts.filter(b => b.session_type === 'review').slice(0, 4);
+  if (!items.length) return null;
+  return (
+    <section className="section fade-up">
+      <div className="cnt">
+        <div className="section-head">
+          <h2>Видео-обзоры гран-при</h2>
+          <a href="/highlights" className="btn-link" onClick={e => { e.preventDefault(); try { parent.postMessage({type:"f1hub-prem-nav", href:"/highlights"}, "*"); } catch(_){} }}>Все обзоры</a>
+        </div>
+        <div className="video-grid">
+          {items.map((b, i) => {
+            // YouTube thumbnail extraction
+            const ytMatch = (b.video_url || b.embed_url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
+            const thumb = ytMatch ? `https://i.ytimg.com/vi/${ytMatch[1]}/hqdefault.jpg` : null;
+            return (
+              <div key={b.id || i} className="video-card" onClick={() => { const ytm = (b.video_url || b.embed_url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/); if (ytm) { try { parent.postMessage({type:'f1hub-prem-play', url:b.video_url, ytId:ytm[1]}, '*'); } catch(_){} } else if (b.video_url) window.open(b.video_url, '_blank'); }}>
+                <div className="thumb">
+                  {thumb ? <img src={thumb} alt="" loading="lazy"/> : <div style={{ width:'100%', height:'100%', background:'#13131a' }}/>}
+                  <div className="play"><PlayIcon/></div>
+                </div>
+                <div className="body">
+                  <h4 style={{ fontSize:14, fontWeight:800 }}>Обзор</h4>
+                  <div style={{ fontSize:13, color:'var(--muted)', marginTop:3, fontWeight:600 }}>{(scheduleByRound && scheduleByRound[b.race_round] && scheduleByRound[b.race_round].name) || ('Раунд ' + b.race_round)}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ FOOTER CTA ============
+function FooterCTA() {
+  return (
+    <section className="section">
+      <div className="cnt">
+        <div className="foot-cta fade-up">
+          <img className="bg" src="/static/footer-car.jpg" alt=""
+            onError={(e) => { e.target.style.display = 'none'; }}/>
+          <div className="streaks"/>
+          <div className="ov"/>
+          <div className="content">
+            <div>
+              <div className="eyebrow eyebrow-red" style={{ marginBottom:12 }}>F1 HUB · TELEGRAM</div>
+              <h2>Открой Formula 1<br/>прямо в Telegram</h2>
+              <div style={{ fontSize:14, color:'rgba(255,255,255,.7)', marginTop:14, maxWidth:420 }}>
+                Прогнозы, Live-данные с трассы, чемпионат и мини-игры — всё в одном боте.
+              </div>
+            </div>
+            <div className="right">
+              <a href="https://t.me/F1_egor_bot" target="_blank" rel="noopener" className="btn btn-red">Открыть бот</a>
+              <a href="/calendar" className="btn btn-ghost">Полный календарь</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============ APP ============
+function App() {
+  const [home, setHome] = useState(null);
+  const [standings, setStandings] = useState(null);
+  const [schedule, setSchedule] = useState(null);
+  const [news, setNews] = useState(null);
+  const [broadcasts, setBroadcasts] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/home?season=2026'),
+      apiGet('/api/standings/drivers?season=2026'),
+      apiGet('/api/schedule?season=2026'),
+      apiGet('/api/news'),
+      apiGet('/api/broadcasts?season=2026'),
+    ]).then(([h, st, sc, n, b]) => {
+      setHome(h);
+      setStandings(st?.standings || []);
+      setSchedule(sc?.races || []);
+      const newsList = n?.posts || n?.articles || (Array.isArray(n) ? n : []) || [];
+      const f1Keywords = /формул|f1|гонщ|болид|гран-при|гран при|трас|пилот|чемпион|квалиф|подиум|сезон|спринт|маклар|феррар|мерседес|ред булл|астон|вильямс|альпин|сауб|хаас/i;
+      const filtered = newsList.filter(p => f1Keywords.test(p.title || '') || f1Keywords.test(p.preview || ''));
+      setNews(filtered.length ? filtered : newsList);
+      setBroadcasts(b?.broadcasts || []);
+    });
+  }, []);
+
+  const scheduleByRound = useMemo(() => {
+    const m = {};
+    (schedule || []).forEach(r => { m[r.round] = r; });
+    return m;
+  }, [schedule]);
+
+  return (
+    <Fragment>
+      
+      <Hero nextRace={home?.next_race} lastRace={home?.last_race} scheduleByRound={scheduleByRound}/>
+      <Highlights broadcasts={broadcasts} scheduleByRound={scheduleByRound}/>
+      <NewsGrid news={news}/>
+      <QuickLinks/>
+      <Ticker/>
+      <EditorsPicks lastRace={home?.last_race} news={news}/>
+      <DriversByTeam standings={standings}/>
+      <PodiumTop3 standings={standings}/>
+      <StandingsTable standings={standings}/>
+      <Ticker/>
+      <FooterCTA/>
+      <footer style={{ padding:'32px 0', borderTop:'1px solid var(--line)', color:'var(--muted)' }}>
+        <div className="cnt" style={{ display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:14, fontSize:12 }}>
+          <span>F1·HUB · trackside edition · 2026</span>
+          <span>Фанатский ресурс · данные из открытых источников</span>
+        </div>
+      </footer>
+    </Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+<script>
+(function(){
+  function send(){ try { parent.postMessage({type:"f1hub-prem-height", h: document.documentElement.scrollHeight}, "*"); } catch(e){} }
+  window.addEventListener("load", () => { setTimeout(send, 100); setTimeout(send, 600); setTimeout(send, 1500); });
+  const ro = new ResizeObserver(send); ro.observe(document.documentElement);
+  setInterval(send, 2000);
+  // intercept internal links -> tell parent to navigate
+  document.addEventListener("click", e => {
+    const a = e.target.closest("a[href^=\"/\"], a[href^=\"./\"]");
+    if (a && a.href && !a.target) {
+      e.preventDefault();
+      parent.postMessage({type:"f1hub-prem-nav", href: new URL(a.href).pathname}, "*");
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -219,7 +219,6 @@ const BroadcastList = ({ broadcasts, hasSprint }) => {
 
   const thumbFor = (b) => {
     if (!b) return null;
-    if (b.thumbnail_url) return b.thumbnail_url;
     const m = (b.video_url || b.embed_url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
     return m ? ('https://i.ytimg.com/vi/' + m[1] + '/hqdefault.jpg') : null;
   };
@@ -370,14 +369,14 @@ const LoginModal = ({ onClose, onLoggedIn }) => {
 
 // ============ TOP NAV ============
 const NAV_LINKS = [
-  { id:'home',      label:'Главная',    href:'/',                     internal:true  },
-  { id:'calendar',  label:'Календарь',  href:'/calendar',             internal:true  },
-  { id:'standings', label:'Чемпионат',  href:'/standings',            internal:true  },
-  { id:'predict',   label:'Прогнозы',   href:'/predict',              internal:true  },
-  { id:'games', label:'Игры', href:'/games',internal:true },
-  { id:'news', label:'Новости', href:'/news',internal:true },
-  { id:'highlights', label:'Обзоры', href:'/highlights',internal:true },
-  { id:'profile', label:'Профиль', href:'/profile',internal:true },
+  { id:'home',      label:'Главная',    href:'/redesign/v2',           internal:true  },
+  { id:'calendar',  label:'Календарь',  href:'/redesign/v2/calendar',  internal:true  },
+  { id:'standings', label:'Чемпионат',  href:'/redesign/v2/standings', internal:true  },
+  { id:'predict',   label:'Прогнозы',   href:'/redesign/v2/predict',   internal:true  },
+  { id:'games', label:'Игры', href:'/redesign/v2/games', internal:true },
+  { id:'news', label:'Новости', href:'/redesign/v2/news', internal:true },
+  { id:'highlights', label:'Обзоры', href:'/redesign/v2/highlights', internal:true },
+  { id:'profile', label:'Профиль', href:'/redesign/v2/profile', internal:true },
 ];
 const TopNav = ({ activeId, user, spoilerFree, onToggleSpoiler, onLogin, onLogout, onNavigate }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -396,7 +395,7 @@ const TopNav = ({ activeId, user, spoilerFree, onToggleSpoiler, onLogin, onLogou
           <button className="burger" aria-label="Меню" onClick={() => setMobileOpen(true)}>
             <span/><span/><span/>
           </button>
-          <a href="/" className="logo" onClick={e => { e.preventDefault(); onNavigate("/"); }}><img src="/static/logo-f1hub.png" alt="F1 HUB" style={{ height:28, width:"auto", display:"block" }}/></a>
+          <a href="/redesign/v2" className="logo" onClick={e => { e.preventDefault(); onNavigate("/redesign/v2"); }}><img src="/static/logo-f1hub.png" alt="F1 HUB" style={{ height:28, width:"auto", display:"block" }}/></a>
           <nav>
             {NAV_LINKS.map(l => (
               <a key={l.id} href={l.href} data-active={activeId === l.id ? 'true' : 'false'} onClick={e => handleClick(e, l)}>{l.label}</a>
@@ -1246,7 +1245,7 @@ const PredictionsPage = ({ user, onLogin }) => {
 
   const displayValue = (type, value) => {
     if (Array.isArray(value)) return value.map(n => driverByNum[n]?.code || n).join(' → ');
-    if (type === 'safety_car') return [true,'yes','true',1,'1'].includes(value) ? 'Да' : 'Нет';
+    if (type === 'safety_car') return (value === true || value === 'yes') ? 'Да' : 'Нет';
     if (type === 'winner' || type === 'fastest_lap') return driverByNum[value]?.name || value;
     return String(value ?? '');
   };
@@ -1340,7 +1339,7 @@ const PredictionsHistory = ({ items, driverByNum = {} }) => {
 
   const displayValue = (type, value) => {
     if (Array.isArray(value)) return value.map(n => driverByNum[n]?.code || n).join(' → ');
-    if (type === 'safety_car') return [true,'yes','true',1,'1'].includes(value) ? 'Да' : 'Нет';
+    if (type === 'safety_car') return (value === true || value === 'yes') ? 'Да' : 'Нет';
     if (type === 'winner' || type === 'fastest_lap') return driverByNum[value]?.name || value;
     return String(value ?? '');
   };
@@ -1418,13 +1417,13 @@ const usePremiumFrame = (embedUrl, navigate) => {
       }
       if (e.data.type === 'f1hub-prem-nav' && e.data.href) {
         const v2Map = {
-          '/': '/',
-          '/redesign': '/',
-          '/redesign/v2': '/',
-          '/redesign/calendar': '/calendar',
-          '/redesign/v2/calendar': '/calendar',
+          '/': '/redesign/v2',
+          '/redesign': '/redesign/v2',
+          '/redesign/v2': '/redesign/v2',
+          '/redesign/calendar': '/redesign/v2/calendar',
+          '/redesign/v2/calendar': '/redesign/v2/calendar',
         };
-        const target = v2Map[e.data.href] || (e.data.href.startsWith('/redesign/v2/') ? e.data.href.replace('/redesign/v2', '') : e.data.href);
+        const target = v2Map[e.data.href] || (e.data.href.startsWith('/redesign/v2') ? e.data.href : '/redesign/v2');
         navigate(target);
       }
     };
@@ -1435,14 +1434,14 @@ const usePremiumFrame = (embedUrl, navigate) => {
 };
 
 const HomePremiumFrame = ({ navigate, spoilerFree }) => {
-  const { ref, height } = usePremiumFrame('/home-embed', navigate);
+  const { ref, height } = usePremiumFrame('/redesign/v2/home-embed', navigate);
   const onLoad = (e) => { try { e.target.contentWindow.postMessage({ type:'f1hub-prem-set-spoiler', value: !!spoilerFree }, '*'); } catch(_){} };
-  return <iframe ref={ref} onLoad={onLoad} src="/home-embed" title="F1 HUB" style={{ width:'100%', border:0, display:'block', height: height + 'px' }} scrolling="no"/>;
+  return <iframe ref={ref} onLoad={onLoad} src="/redesign/v2/home-embed" title="F1 HUB" style={{ width:'100%', border:0, display:'block', height: height + 'px' }} scrolling="no"/>;
 };
 const CalendarPremiumFrame = ({ navigate, spoilerFree }) => {
-  const { ref, height } = usePremiumFrame('/calendar-embed', navigate);
+  const { ref, height } = usePremiumFrame('/redesign/v2/calendar-embed', navigate);
   const onLoad = (e) => { try { e.target.contentWindow.postMessage({ type:'f1hub-prem-set-spoiler', value: !!spoilerFree }, '*'); } catch(_){} };
-  return <iframe ref={ref} onLoad={onLoad} src="/calendar-embed" title="F1 HUB Calendar" style={{ width:'100%', border:0, display:'block', height: height + 'px' }} scrolling="no"/>;
+  return <iframe ref={ref} onLoad={onLoad} src="/redesign/v2/calendar-embed" title="F1 HUB Calendar" style={{ width:'100%', border:0, display:'block', height: height + 'px' }} scrolling="no"/>;
 };
 
 
@@ -3007,7 +3006,7 @@ const GamesPage = ({onChange}) => {
 
 // ============ ROUTING ============
 const parseRoute = (path) => {
-  const clean = path.replace(/^\/(redesign\/v2\/?)?/, '');
+  const clean = path.replace(/^\/redesign\/v2\/?/, '');
   if (!clean) return { name:'home' };
   const parts = clean.split('/').filter(Boolean);
   if (parts[0] === 'race' && parts[1]) return { name:'race', round: parseInt(parts[1], 10), season: parts[2] ? parseInt(parts[2], 10) : null };
@@ -3108,7 +3107,7 @@ const App = () => {
 
   const goBack = () => {
     if (window.history.length > 1) window.history.back();
-    else { window.history.pushState({}, '', '/'); setRoute({ name:'home' }); }
+    else { window.history.pushState({}, '', '/redesign/v2'); setRoute({ name:'home' }); }
   };
 
   return (
@@ -3129,7 +3128,7 @@ const App = () => {
         {route.name === 'standings' && <StandingsPage season={route.season || new Date().getFullYear()} spoilerFree={spoilerFree} onDriverPick={setPickedDriver} onTeamPick={setPickedTeam}/>}
         {route.name === 'predict' && <PredictionsPage user={user} onLogin={() => setShowLogin(true)}/>}
         {route.name === 'games' && <GamesPage/>}
-        {route.name === 'news' && !selectedArticle && <NewsPage onArticleClick={(url) => { setSelectedArticle(url); window.history.pushState({}, '', '/article'); setRoute({ name:'article' }); }}/>}
+        {route.name === 'news' && !selectedArticle && <NewsPage onArticleClick={(url) => { setSelectedArticle(url); window.history.pushState({}, '', '/redesign/v2/article'); setRoute({ name:'article' }); }}/>}
         {route.name === 'highlights' && <HighlightsPage onPlay={(ytId, title) => setPlayYt({ ytId, title })}/>}
         {route.name === 'profile' && (user ? <ProfilePage user={user}/> : <AuthGate onLogin={() => setShowLogin(true)} title="Раздел 06 · Профиль"/>)}
         {route.name === 'article' && <ArticlePage articleUrl={selectedArticle} onBack={() => { setSelectedArticle(null); window.history.back(); }}/>}
