@@ -105,20 +105,42 @@ def cache_set(key: str, data: Any):
     _cache[key] = {"data": data, "time": time.time()}
     try:
         if "_should_snapshot" in globals() and _should_snapshot(key):
-            cache_snapshot_save()
+            _cache_snapshot_schedule()
     except Exception:
         pass
 
 
-def cache_get_stale(key: str) -> Optional[Any]:
-    """Return cached data ignoring TTL — fallback when upstream is down.
-    Refreshes the entry timestamp so subsequent reads are served fast from
-    cache_get instead of repeatedly hitting the dead upstream."""
+def cache_get_stale(key: str) -> Optional[Tuple[Any, float]]:
+    """Return (data, age_seconds) ignoring TTL — fallback when upstream is down.
+
+    Deliberately does NOT touch entry["time"]. Refreshing the timestamp here
+    would make stale data look fresh to cache_get, so once upstream recovered
+    we'd keep serving the outage-era copy for another full TTL — and every
+    stale read ratcheted the timestamp forward again, so the age was
+    unknowable. Hammering the dead upstream is prevented by the circuit
+    breakers instead, which is their job. The age lets callers tell the user
+    how old the data is.
+    """
     entry = _cache.get(key)
     if entry:
-        entry["time"] = time.time()
-        return entry["data"]
+        return entry["data"], max(0.0, time.time() - entry["time"])
     return None
+
+
+def _stale_payload(key: str) -> Optional[Any]:
+    """Stale cache entry tagged for the client, or None if nothing cached.
+
+    Marks dict payloads with stale/stale_age_sec so the UI can say "data may
+    be out of date" instead of silently presenting an outage-era snapshot as
+    current — the failure mode users actually complain about.
+    """
+    got = cache_get_stale(key)
+    if got is None:
+        return None
+    data, age = got
+    if isinstance(data, dict):
+        return {**data, "stale": True, "stale_age_sec": int(age)}
+    return data
 
 
 # Disk-persisted snapshot for outage resilience. Only "expensive"/critical keys
@@ -138,16 +160,67 @@ def _should_snapshot(key: str) -> bool:
     return key.split(":")[0] in _SNAPSHOT_PREFIXES
 
 
-def cache_snapshot_save():
-    """Persist snapshot-eligible cache entries to disk (best-effort)."""
+def _cache_snapshot_collect() -> Dict[str, Any]:
+    """Select snapshot-eligible entries. Contains no await: callers on the event
+    loop get a consistent copy that can't be mutated mid-iteration."""
+    return {k: v for k, v in list(_cache.items()) if _should_snapshot(k)}
+
+
+def _cache_snapshot_write(snap: Dict[str, Any]):
+    """Serialize + atomically replace the snapshot file (best-effort)."""
     try:
-        snap = {k: v for k, v in _cache.items() if _should_snapshot(k)}
+        payload = _json.dumps(snap, ensure_ascii=False)
         tmp = _SNAPSHOT_PATH + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            _json.dump(snap, f, ensure_ascii=False)
+            f.write(payload)
         _os.replace(tmp, _SNAPSHOT_PATH)
     except Exception as e:
         logger.warning(f"cache snapshot save failed: {e}")
+
+
+def cache_snapshot_save():
+    """Persist snapshot-eligible cache entries to disk (blocking; sync callers)."""
+    _cache_snapshot_write(_cache_snapshot_collect())
+
+
+# Snapshot writing is serialized off the event loop. cache_set() runs inside
+# request handlers on a single uvicorn worker, so a synchronous dump of the
+# whole snapshot (schedule + every race/qualifying result — hundreds of KB)
+# stalled *every* concurrent request for the duration of the write. Worse, a
+# burst of cache_set calls rewrote the same file once per key.
+_snapshot_task: Optional["asyncio.Task"] = None
+_snapshot_dirty = False
+_SNAPSHOT_DEBOUNCE = 5.0  # seconds to coalesce a burst of cache_set calls
+
+
+async def _cache_snapshot_worker():
+    global _snapshot_dirty, _snapshot_task
+    try:
+        while _snapshot_dirty:
+            _snapshot_dirty = False
+            await asyncio.sleep(_SNAPSHOT_DEBOUNCE)
+            # Collect on the loop thread, serialize+write off it.
+            snap = _cache_snapshot_collect()
+            await asyncio.to_thread(_cache_snapshot_write, snap)
+    finally:
+        _snapshot_task = None
+
+
+def _cache_snapshot_schedule():
+    """Mark the snapshot dirty; write it debounced, off the event loop.
+
+    No running loop (imports, sync scripts, tests) → write inline so behaviour
+    outside the API stays unchanged.
+    """
+    global _snapshot_task, _snapshot_dirty
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        cache_snapshot_save()
+        return
+    _snapshot_dirty = True
+    if _snapshot_task is None or _snapshot_task.done():
+        _snapshot_task = asyncio.create_task(_cache_snapshot_worker())
 
 
 def cache_snapshot_load():
@@ -335,6 +408,21 @@ def get_demo_sessions_list() -> List[Dict]:
 
 # ============ FETCH HELPERS WITH RETRY ============
 
+# Circuit breaker for OpenF1: it powers every live endpoint, and each of those
+# fans out into several fetch_openf1 calls. With a dead upstream and no breaker,
+# one page load = N x (retries+1) x 15s read-timeout, all serialized behind a
+# 3-slot semaphore — the whole API goes unresponsive, not just the live screens.
+_openf1_fail_count = 0
+_openf1_breaker_until = 0.0
+_OPENF1_FAIL_THRESHOLD = 3      # consecutive failures to trip the breaker
+_OPENF1_BREAKER_COOLDOWN = 60   # shorter than Ergast: live data must recover fast
+
+
+def openf1_breaker_open() -> bool:
+    """True while the OpenF1 breaker is tripped (upstream considered down)."""
+    return time.time() < _openf1_breaker_until
+
+
 async def fetch_openf1(
     endpoint: str,
     params: dict = None,
@@ -342,9 +430,18 @@ async def fetch_openf1(
     retry_delay: float = 1.0,
 ) -> Optional[Any]:
     """
-    Fetch from OpenF1 API with retry logic and concurrency limit.
+    Fetch from OpenF1 API with retry logic, concurrency limit and circuit breaker.
     Returns parsed JSON (list or dict) or None on failure.
     """
+    global _openf1_fail_count, _openf1_breaker_until
+
+    # Breaker open → fail fast, let callers fall back to stale cache.
+    if time.time() < _openf1_breaker_until:
+        return None
+    # While upstream is known-bad, probe cheaply so the probe can't hang ~45s.
+    if _openf1_fail_count >= _OPENF1_FAIL_THRESHOLD:
+        retries = 0
+
     async with _openf1_semaphore:
         client = get_client()
         url = f"{OPENF1_API}/{endpoint}"
@@ -354,26 +451,44 @@ async def fetch_openf1(
                 resp = await client.get(url, params=params)
                 if resp.status_code == 200:
                     data = resp.json()
+                    _openf1_fail_count = 0
+                    _openf1_breaker_until = 0.0
                     return data
                 elif resp.status_code == 429:
-                    # Rate limited — wait and retry
+                    # Rate limited — wait and retry. If a retry succeeds the
+                    # breaker stays closed; only calls that exhaust every
+                    # attempt count as a failure, which is the right time to
+                    # back off anyway.
                     wait = min(retry_delay * (2 ** attempt), 10)
                     logger.warning(f"OpenF1 rate limited on {endpoint}, waiting {wait}s")
                     await asyncio.sleep(wait)
                     continue
+                elif resp.status_code < 500:
+                    # 4xx = our request is wrong for this endpoint, upstream is
+                    # healthy. Fail immediately without touching the breaker.
+                    logger.warning(f"OpenF1 {endpoint} returned {resp.status_code}")
+                    return None
                 else:
                     logger.warning(f"OpenF1 {endpoint} returned {resp.status_code}")
                     if attempt < retries:
                         await asyncio.sleep(retry_delay)
                         continue
-                    return None
+                    break
             except (httpx.RequestError, httpx.TimeoutException) as e:
                 logger.error(f"OpenF1 {endpoint} error (attempt {attempt+1}): {e}")
                 if attempt < retries:
                     await asyncio.sleep(retry_delay * (attempt + 1))
                 continue
 
-        return None
+    # Network error or 5xx on every attempt — count toward the breaker.
+    _openf1_fail_count += 1
+    if _openf1_fail_count >= _OPENF1_FAIL_THRESHOLD:
+        _openf1_breaker_until = time.time() + _OPENF1_BREAKER_COOLDOWN
+        logger.warning(
+            f"OpenF1 circuit breaker OPEN for {_OPENF1_BREAKER_COOLDOWN}s "
+            f"after {_openf1_fail_count} failures"
+        )
+    return None
 
 
 def ergast_season(season: int) -> str:
@@ -724,7 +839,7 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
     endpoint = ergast_season(s)
     data = await fetch_ergast(endpoint)
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"season": str(s), "races": [], "error": "Failed to fetch schedule"}
@@ -851,7 +966,7 @@ async def get_race_results(round_num: int, season: int = None) -> Dict[str, Any]
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/results")
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"error": "Failed to fetch results", "round": round_num}
@@ -918,7 +1033,7 @@ async def get_last_race(season: int = None) -> Dict[str, Any]:
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/last/results")
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"error": "Failed to fetch last race"}
@@ -966,7 +1081,7 @@ async def get_qualifying_results(round_num: int, season: int = None) -> Dict[str
     prefix = ergast_season(s)
     data = await fetch_ergast(f"{prefix}/{round_num}/qualifying")
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"error": "Failed to fetch qualifying", "round": round_num}
@@ -1010,7 +1125,7 @@ async def get_driver_standings(season: int = None) -> Dict[str, Any]:
     endpoint = f"{ergast_season(s)}/driverStandings"
     data = await fetch_ergast(endpoint)
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"standings": [], "error": "Failed to fetch standings"}
@@ -1049,20 +1164,27 @@ async def get_driver_standings(season: int = None) -> Dict[str, Any]:
     prev_points = 0
 
     for sd in standings_lists[0].get("DriverStandings", []):
-        points = float(sd["points"])
+        # Per-row guard: one malformed entry from upstream used to raise
+        # KeyError/ValueError out of the whole endpoint (500, nothing cached,
+        # so every retry 500'd too). Skip the bad row, serve the rest.
+        try:
+            points = float(sd["points"])
+            driver_id = sd["Driver"].get("driverId", "")
+            driver_num = ergast_driver_id_to_number(driver_id, s) or int(sd["Driver"].get("permanentNumber", 0))
+            position = int(sd["position"])
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning(f"driverStandings: skipping malformed row {sd!r}: {e}")
+            continue
+
         if not leader_points:
             leader_points = points
 
-        driver_id = sd["Driver"].get("driverId", "")
-        driver_num = ergast_driver_id_to_number(driver_id, s) or int(sd["Driver"].get("permanentNumber", 0))
-        team_name = normalize_team_name(sd["Constructors"][0]["name"]) if sd.get("Constructors") else ""
-
         entry = enrich_driver(driver_num, {
-            "position": int(sd["position"]),
+            "position": position,
             "points": points,
             "gap_to_leader": round(leader_points - points, 1),
             "gap_to_prev": round(prev_points - points, 1) if prev_points else 0,
-            "wins": int(sd.get("wins", 0)),
+            "wins": int(sd.get("wins", 0) or 0),
             "nationality": sd["Driver"].get("nationality", ""),
             "ergast_id": driver_id,
         }, season=s)
@@ -1089,7 +1211,7 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
     endpoint = f"{ergast_season(s)}/constructorStandings"
     data = await fetch_ergast(endpoint)
     if not data:
-        stale = cache_get_stale(cache_key)
+        stale = _stale_payload(cache_key)
         if stale is not None:
             return stale
         return {"standings": [], "error": "Failed to fetch constructor standings"}
@@ -1133,11 +1255,17 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
     leader_points = 0
 
     for sc in standings_lists[0].get("ConstructorStandings", []):
-        points = float(sc["points"])
+        # Per-row guard — see get_driver_standings.
+        try:
+            points = float(sc["points"])
+            team_name = normalize_team_name(sc["Constructor"]["name"])
+            position = int(sc["position"])
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning(f"constructorStandings: skipping malformed row {sc!r}: {e}")
+            continue
+
         if not leader_points:
             leader_points = points
-
-        team_name = normalize_team_name(sc["Constructor"]["name"])
 
         team_drivers = [
             enrich_driver(num, season=s)
@@ -1146,7 +1274,7 @@ async def get_constructor_standings(season: int = None) -> Dict[str, Any]:
         ]
 
         standings.append({
-            "position": int(sc["position"]),
+            "position": position,
             "team": team_name,
             "team_color": colors.get(team_name, "#888"),
             "points": points,
@@ -1881,7 +2009,7 @@ async def get_home_data(season: int = None) -> Dict[str, Any]:
         try:
             return await asyncio.wait_for(get_last_race(s), timeout=1.5)
         except (asyncio.TimeoutError, Exception):
-            stale = cache_get_stale(f"race_results:last:{s}")
+            stale = _stale_payload(f"race_results:last:{s}")
             return stale if stale is not None else {"error": "unavailable"}
 
     next_race, last_race, standings = await asyncio.gather(

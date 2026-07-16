@@ -407,6 +407,24 @@ async def post_init(app: Application):
     ])
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log any unhandled handler exception instead of swallowing it.
+
+    Without this, PTB drops the traceback and the user just sees the bot go
+    quiet — the failure is invisible in the logs too.
+    """
+    logger.error("Unhandled bot error", exc_info=context.error)
+    try:
+        if isinstance(update, Update) and update.effective_chat:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="⚠️ Что-то пошло не так. Попробуй ещё раз чуть позже.",
+            )
+    except Exception:
+        # Never let the error handler raise — that would kill the update loop.
+        logger.exception("error handler failed to notify user")
+
+
 def main():
     """Start the bot."""
     if not TELEGRAM_TOKEN:
@@ -428,6 +446,8 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_get_code, pattern="^get_code$"))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CommandHandler("notify_test", cmd_notify_test))
+
+    app.add_error_handler(on_error)
 
     # Schedule jobs
     job_queue = app.job_queue

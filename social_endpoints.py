@@ -43,7 +43,7 @@ def _serialize_comment(r, my_user_id: _SocialOpt[int]) -> dict:
 
 
 @app.get("/api/broadcast/{broadcast_id}/social")
-async def broadcast_social_get(broadcast_id: int, request: Request):
+def broadcast_social_get(broadcast_id: int, request: Request):
     user_id = _social_user_id(request)
     conn = _social_db()
     cur = conn.cursor()
@@ -66,7 +66,7 @@ async def broadcast_social_get(broadcast_id: int, request: Request):
 
 
 @app.post("/api/broadcast/{broadcast_id}/like")
-async def broadcast_like_toggle(broadcast_id: int, request: Request):
+def broadcast_like_toggle(broadcast_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()
@@ -95,7 +95,7 @@ async def broadcast_like_toggle(broadcast_id: int, request: Request):
 
 
 @app.get("/api/broadcast/{broadcast_id}/comments")
-async def broadcast_get_comments(
+def broadcast_get_comments(
     broadcast_id: int,
     request: Request,
     sort: str = "new",
@@ -136,7 +136,7 @@ async def broadcast_get_comments(
 
 
 @app.post("/api/broadcast/{broadcast_id}/comment")
-async def broadcast_post_comment(
+def broadcast_post_comment(
     broadcast_id: int, req: CommentRequest, request: Request
 ):
     user = get_current_user(request)
@@ -171,7 +171,7 @@ async def broadcast_post_comment(
 
 
 @app.post("/api/comment/{comment_id}/like")
-async def comment_like_toggle(comment_id: int, request: Request):
+def comment_like_toggle(comment_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()
@@ -202,7 +202,7 @@ async def comment_like_toggle(comment_id: int, request: Request):
 
 
 @app.delete("/api/comment/{comment_id}")
-async def comment_delete(comment_id: int, request: Request):
+def comment_delete(comment_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()

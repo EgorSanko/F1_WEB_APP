@@ -1,0 +1,25 @@
+# Secrets — never into the image (build context is the project dir)
+.env
+poster.env
+*.pem
+*.key
+
+# Live data: DB + generated posters. Baking these in leaks user data and
+# ships a stale DB that would shadow the mounted volume.
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# History / junk
+.git/
+.gitignore
+*.bak
+*.bak.*
+*.bak-*
+*.orig
+*.log
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store

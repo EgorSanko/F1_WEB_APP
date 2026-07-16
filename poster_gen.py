@@ -165,13 +165,21 @@ def gen_background(race, style, key):
         json.dump(body, f)
         bf = f.name
 
+    # The API key must never appear in argv: /proc/<pid>/cmdline is world-readable,
+    # so any local user could read it out of `ps` while the poster job runs.
+    # curl reads headers from a config file instead (mode 0600).
+    cf_fd, cfg = tempfile.mkstemp(suffix=".curlrc")
+    os.close(cf_fd)
+    os.chmod(cfg, 0o600)
+    with open(cfg, "w", encoding="utf-8") as f:
+        f.write('header = "Authorization: Bearer %s"\n' % key)
+        f.write('header = "Content-Type: application/json"\n')
+        f.write('header = "HTTP-Referer: https://f1hub.lead-seek.ru"\n')
+        f.write('header = "X-Title: f1hub-poster"\n')
+
     def _curl(extra, base):
         return subprocess.run(
-            ["curl", "-s", *extra, "-m", "240",
-             "-H", "Authorization: Bearer " + key,
-             "-H", "Content-Type: application/json",
-             "-H", "HTTP-Referer: https://f1hub.lead-seek.ru",
-             "-H", "X-Title: f1hub-poster",
+            ["curl", "-s", "-K", cfg, *extra, "-m", "240",
              "-d", "@" + bf,
              base + "/api/v1/chat/completions"],
             capture_output=True, text=True, timeout=300)
@@ -185,6 +193,7 @@ def gen_background(race, style, key):
             m = re.search(r"data:image/[a-zA-Z]+;base64,([A-Za-z0-9+/=]+)", out.stdout or "")
     finally:
         os.unlink(bf)
+        os.unlink(cfg)
     if not m:
         raise SystemExit("no image in response: " + (out.stdout or out.stderr or "")[:400])
     return base64.b64decode(m.group(1))

@@ -102,8 +102,16 @@ app = FastAPI(title="F1 Hub API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    # Restrict to our own frontends (the app is same-origin via nginx, so this
+    # only blocks OTHER sites from reading our API responses). Telegram in-app
+    # browser is covered by the regex. Auth is header-based → no cookie/CSRF risk.
+    allow_origins=[
+        "https://f1.lead-seek.ru",
+        "https://f1hub.lead-seek.ru",
+        "https://f1app.lead-seek.ru",
+    ],
+    allow_origin_regex=r"https://([a-z0-9-]+\.)?telegram\.org",
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -128,14 +136,42 @@ RATE_LIMIT = 300          # requests per window
 RATE_WINDOW = 60          # seconds
 RATE_LIMIT_AUTH = 600     # higher limit for authenticated users
 
+# Anti-brute-force for the 6-digit login code endpoint (separate from the general limit)
+_code_attempts: Dict[str, list] = defaultdict(list)
+CODE_MAX_ATTEMPTS = 10    # failed /api/auth/code attempts per IP per window
+CODE_WINDOW = 300         # 5 min
+
+
+_last_bucket_gc = 0.0
+
+
+def _real_client_ip(request: Request) -> str:
+    """Real client IP behind nginx. request.client.host is 127.0.0.1 (the proxy)
+    for every request, which would collapse ALL users into one rate bucket
+    (self-DoS + trivially bypassable). nginx sets X-Real-IP=$remote_addr and
+    overwrites any client-supplied value, so it's trustworthy; XFF is a fallback."""
+    xri = request.headers.get("x-real-ip", "").strip()
+    if xri:
+        return xri
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        # last hop = the IP our nginx saw (client-supplied earlier hops are spoofable)
+        return xff.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
+
 
 def _check_rate_limit(ip: str, authenticated: bool = False) -> bool:
     """Return True if request is allowed, False if rate-limited."""
+    global _last_bucket_gc
     now = time.time()
-    bucket = _rate_buckets[ip]
-    # Prune old entries
     cutoff = now - RATE_WINDOW
+    bucket = _rate_buckets[ip]
     _rate_buckets[ip] = bucket = [t for t in bucket if t > cutoff]
+    # Periodically drop empty IP buckets so the dict can't grow unbounded.
+    if now - _last_bucket_gc > 300:
+        _last_bucket_gc = now
+        for k in [k for k, v in list(_rate_buckets.items()) if not v]:
+            _rate_buckets.pop(k, None)
     limit = RATE_LIMIT_AUTH if authenticated else RATE_LIMIT
     if len(bucket) >= limit:
         return False
@@ -153,7 +189,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         # Rate limiting (skip health + static)
         path = request.url.path
         if path.startswith("/api/") and path != "/api/health":
-            ip = request.client.host if request.client else "unknown"
+            ip = _real_client_ip(request)
             has_auth = bool(request.headers.get("X-Telegram-Init-Data") or
                            request.headers.get("Authorization", "").startswith("TgLogin "))
             if not _check_rate_limit(ip, authenticated=has_auth):
@@ -187,11 +223,15 @@ app.add_middleware(RequestLogMiddleware)
 # WebApp initData: HMAC key = SHA256("WebAppData", BOT_TOKEN), has "user" JSON field
 # Login Widget:    HMAC key = SHA256(BOT_TOKEN), has top-level id/first_name/username
 
-AUTH_MAX_AGE = 30 * 86400  # 30 days (RM lesson: 24h silently logged out profiles)
+AUTH_MAX_AGE = 30 * 86400          # 30 days — Login Widget session token (deliberately long)
+AUTH_MAX_AGE_WEBAPP = 86400        # 24h — WebApp initData (regenerated every app open; anti-replay)
 
 
 def _validate_webapp_initdata(parsed: Dict[str, str]) -> Dict[str, Any]:
     """Validate WebApp initData (has 'user' field with JSON)."""
+    if not TELEGRAM_TOKEN:
+        # Empty token → HMAC key derived from b'' → signatures forgeable. Fail closed.
+        raise HTTPException(status_code=503, detail="Auth not configured")
     received_hash = parsed.pop("hash", "")
     if not received_hash:
         raise HTTPException(status_code=401, detail="No hash")
@@ -210,7 +250,7 @@ def _validate_webapp_initdata(parsed: Dict[str, str]) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid signature")
 
     auth_date = int(parsed.get("auth_date", 0))
-    if time.time() - auth_date > AUTH_MAX_AGE:
+    if time.time() - auth_date > AUTH_MAX_AGE_WEBAPP:
         raise HTTPException(status_code=401, detail="Auth expired")
 
     user_data = json.loads(parsed.get("user", "{}"))
@@ -221,6 +261,8 @@ def _validate_webapp_initdata(parsed: Dict[str, str]) -> Dict[str, Any]:
 
 def _validate_login_widget(parsed: Dict[str, str]) -> Dict[str, Any]:
     """Validate Telegram Login Widget auth data (top-level id/first_name/hash)."""
+    if not TELEGRAM_TOKEN:
+        raise HTTPException(status_code=503, detail="Auth not configured")
     received_hash = parsed.pop("hash", "")
     if not received_hash:
         raise HTTPException(status_code=401, detail="No hash")
@@ -340,7 +382,12 @@ async def app_auth_callback(request: Request):
     params = dict(request.query_params)
     back_raw = params.pop("back", None)
     payload = _u.urlencode(params, safe=":/")
-    if back_raw:
+    # SECURITY: `back` carries the signed login payload (id/auth_date/hash — a valid
+    # ~30-day credential). It MUST be a mobile app deep-link scheme, never http(s):
+    # ?back=https://evil.com would exfiltrate the token to an attacker's site.
+    _bl = (back_raw or "").lower()
+    _safe_back = _bl.startswith("f1hub://") or _bl.startswith("exp://") or _bl.startswith("exp+")
+    if _safe_back:
         # back already URL-encoded by client when assembling return_to
         sep = "&" if "?" in back_raw else "?"
         deep_link = f"{back_raw}{sep}{payload}" if payload else back_raw
@@ -588,15 +635,28 @@ async def auth_code(request: Request):
     Body: { "code": "123456" }
     Returns auth token (query string) if valid.
     """
+    # Anti-brute-force: a 6-digit code is guessable without a per-IP cap.
+    # Only FAILED attempts count, so legitimate users are never locked out.
+    _ip = _real_client_ip(request)
+    _now = time.time()
+    _code_attempts[_ip] = [t for t in _code_attempts[_ip] if t > _now - CODE_WINDOW]
+    if len(_code_attempts[_ip]) >= CODE_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Слишком много попыток, попробуй позже")
+
     body = await request.json()
     code = str(body.get("code", "")).strip()
     if not code:
         raise HTTPException(status_code=400, detail="Missing code")
     user_id = db.verify_auth_code(code)
     if not user_id:
+        _code_attempts[_ip].append(_now)
         raise HTTPException(status_code=401, detail="Invalid or expired code")
+    _code_attempts.pop(_ip, None)  # success → clear the counter
     user = db.get_or_create_user(user_id=user_id)
-    import time, urllib.parse
+    # NB: no `import time` here — `time` comes from the module scope. A local
+    # import would rebind `time` for the *whole* function, so the throttle's
+    # time.time() call above would raise UnboundLocalError.
+    import urllib.parse
     params = {
         "id": str(user["user_id"]),
         "first_name": user.get("first_name") or "",
@@ -2384,15 +2444,20 @@ async def proxy_stream(request: Request, url: str):
     """Proxy HLS/video streams to bypass CORS."""
     import httpx as _httpx
 
-    # Only allow rutube and googlevideo domains
-    allowed = ['rutube.ru', 'googlevideo.com', 'youtube.com', 'bl.rutube.ru']
+    # Only allow rutube/googlevideo/youtube. Exact host or true subdomain — plain
+    # endswith('rutube.ru') would match an attacker's evilrutube.ru (SSRF).
+    allowed = ['rutube.ru', 'googlevideo.com', 'youtube.com']
     from urllib.parse import urlparse
     parsed = urlparse(url)
-    if not any(parsed.hostname and parsed.hostname.endswith(d) for d in allowed):
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in ("http", "https") or not any(host == d or host.endswith("." + d) for d in allowed):
         raise HTTPException(status_code=403, detail="Domain not allowed")
 
     try:
-        async with _httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        # follow_redirects=False: an allowed host must not 302 us to an internal
+        # address (169.254.169.254 / localhost). m3u8 sub-URLs are re-proxied
+        # (and re-validated) individually below.
+        async with _httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
             resp = await client.get(url, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://rutube.ru/",
@@ -2435,14 +2500,17 @@ async def proxy_stream(request: Request, url: str):
         raise HTTPException(status_code=502, detail=str(e))
 
 
-async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
+async def _had_safety_car_for_round(race_round: int, season: int) -> Optional[bool]:
     """Determine if a (finished) race had a Safety Car, using that race's own
-    OpenF1 session race-control history. Robust post-race, unlike live data."""
+    OpenF1 session race-control history. Robust post-race, unlike live data.
+    Returns True/False when determinable, None if OpenF1 data is unavailable
+    (so the caller keeps safety_car predictions PENDING instead of wrongly
+    settling them against False on a transient outage)."""
     import httpx as _hx
     try:
         race = await _get_race_by_round(race_round, season)
         if not race:
-            return False
+            return None
         # Match the OpenF1 Race session by date.
         race_dt = (race.get("race_datetime") or "")[:10]  # YYYY-MM-DD
         country = race.get("country", "")
@@ -2460,7 +2528,7 @@ async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
                 if s.get("country_name") == country:
                     session_key = s.get("session_key"); break
         if session_key is None:
-            return False
+            return None
         rc = None
         for _attempt in range(3):
             async with _hx.AsyncClient(timeout=15) as c:
@@ -2474,7 +2542,7 @@ async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
             await _aio.sleep(2 * (_attempt + 1))  # back off on 429/5xx
         if not isinstance(rc, list):
             logger.warning(f"SC detection round {race_round}: race_control unavailable")
-            return False
+            return None
         for m in rc:
             msg = (m.get("message", "") or "").upper()
             # FULL Safety Car only — exclude Virtual SC (VSC). OpenF1 tags VSC
@@ -2485,7 +2553,7 @@ async def _had_safety_car_for_round(race_round: int, season: int) -> bool:
         return False
     except Exception as e:
         logger.warning(f"SC detection for round {race_round} failed: {e}")
-        return False
+        return None
 
 
 # ============ ADMIN ============
@@ -2550,23 +2618,19 @@ async def admin_settle(race_round: int, request: Request, season: int = 0):
             except (ValueError, TypeError):
                 pass
         elif ptype == "safety_car":
+            if had_safety_car is None:
+                # OpenF1 has no data yet — keep this prediction PENDING and retry
+                # next run instead of wrongly settling it against False.
+                continue
             predicted_yes = pvalue in (True, "yes", "true")
             if predicted_yes == had_safety_car:
                 points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
 
-        # Atomic: resolve only if still pending. If the other settle path
-        # already handled it, skip — never double-award points.
-        if not db.resolve_prediction(pred["id"], status, points):
+        # Atomically resolve + award points + streak/stats in ONE transaction.
+        # Returns False if the other settle path already handled it → skip.
+        # Prevents both double-award and a crash leaving a settled-but-unpaid row.
+        if not db.settle_and_award(pred["id"], pred["user_id"], status, points):
             continue
-        if points > 0:
-            db.add_user_points(pred["user_id"], points)
-        if status == "correct":
-            db.execute_write(
-                "UPDATE users SET predictions_correct=predictions_correct+1, streak=streak+1, max_streak=MAX(max_streak,streak+1) WHERE user_id=?",
-                (pred["user_id"],)
-            )
-        elif status == "incorrect":
-            db.execute_write("UPDATE users SET streak=0 WHERE user_id=?", (pred["user_id"],))
 
         db.check_and_award_achievements(pred["user_id"])
         settled += 1
@@ -2739,7 +2803,7 @@ def _serialize_comment(r, my_user_id: _SocialOpt[int]) -> dict:
 
 
 @app.get("/api/broadcast/{broadcast_id}/social")
-async def broadcast_social_get(broadcast_id: int, request: Request):
+def broadcast_social_get(broadcast_id: int, request: Request):
     user_id = _social_user_id(request)
     conn = _social_db()
     cur = conn.cursor()
@@ -2762,7 +2826,7 @@ async def broadcast_social_get(broadcast_id: int, request: Request):
 
 
 @app.post("/api/broadcast/{broadcast_id}/like")
-async def broadcast_like_toggle(broadcast_id: int, request: Request):
+def broadcast_like_toggle(broadcast_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()
@@ -2791,7 +2855,7 @@ async def broadcast_like_toggle(broadcast_id: int, request: Request):
 
 
 @app.get("/api/broadcast/{broadcast_id}/comments")
-async def broadcast_get_comments(
+def broadcast_get_comments(
     broadcast_id: int,
     request: Request,
     sort: str = "new",
@@ -2832,7 +2896,7 @@ async def broadcast_get_comments(
 
 
 @app.post("/api/broadcast/{broadcast_id}/comment")
-async def broadcast_post_comment(
+def broadcast_post_comment(
     broadcast_id: int, req: CommentRequest, request: Request
 ):
     user = get_current_user(request)
@@ -2867,7 +2931,7 @@ async def broadcast_post_comment(
 
 
 @app.post("/api/comment/{comment_id}/like")
-async def comment_like_toggle(comment_id: int, request: Request):
+def comment_like_toggle(comment_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()
@@ -2898,7 +2962,7 @@ async def comment_like_toggle(comment_id: int, request: Request):
 
 
 @app.delete("/api/comment/{comment_id}")
-async def comment_delete(comment_id: int, request: Request):
+def comment_delete(comment_id: int, request: Request):
     user = get_current_user(request)
     user_id = int(user["id"])
     conn = _social_db()
@@ -2968,6 +3032,9 @@ async def _settle_round_impl(race_round: int, season: int = None) -> dict:
     race_results = results.get("results", [])
     if not race_results:
         return {"error": "No results", "settled": 0}
+    # Don't auto-settle a red-flagged / barely-started / abandoned race (matches cron).
+    if race_results[0].get("laps", 0) < 10:
+        return {"error": "Race not complete (not enough laps)", "settled": 0}
 
     winner = race_results[0]["driver_number"]
     podium = [r["driver_number"] for r in race_results[:3]]
@@ -3012,23 +3079,19 @@ async def _settle_round_impl(race_round: int, season: int = None) -> dict:
             except (ValueError, TypeError):
                 pass
         elif ptype == "safety_car":
+            if had_safety_car is None:
+                # OpenF1 has no data yet — keep this prediction PENDING and retry
+                # next run instead of wrongly settling it against False.
+                continue
             predicted_yes = pvalue in (True, "yes", "true")
             if predicted_yes == had_safety_car:
                 points, status = PREDICTION_POINTS["safety_car"]["correct"], "correct"
 
-        # Atomic: resolve only if still pending. If the other settle path
-        # already handled it, skip — never double-award points.
-        if not db.resolve_prediction(pred["id"], status, points):
+        # Atomically resolve + award points + streak/stats in ONE transaction.
+        # Returns False if the other settle path already handled it → skip.
+        # Prevents both double-award and a crash leaving a settled-but-unpaid row.
+        if not db.settle_and_award(pred["id"], pred["user_id"], status, points):
             continue
-        if points > 0:
-            db.add_user_points(pred["user_id"], points)
-        if status == "correct":
-            db.execute_write(
-                "UPDATE users SET predictions_correct=predictions_correct+1, streak=streak+1, max_streak=MAX(max_streak,streak+1) WHERE user_id=?",
-                (pred["user_id"],)
-            )
-        elif status == "incorrect":
-            db.execute_write("UPDATE users SET streak=0 WHERE user_id=?", (pred["user_id"],))
 
         db.check_and_award_achievements(pred["user_id"])
         settled += 1

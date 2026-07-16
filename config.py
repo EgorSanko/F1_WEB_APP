@@ -14,7 +14,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", "https://localhost")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 DATABASE_PATH = os.getenv("DATABASE_PATH", "/app/data/f1hub.db")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-VK_SERVICE_KEY = os.getenv("VK_SERVICE_KEY", "24af3a8d24af3a8d24af3a8d4e2791dbde224af24af3a8d4d20f32301ddf2ade9ff84df")
+VK_SERVICE_KEY = os.getenv("VK_SERVICE_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # ============ API URLS ============

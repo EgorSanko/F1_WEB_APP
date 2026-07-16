@@ -369,6 +369,33 @@ def resolve_prediction(prediction_id: int, status: str, points_won: int) -> bool
         return cur.rowcount == 1
 
 
+def settle_and_award(prediction_id: int, user_id: int, status: str, points_won: int) -> bool:
+    """Atomically settle a prediction AND award points + streak/stats in ONE
+    transaction. Points/stats are applied ONLY if THIS call flipped the row from
+    pending (rowcount==1). Prevents (a) a crash between status-flip and points-credit
+    leaving a settled-but-unpaid prediction, and (b) double-award across the two
+    settle processes. Mirrors the cron (settle_predictions.py)."""
+    with get_db() as conn:
+        cur = conn.execute(
+            """UPDATE predictions SET status = ?, points_won = ?, resolved_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND status = 'pending'""",
+            (status, points_won, prediction_id)
+        )
+        if cur.rowcount != 1:
+            return False
+        if points_won > 0:
+            conn.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points_won, user_id))
+        if status == "correct":
+            conn.execute(
+                "UPDATE users SET predictions_correct = predictions_correct + 1, "
+                "streak = streak + 1, max_streak = MAX(max_streak, streak + 1) WHERE user_id = ?",
+                (user_id,)
+            )
+        elif status == "incorrect":
+            conn.execute("UPDATE users SET streak = 0 WHERE user_id = ?", (user_id,))
+        return True
+
+
 # ============ GAME OPERATIONS ============
 
 def record_game(user_id: int, game_type: str, score: int,
@@ -508,19 +535,22 @@ def check_and_award_achievements(user_id: int) -> List[str]:
 # ============ LEADERBOARD ============
 
 def update_leaderboard():
-    """Rebuild the leaderboard cache."""
-    execute_write("DELETE FROM leaderboard_cache")
-    execute_write(
-        """INSERT INTO leaderboard_cache (user_id, username, first_name, photo_url,
-           total_points, correct_predictions, rank, updated_at)
-           SELECT u.user_id, u.username, u.first_name, u.photo_url,
-                  u.points, u.predictions_correct,
-                  ROW_NUMBER() OVER (ORDER BY u.points DESC),
-                  CURRENT_TIMESTAMP
-           FROM users u
-           ORDER BY u.points DESC
-           LIMIT 100"""
-    )
+    """Rebuild the leaderboard cache. DELETE+INSERT in ONE transaction so a
+    concurrent reader never sees an empty board and a failed INSERT can't leave
+    it wiped (rolls back the DELETE too)."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM leaderboard_cache")
+        conn.execute(
+            """INSERT INTO leaderboard_cache (user_id, username, first_name, photo_url,
+               total_points, correct_predictions, rank, updated_at)
+               SELECT u.user_id, u.username, u.first_name, u.photo_url,
+                      u.points, u.predictions_correct,
+                      ROW_NUMBER() OVER (ORDER BY u.points DESC),
+                      CURRENT_TIMESTAMP
+               FROM users u
+               ORDER BY u.points DESC
+               LIMIT 100"""
+        )
 
 
 def get_leaderboard(limit: int = 50) -> List[Dict[str, Any]]:
