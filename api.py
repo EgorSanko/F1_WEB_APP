@@ -10,7 +10,7 @@ import time
 import logging
 import random
 from urllib.parse import unquote
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
@@ -83,10 +83,48 @@ async def lifespan(app: FastAPI):
 
     app.state.prewarm_task = _asyncio.create_task(_prewarm())
 
+    # Background loops.
+    #
+    # These used to be started from @app.on_event("startup") handlers further
+    # down this file. That silently did NOTHING: Starlette ignores on_startup /
+    # on_shutdown entirely when a `lifespan` is passed to FastAPI() (see
+    # starlette.routing.Router.__init__). So push notifications, prediction
+    # auto-settle, thumbnail backfill and the cache refresher were all dead —
+    # no error, no log line, they just never ran. Started here instead.
+    #
+    # The task objects are kept in a list because asyncio only holds weak
+    # references to running tasks; without a strong ref they can be garbage
+    # collected mid-flight.
+    _bg_specs = [
+        ("push", _push_loop),
+        ("auto_settle", _auto_settle_loop),
+        ("thumbnail_backfill", _thumbnail_backfill_loop),
+        ("data_refresh", _force_refresh_loop),
+    ]
+    app.state.bg_tasks = []
+    for _name, _fn in _bg_specs:
+        _t = _asyncio.create_task(_fn(), name=_name)
+        app.state.bg_tasks.append(_t)
+    logger.info("background loops started: %s", ", ".join(n for n, _ in _bg_specs))
+
+    def _bg_done(task: "_asyncio.Task"):
+        # A crashed loop must not die in silence — that is exactly how the
+        # on_event bug stayed invisible for months.
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error("background loop %r died: %r", task.get_name(), exc, exc_info=exc)
+
+    for _t in app.state.bg_tasks:
+        _t.add_done_callback(_bg_done)
+
     try:
         yield
     finally:
         logger.info("F1 Hub API shutting down")
+        for _t in getattr(app.state, "bg_tasks", []):
+            _t.cancel()
         await live_client.shutdown()
         app.state.f1_live_task.cancel()
         try:
@@ -2139,13 +2177,14 @@ async def get_position_chart(round_num: int, season: int = CURRENT_SEASON):
 @app.get("/api/broadcasts")
 async def list_broadcasts(race_round: Optional[int] = None, season: Optional[int] = None, is_live: Optional[bool] = None):
     db.auto_end_stale_broadcasts()
-    return {"broadcasts": db.get_broadcasts(race_round=race_round, season=season, is_live=1 if is_live else None if is_live is None else 0)}
+    rows = db.get_broadcasts(race_round=race_round, season=season, is_live=1 if is_live else None if is_live is None else 0)
+    return {"broadcasts": _use_mirrored_thumbs(rows)}
 
 
 @app.get("/api/broadcasts/live")
 async def live_broadcasts():
     db.auto_end_stale_broadcasts()
-    return {"broadcasts": db.get_live_broadcasts()}
+    return {"broadcasts": _use_mirrored_thumbs(db.get_live_broadcasts())}
 
 
 @app.post("/api/admin/broadcast")
@@ -2248,6 +2287,7 @@ async def resolve_vk_embed(video_url: str) -> str:
     # Fetch the VK video page to extract embed hash
     vk_page_url = f"https://vk.com/video{oid}_{vid}"
     try:
+        import httpx as _httpx  # was referenced without being imported in this scope
         async with _httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
             resp = await client.get(vk_page_url, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -2539,7 +2579,7 @@ async def _had_safety_car_for_round(race_round: int, season: int) -> Optional[bo
             if resp.status_code == 200:
                 rc = resp.json()
                 break
-            await _aio.sleep(2 * (_attempt + 1))  # back off on 429/5xx
+            await _asyncio.sleep(2 * (_attempt + 1))  # back off on 429/5xx
         if not isinstance(rc, list):
             logger.warning(f"SC detection round {race_round}: race_control unavailable")
             return None
@@ -2751,9 +2791,9 @@ async def _push_loop():
         await _asyncio.sleep(60)
 
 
-@app.on_event("startup")
-async def _start_push_loop():
-    _asyncio.create_task(_push_loop())
+# NOTE: the on_event("startup") handler that used to live here was dead code —
+# FastAPI ignores on_startup when a lifespan= is set. This loop is now started
+# from lifespan() at the top of this file.
 
 
 
@@ -3138,9 +3178,9 @@ async def _auto_settle_loop():
         await _asyncio.sleep(600)  # every 10 min
 
 
-@app.on_event("startup")
-async def _start_auto_settle_loop():
-    _asyncio.create_task(_auto_settle_loop())
+# NOTE: the on_event("startup") handler that used to live here was dead code —
+# FastAPI ignores on_startup when a lifespan= is set. This loop is now started
+# from lifespan() at the top of this file.
 
 # ============ BROADCAST THUMBNAIL HELPER ============
 
@@ -3167,6 +3207,95 @@ async def _resolve_thumbnail_url(video_url: str, embed_url: str = None) -> str |
         except Exception:
             pass
     return None
+
+
+# ---- Thumbnail mirroring -------------------------------------------------
+# Covers used to be loaded straight from the provider CDNs on every render.
+# Two problems with that: i.ytimg.com sends max-age=7200, so YouTube covers
+# were re-downloaded every 2 hours, and Rutube serves the FULL-SIZE still —
+# ~370 KB per cover, several per screen. So we mirror each cover to disk once
+# and serve it from our own domain with a 1-year immutable cache.
+#
+# The DB keeps the canonical CDN url; the mirror is a pure cache layer. If a
+# mirrored file is missing the API falls back to the CDN url, so losing
+# data/thumbs/ degrades to the old behaviour instead of breaking covers.
+
+_THUMB_DIR = "/app/data/thumbs"
+# Absolute, not "/thumbs/...": the field used to hold an absolute CDN url and
+# the mobile app feeds it straight to <Image source={{uri}}>, which cannot
+# resolve a site-relative path.
+_THUMB_URL_PREFIX = f"{WEBAPP_URL.rstrip('/')}/thumbs"
+_THUMB_MAX_BYTES = 8 * 1024 * 1024
+
+
+def _thumb_filename(broadcast_id: int, remote_url: str) -> str:
+    ext = ".jpg"
+    for cand in (".jpg", ".jpeg", ".png", ".webp"):
+        if cand in (remote_url or "").lower():
+            ext = cand
+            break
+    return f"{broadcast_id}{ext}"
+
+
+def _use_mirrored_thumbs(rows):
+    """Swap CDN cover urls for locally mirrored ones where the file exists."""
+    import os as _os_
+    out = []
+    for r in rows:
+        d = dict(r)
+        remote = d.get("thumbnail_url")
+        if remote and not remote.startswith(_THUMB_URL_PREFIX):
+            fn = _thumb_filename(d.get("id"), remote)
+            if _os_.path.exists(_os_.path.join(_THUMB_DIR, fn)):
+                d["thumbnail_url"] = f"{_THUMB_URL_PREFIX}/{fn}"
+        out.append(d)
+    return out
+
+
+async def _mirror_one_thumb(broadcast_id: int, remote_url: str) -> bool:
+    """Download a cover to disk once. Returns True if it was fetched now."""
+    import os as _os_, httpx as _httpx_
+    if not remote_url or remote_url.startswith(_THUMB_URL_PREFIX):
+        return False
+    _os_.makedirs(_THUMB_DIR, exist_ok=True)
+    path = _os_.path.join(_THUMB_DIR, _thumb_filename(broadcast_id, remote_url))
+    if _os_.path.exists(path) and _os_.path.getsize(path) > 0:
+        return False
+    try:
+        async with _httpx_.AsyncClient(timeout=20, follow_redirects=True) as client:
+            r = await client.get(remote_url, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code != 200 or not r.content:
+                return False
+            if len(r.content) > _THUMB_MAX_BYTES:
+                return False
+            if not (r.headers.get("content-type", "").startswith("image/")):
+                return False
+            # Write via a temp file so a partial download can never be served.
+            tmp = path + ".part"
+            with open(tmp, "wb") as f:
+                f.write(r.content)
+            _os_.replace(tmp, path)
+            return True
+    except Exception as e:
+        _push_log.warning("thumb mirror failed for %s: %r", broadcast_id, e)
+        return False
+
+
+async def _mirror_broadcast_thumbs() -> int:
+    """Ensure every broadcast with a cover has a local copy."""
+    import sqlite3
+    conn = sqlite3.connect("/app/data/f1hub.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, thumbnail_url FROM broadcasts "
+        "WHERE thumbnail_url IS NOT NULL AND thumbnail_url != ''"
+    ).fetchall()
+    conn.close()
+    n = 0
+    for row in rows:
+        if await _mirror_one_thumb(row["id"], row["thumbnail_url"]):
+            n += 1
+    return n
 
 
 async def _backfill_broadcast_thumbnails():
@@ -3202,21 +3331,24 @@ async def _thumbnail_backfill_loop():
             n = await _backfill_broadcast_thumbnails()
             if n > 0:
                 _push_log.info(f"broadcast thumbnail backfill: {n} updated")
+            m = await _mirror_broadcast_thumbs()
+            if m > 0:
+                _push_log.info(f"broadcast thumbnail mirror: {m} cached locally")
         except Exception as e:
             _push_log.error(f"thumbnail backfill error: {e}")
         await _asyncio.sleep(3600)  # 1 hour
 
 
-@app.on_event("startup")
-async def _start_thumbnail_backfill():
-    _asyncio.create_task(_thumbnail_backfill_loop())
+# NOTE: the on_event("startup") handler that used to live here was dead code —
+# FastAPI ignores on_startup when a lifespan= is set. This loop is now started
+# from lifespan() at the top of this file.
 
 # ============ BACKGROUND DATA REFRESHER ============
 # Periodically force-refresh critical keys so the BACKGROUND task (not users)
 # absorbs upstream fetch latency, and so real data auto-recovers when
 # Ergast/Jolpica returns (re-populating the disk snapshot via cache_set).
 # Between refreshes, cache_get_stale keeps user requests fast even if upstream
-# is down (it refreshes the entry timestamp on serve).
+# is down (it serves the last-known-good value and reports its age).
 
 async def _force_refresh_loop():
     await _asyncio.sleep(40)  # warmup
@@ -3241,6 +3373,6 @@ async def _force_refresh_loop():
         await _asyncio.sleep(600)  # every 10 min
 
 
-@app.on_event("startup")
-async def _start_data_refresh():
-    _asyncio.create_task(_force_refresh_loop())
+# NOTE: the on_event("startup") handler that used to live here was dead code —
+# FastAPI ignores on_startup when a lifespan= is set. This loop is now started
+# from lifespan() at the top of this file.
