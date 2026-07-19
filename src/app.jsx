@@ -1,6 +1,52 @@
 // React hooks from global React (loaded as vendor lib)
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
+// ---- Ленивая подгрузка тяжёлых библиотек -------------------------------
+// chart.min.js (203 КБ), hls.min.js (404 КБ) и plyr.min.js (110 КБ) висели в
+// <head> синхронными тегами: грузились ВСЕМ и ВСЕГДА, хотя нужны только на
+// экранах с графиками и видео. На слабом мобильном это откладывало первый
+// экран. Теперь подгружаются по требованию, один раз, с кэшем промиса.
+const _libs = {};
+const _loadScript = (src) => _libs[src] || (_libs[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = resolve;
+    s.onerror = () => { delete _libs[src]; reject(new Error('не загрузился ' + src)); };
+    document.head.appendChild(s);
+}));
+const _loadCss = (href) => _libs[href] || (_libs[href] = new Promise((resolve) => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href;
+    l.onload = resolve; l.onerror = resolve;   // без стилей плеер всё равно играет
+    document.head.appendChild(l);
+}));
+
+const ensureChart = () => window.Chart
+    ? Promise.resolve()
+    : _loadScript('/static/vendor/chart.min.js');
+const ensureMedia = () => (window.Hls && window.Plyr)
+    ? Promise.resolve()
+    : Promise.all([
+        _loadScript('/static/vendor/hls.min.js'),
+        _loadScript('/static/vendor/plyr.min.js'),
+        _loadCss('/static/vendor/plyr.css'),
+      ]);
+
+// Возвращает true, когда библиотека готова. Эффекты, которым она нужна,
+// обязаны держать этот флаг в зависимостях и выходить, пока он false.
+const useLib = (ensure) => {
+    const [ready, setReady] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        ensure().then(() => { if (alive) setReady(true); })
+                .catch((e) => console.error('lazy lib:', e));
+        return () => { alive = false; };
+    }, []);
+    return ready;
+};
+// ------------------------------------------------------------------------
+
+
 // IS_WEBAPP is replaced at build time by esbuild define
 const IS_WEBAPP = typeof __IS_WEBAPP__ !== 'undefined' ? __IS_WEBAPP__ : true;
 
@@ -1141,6 +1187,7 @@ const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree
 
 // ==== STANDINGS PAGE ====
 const StandingsPage = ({driversStandings, constructorsStandings, season, onRefresh, spoilerFree, onBack}) => {
+    const chartReady = useLib(ensureChart);
     const [tab, setTab] = useState('drivers');
     const [spoilerDismissed, setSpoilerDismissed] = useState(() => localStorage.getItem('f1hub_spoiler_standings_skip') === 'true');
     const showSpoilerWarning = spoilerFree && !spoilerDismissed;
@@ -1163,6 +1210,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
 
     // Points progression chart rendering
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (tab !== 'progress' || !progressData?.drivers?.length || !progressChartRef.current) return;
         if (progressChartInstance.current) progressChartInstance.current.destroy();
         const ctx = progressChartRef.current.getContext('2d');
@@ -1202,7 +1250,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
             },
         });
         return () => { if (progressChartInstance.current) progressChartInstance.current.destroy(); };
-    }, [progressData, tab]);
+    }, [progressData, tab, chartReady]);
 
     const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}?season=${season}`)); };
 
@@ -2380,6 +2428,7 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
 
 // ==== ANALYTICS PAGE ====
 const AnalyticsPage = () => {
+    const chartReady = useLib(ensureChart);
     const [aTab, setATab] = useState('strategy');
     const [strategy, setStrategy] = useState(null);
     const [posChart, setPosChart] = useState(null);
@@ -2481,6 +2530,7 @@ const AnalyticsPage = () => {
 
     // Position chart rendering
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (aTab !== 'positions' || !posChart?.drivers?.length || !posChartRef.current) return;
         if (posChartInstance.current) posChartInstance.current.destroy();
         const ctx = posChartRef.current.getContext('2d');
@@ -2520,10 +2570,11 @@ const AnalyticsPage = () => {
             },
         });
         return () => { if (posChartInstance.current) posChartInstance.current.destroy(); };
-    }, [posChart, aTab]);
+    }, [posChart, aTab, chartReady]);
 
     // Lap times chart rendering
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (aTab !== 'laptimes' || !lapTimes?.drivers?.length || !lapChartRef.current || !selectedDrivers.length) return;
         if (lapChartInstance.current) lapChartInstance.current.destroy();
         const ctx = lapChartRef.current.getContext('2d');
@@ -2579,10 +2630,11 @@ const AnalyticsPage = () => {
             },
         });
         return () => { if (lapChartInstance.current) lapChartInstance.current.destroy(); };
-    }, [lapTimes, aTab, selectedDrivers]);
+    }, [lapTimes, aTab, selectedDrivers, chartReady]);
 
     // Degradation chart rendering
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (aTab !== 'degradation' || !degradation?.drivers?.length || !degChartRef.current || !degDrivers.length) return;
         if (degChartInstance.current) degChartInstance.current.destroy();
         const ctx = degChartRef.current.getContext('2d');
@@ -2650,10 +2702,11 @@ const AnalyticsPage = () => {
             },
         });
         return () => { if (degChartInstance.current) degChartInstance.current.destroy(); };
-    }, [degradation, aTab, degDrivers]);
+    }, [degradation, aTab, degDrivers, chartReady]);
 
     // Race trace chart rendering
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (aTab !== 'racetrace' || !raceTrace?.drivers || !traceChartRef.current || !traceDrivers.length) return;
         if (traceChartInstance.current) traceChartInstance.current.destroy();
         const ctx = traceChartRef.current.getContext('2d');
@@ -2696,7 +2749,7 @@ const AnalyticsPage = () => {
             },
         });
         return () => { if (traceChartInstance.current) traceChartInstance.current.destroy(); };
-    }, [raceTrace, aTab, traceDrivers]);
+    }, [raceTrace, aTab, traceDrivers, chartReady]);
 
     const toggleDriver = (dn) => {
         setSelectedDrivers(prev => prev.includes(dn) ? prev.filter(n => n !== dn) : [...prev, dn].slice(-5));
@@ -2720,6 +2773,7 @@ const AnalyticsPage = () => {
 
     // Telemetry speed chart
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (aTab !== 'telemetry' || !telData?.driver1?.telemetry?.length || !telSpeedRef.current) return;
         if (telSpeedInstance.current) telSpeedInstance.current.destroy();
         const ctx = telSpeedRef.current.getContext('2d');
@@ -2743,7 +2797,7 @@ const AnalyticsPage = () => {
             },
         });
         return () => { if (telSpeedInstance.current) telSpeedInstance.current.destroy(); };
-    }, [telData, aTab]);
+    }, [telData, aTab, chartReady]);
 
     // Weather radar animation
     useEffect(() => {
@@ -3255,7 +3309,9 @@ const F1VideoPlayer = ({src, title, poster, streamType}) => {
     const playerRef = useRef(null);
     const hlsRef = useRef(null);
 
+    const mediaReady = useLib(ensureMedia);
     useEffect(() => {
+        if (!mediaReady) return;   // ждём ленивую библиотеку
         const video = videoRef.current;
         if (!video || !src) return;
         const tgApp = window.Telegram?.WebApp;
@@ -3340,7 +3396,7 @@ const F1VideoPlayer = ({src, title, poster, streamType}) => {
             hookFS(p);
             return () => { playerRef.current?.destroy?.(); };
         }
-    }, [src, streamType]);
+    }, [src, streamType, mediaReady]);
 
     return (
         <div style={{width:'100%',marginBottom:12}}>
@@ -3703,6 +3759,7 @@ const RacePodium = ({items}) => {
 };
 
 const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab}) => {
+    const chartReady = useLib(ensureChart);
     const [tyreData, setTyreData] = useState(null);
     const [tyreLoading, setTyreLoading] = useState(false);
     const [revealed, setRevealed] = useState(false);
@@ -3752,6 +3809,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
 
     // Position chart rendering effect
     useEffect(() => {
+        if (!chartReady) return;   // ждём ленивую библиотеку
         if (!posChart?.drivers?.length || !posChartRef.current || raceTab !== 'race') return;
         if (posChartInstance.current) posChartInstance.current.destroy();
         const ctx = posChartRef.current.getContext('2d');
@@ -3809,7 +3867,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             }
         });
         return () => { if (posChartInstance.current) posChartInstance.current.destroy(); };
-    }, [posChart, raceTab]);
+    }, [posChart, raceTab, chartReady]);
 
     if (!race) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка гран-при..."/></div>;
 
