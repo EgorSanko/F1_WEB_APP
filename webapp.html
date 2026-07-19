@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>F1 Hub</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- SDK Telegram хостим у себя: с telegram.org он render-блокирующий и у части
+         РФ-операторов подвисает -> мини-приложение показывает пустой экран.
+         Обновлять вручную при смене версии SDK. -->
+    <script src="/static/vendor/telegram-web-app.js?v=20260719"></script>
     <script src="/static/vendor/react.min.js"></script>
     <script src="/static/vendor/react-dom.min.js"></script>
     <script src="/static/vendor/chart.min.js"></script>
