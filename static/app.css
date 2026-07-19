@@ -77,7 +77,11 @@ body { background:var(--f1-darker); color:var(--f1-text); font-family:'Titillium
 .fade-in { animation:fadeIn 0.35s ease-out; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-.page-container { height:100dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+/* Без -webkit-overflow-scrolling:touch. На iOS оно выносит скроллер в отдельный
+   слой композитинга, и position:fixed ВНУТРИ него начинает считаться от этого
+   контейнера, а не от экрана — из-за чего оверлеи переставали накрывать
+   .bottom-nav. Свойство устарело: с iOS 13 инерционный скролл и так по умолчанию. */
+.page-container { height:100dvh; overflow-y:auto; }
 .page-container:not(.flex-layout)::after { content:''; display:block; height:80px; flex-shrink:0; }
 
 .standings-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--f1-border); transition:background 0.15s; }

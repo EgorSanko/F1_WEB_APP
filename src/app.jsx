@@ -1619,8 +1619,50 @@ const DriverPickRow = ({d, isSelected, rank, onClick, disabled}) => {
     );
 };
 
+// Оверлей, вынесенный прямо в <body>.
+//
+// Зачем: .page-container — это скроллер с -webkit-overflow-scrolling:touch.
+// На iOS такой скроллер уезжает в собственный слой композитинга, и любой
+// position:fixed ВНУТРИ него начинает считаться от контейнера, а не от экрана:
+// оверлей перестаёт накрывать .bottom-nav, и нижняя часть (кнопка отправки)
+// оказывается под навбаром и не нажимается. В Chrome/Android этого не видно.
+// Тот же приём уже используется для полноэкранного плеера ниже по файлу.
+const BodyPortal = ({children}) => {
+    const elRef = useRef(null);
+    if (!elRef.current) elRef.current = document.createElement('div');
+    useEffect(() => {
+        const el = elRef.current;
+        document.body.appendChild(el);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';   // фон не скроллится под модалкой
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            if (el.parentNode) el.parentNode.removeChild(el);
+        };
+    }, []);
+    return ReactDOM.createPortal(children, elRef.current);
+};
+
+// Высота РЕАЛЬНО видимой области в Telegram.
+// На iOS window.innerHeight (и 100dvh) бывает больше видимой части — низ
+// перекрыт панелью/зоной жестов Telegram. Тогда нижний край fixed-оверлея
+// уезжает за экран и кнопка «не всплывает». Telegram отдаёт стабильную
+// высоту — берём её, если она есть, иначе остаёмся на прежнем поведении.
+const useTgViewportHeight = () => {
+    const [h, setH] = useState(() => (tg && tg.viewportStableHeight) || null);
+    useEffect(() => {
+        if (!tg || !tg.onEvent) return;
+        const upd = () => setH(tg.viewportStableHeight || null);
+        tg.onEvent('viewportChanged', upd);
+        upd();
+        return () => { try { tg.offEvent('viewportChanged', upd); } catch (e) {} };
+    }, []);
+    return h;
+};
+
 // Полноэкранная форма прогноза — как Modal в приложении
 const PredictForm = ({info, drivers, raceRound, onClose, onDone}) => {
+    const tgViewportH = useTgViewportHeight();
     const [pick, setPick] = useState(null);
     const [podium, setPodium] = useState([]);
     const [dnf, setDnf] = useState('');
@@ -1649,7 +1691,10 @@ const PredictForm = ({info, drivers, raceRound, onClose, onDone}) => {
     };
 
     return (
-        <div style={{position:'fixed',inset:0,zIndex:2000,background:'var(--f1-darker)',display:'flex',flexDirection:'column'}}>
+        <BodyPortal>
+        <div style={{position:'fixed',top:0,left:0,right:0,
+                     ...(tgViewportH ? {height:tgViewportH} : {bottom:0}),
+                     zIndex:2000,background:'var(--f1-darker)',display:'flex',flexDirection:'column'}}>
             <div style={{display:'flex',alignItems:'center',padding:'14px 12px 6px'}}>
                 <button onClick={onClose} style={{width:44,height:44,background:'none',border:'none',color:'var(--f1-text)',fontSize:24,cursor:'pointer',fontFamily:'inherit'}}>{'‹'}</button>
                 <div style={{flex:1,textAlign:'center',fontSize:18,fontWeight:700}}>{info.label}</div>
@@ -1728,6 +1773,7 @@ const PredictForm = ({info, drivers, raceRound, onClose, onDone}) => {
                 </button>
             </div>
         </div>
+        </BodyPortal>
     );
 };
 
