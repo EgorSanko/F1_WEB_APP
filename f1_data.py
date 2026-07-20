@@ -741,13 +741,18 @@ RACE_NAMES_RU = {
     "Madrid Grand Prix": "Гран-при Мадрида",
 }
 
+# Фолбэк на случай, если Ergast/Jolpica ещё не заполнил sprint-сессии для
+# будущих гонок. ДОЛЖЕН отражать календарь спринтов ИМЕННО этого сезона.
+# Спринты F1 2026 (6): Китай, Майами, Канада, Британия, Нидерланды, Сингапур.
+# Раньше здесь по ошибке лежал календарь 2025 (spa/americas/losail/interlagos),
+# из-за чего Бельгия, США, Катар и Бразилия ложно помечались спринт-уикендом.
 SPRINT_ROUNDS_2026 = {
-    "shanghai": True,
-    "miami": True,
-    "spa": True,
-    "americas": True,
-    "losail": True,
-    "interlagos": True,
+    "shanghai": True,     # R2  Китай
+    "miami": True,        # R4  Майами
+    "villeneuve": True,   # R5  Канада
+    "silverstone": True,  # R9  Британия
+    "zandvoort": True,    # R12 Нидерланды
+    "marina_bay": True,   # R16 Сингапур
 }
 
 CIRCUIT_COUNTRIES = {
