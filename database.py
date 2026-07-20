@@ -492,7 +492,7 @@ def check_and_award_achievements(user_id: int) -> List[str]:
     if user["points"] >= 500:
         if unlock_achievement(user_id, "points_500"):
             newly_unlocked.append("points_500")
-    if user["points"] >= 1000:
+    if user["points"] >= 750:   # порог снижен с 1000: потолок сезона был 705
         if unlock_achievement(user_id, "points_1000"):
             newly_unlocked.append("points_1000")
 
@@ -504,14 +504,19 @@ def check_and_award_achievements(user_id: int) -> List[str]:
         if unlock_achievement(user_id, "first_win"):
             newly_unlocked.append("first_win")
 
-    # Streak-based
-    if user["streak"] >= 3:
+    # Streak-based. По max_streak (лучшая серия за всё время), а НЕ по текущему
+    # streak: текущий обнуляется первым же промахом, поэтому в момент проверки он
+    # почти всегда 0 — достижение не выдавалось, даже когда серия реально была.
+    # Пороги снижены (2/3/4 вместо 3/5/10): при 5 прогнозах на гонку длинные
+    # серии correct практически недостижимы (потолок сезона был 4).
+    best_streak = max(user.get("max_streak", 0) or 0, user.get("streak", 0) or 0)
+    if best_streak >= 2:
         if unlock_achievement(user_id, "streak_3"):
             newly_unlocked.append("streak_3")
-    if user["streak"] >= 5:
+    if best_streak >= 3:
         if unlock_achievement(user_id, "streak_5"):
             newly_unlocked.append("streak_5")
-    if user["streak"] >= 10:
+    if best_streak >= 4:
         if unlock_achievement(user_id, "streak_10"):
             newly_unlocked.append("streak_10")
 
@@ -528,6 +533,18 @@ def check_and_award_achievements(user_id: int) -> List[str]:
     if len(pred_types) >= 5:
         if unlock_achievement(user_id, "all_predictions"):
             newly_unlocked.append("all_predictions")
+
+    # Perfect podium — раньше НЕ проверялось нигде (мёртвое достижение). Выдаём
+    # за подиум-прогноз, где угадано минимум 2 из 3: points_won>=30 (2_of_3=30,
+    # all_3=100; 1_of_3=10 не считается).
+    podium_hit = execute_one(
+        "SELECT 1 FROM predictions WHERE user_id = ? AND prediction_type = 'podium' "
+        "AND points_won >= 30 LIMIT 1",
+        (user_id,)
+    )
+    if podium_hit:
+        if unlock_achievement(user_id, "perfect_podium"):
+            newly_unlocked.append("perfect_podium")
 
     return newly_unlocked
 
