@@ -2208,6 +2208,17 @@ async def admin_upsert_broadcast(req: BroadcastRequest, request: Request):
         created_by=tg_user["id"],
     )
 
+    # Обложку ставим СРАЗУ при добавлении, не ждём часовой фоновый цикл:
+    # для YouTube резолв мгновенный (из URL), для Rutube — один API-запрос.
+    # Иначе только что добавленное видео висит без обложки до часа.
+    try:
+        thumb = await _resolve_thumbnail_url(video_url, embed_url)
+        if thumb:
+            db.execute_write("UPDATE broadcasts SET thumbnail_url=? WHERE id=?", (thumb, bid))
+            await _mirror_one_thumb(bid, thumb)
+    except Exception as e:
+        _push_log.warning("inline thumbnail for broadcast %s failed: %r", bid, e)
+
     # Push "обзор выложен" only for review-type broadcasts (and non-live)
     if req.session_type == "review" and not req.is_live:
         try:
