@@ -860,6 +860,14 @@ async def get_schedule(season: int = CURRENT_SEASON):
     return await f1_data.get_schedule(season=season)
 
 
+@app.get("/api/weather/{round_num}")
+async def get_weather(round_num: int, season: int = CURRENT_SEASON):
+    """Per-session weekend weather forecast (Open-Meteo). Lazy-cached 3h.
+    Never raises: on any issue returns {"available": false} so the race card
+    degrades gracefully instead of failing."""
+    return await f1_data.get_race_weather(round_num, season=season)
+
+
 @app.get("/api/race/next")
 async def get_next_race(season: int = CURRENT_SEASON):
     return await f1_data.get_next_race(season=season)

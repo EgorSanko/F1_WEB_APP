@@ -833,6 +833,135 @@ def translate_race_control(message: str) -> str:
     return message
 
 
+# ============ WEATHER (Open-Meteo — free, no key, RF-reachable) ============
+
+OPENMETEO_API = "https://api.open-meteo.com/v1/forecast"
+# Open-Meteo covers ~16 days ahead. Sessions further out get available:false.
+WEATHER_HORIZON_DAYS = 16
+# Session render order for the weekend block.
+_WEATHER_SESSION_ORDER = [
+    "fp1", "fp2", "fp3", "sprint_qualifying", "sprint", "qualifying", "race",
+]
+
+
+async def get_race_weather(round_num: int, season: int = None) -> Dict[str, Any]:
+    """Per-session weather forecast for a Grand Prix weekend via Open-Meteo.
+
+    Coordinates come from the already-enriched schedule (lat/lng), session
+    times from schedule.sessions. We request the forecast in UTC so hourly
+    labels match our UTC session times exactly. Cached 3h in-memory; on
+    upstream failure we serve the last good copy (stale) and never let a
+    weather hiccup break the race card ({"available": false} worst case).
+    """
+    s = season or CURRENT_SEASON
+    cache_key = f"forecast:{s}:{round_num}"
+    cached = cache_get(cache_key, ttl_override=10800)  # 3 hours
+    if cached:
+        return cached
+
+    sched = await get_schedule(s)
+    race = next((r for r in sched.get("races", []) if r.get("round") == round_num), None)
+    if not race:
+        return {"available": False, "reason": "race_not_found", "round": round_num, "sessions": {}}
+    lat, lon = race.get("lat"), race.get("lng")
+    if lat in (None, "") or lon in (None, ""):
+        return {"available": False, "reason": "no_coords", "round": round_num, "sessions": {}}
+
+    now = datetime.utcnow()
+    client = get_client()
+    try:
+        resp = await client.get(OPENMETEO_API, params={
+            "latitude": lat, "longitude": lon,
+            "hourly": "temperature_2m,precipitation_probability,precipitation,wind_speed_10m,weather_code",
+            "timezone": "UTC", "forecast_days": WEATHER_HORIZON_DAYS,
+        })
+        if resp.status_code != 200:
+            raise RuntimeError(f"open-meteo HTTP {resp.status_code}")
+        data = resp.json()
+    except Exception as e:
+        logger.warning(f"weather fetch failed for round {round_num}: {e}")
+        stale = _stale_payload(cache_key)
+        if stale is not None:
+            return stale
+        return {"available": False, "reason": "upstream_down", "round": round_num, "sessions": {}}
+
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    parsed = []
+    for i, t in enumerate(times):
+        try:
+            parsed.append((datetime.fromisoformat(t), i))
+        except (ValueError, TypeError):
+            pass
+    if not parsed:
+        return {"available": False, "reason": "no_data", "round": round_num, "sessions": {}}
+    first_dt, last_dt = parsed[0][0], parsed[-1][0]
+    hour_index = {pdt.strftime("%Y-%m-%dT%H"): i for pdt, i in parsed}
+
+    def nearest_idx(dt_utc):
+        key = dt_utc.strftime("%Y-%m-%dT%H")
+        if key in hour_index:
+            return hour_index[key]
+        best_i, best_d = None, None
+        for pdt, i in parsed:
+            d = abs((pdt - dt_utc).total_seconds())
+            if best_d is None or d < best_d:
+                best_d, best_i = d, i
+        return best_i
+
+    def val(field, i):
+        arr = hourly.get(field) or []
+        return arr[i] if 0 <= i < len(arr) else None
+
+    sessions = race.get("sessions") or {}
+    out = {}
+    for key in _WEATHER_SESSION_ORDER:
+        sv = sessions.get(key)
+        if not sv or not sv.get("date"):
+            continue
+        try:
+            dt = datetime.fromisoformat(f"{sv['date']}T{(sv.get('time') or '12:00:00Z').replace('Z','')}")
+        except (ValueError, TypeError):
+            continue
+        if dt > last_dt + timedelta(hours=1):
+            out[key] = {"available": False, "reason": "too_far"}
+            continue
+        if dt < first_dt - timedelta(hours=1):
+            out[key] = {"available": False, "reason": "past"}
+            continue
+        i = nearest_idx(dt)
+        if i is None:
+            out[key] = {"available": False, "reason": "no_match"}
+            continue
+        temp = val("temperature_2m", i)
+        wind = val("wind_speed_10m", i)
+        precip = val("precipitation", i)
+        rain_p = val("precipitation_probability", i)
+        out[key] = {
+            "available": True,
+            "datetime": dt.isoformat() + "Z",
+            "temp_c": round(temp) if temp is not None else None,
+            "rain_prob": int(rain_p) if rain_p is not None else None,
+            "precip_mm": round(precip, 1) if precip is not None else None,
+            "wind_kmh": round(wind) if wind is not None else None,
+            "code": val("weather_code", i),
+        }
+
+    result = {
+        "available": True,
+        "round": round_num,
+        "season": s,
+        "circuit": race.get("circuit"),
+        "name": race.get("name"),
+        "locality": race.get("locality"),
+        "country_code": race.get("country_code"),
+        "sessions": out,
+        "updated": now.isoformat() + "Z",
+    }
+    cache_set(cache_key, result)
+    return result
+
+
 async def get_schedule(season: int = None) -> Dict[str, Any]:
     """Get full season schedule with enriched data."""
     s = season or CURRENT_SEASON

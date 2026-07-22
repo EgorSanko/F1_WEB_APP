@@ -3758,6 +3758,71 @@ const RacePodium = ({items}) => {
     );
 };
 
+// Погода на уикенд (Open-Meteo) — прямая подсказка для игры прогнозов:
+// мокрая квала/гонка = хаос, значит стоит ставить осторожнее.
+const weatherEmoji = (code) => {
+    if (code == null) return '❓';
+    if (code <= 1) return '☀️';
+    if (code <= 3) return '⛅';
+    if (code <= 48) return '🌫️';
+    if (code <= 67) return '🌧️';
+    if (code <= 77) return '🌨️';
+    if (code <= 82) return '🌧️';
+    if (code >= 95) return '⛈️';
+    return '⛅';
+};
+const RaceWeather = ({round, season}) => {
+    const [wx, setWx] = useState(null);
+    const [failed, setFailed] = useState(false);
+    useEffect(() => {
+        if (round == null) return;
+        let alive = true;
+        api.get(`/api/weather/${round}?season=${season}`)
+           .then(d => { if (alive) setWx(d || {}); })
+           .catch(() => { if (alive) setFailed(true); });
+        return () => { alive = false; };
+    }, [round, season]);
+    if (failed) return null;                       // погода не должна ломать карточку
+    if (!wx) return <div className="skeleton" style={{height:120,borderRadius:16,marginBottom:16}}/>;
+    const names = {fp1:'Практика 1',fp2:'Практика 2',fp3:'Практика 3',qualifying:'Квалификация',race:'Гонка',sprint:'Спринт',sprint_qualifying:'Спринт-квалификация'};
+    const order = ['fp1','sprint_qualifying','fp2','fp3','sprint','qualifying','race'];
+    const entries = order.filter(k => wx.sessions && wx.sessions[k]).map(k => [k, wx.sessions[k]]);
+    if (!entries.length) return null;
+    return (
+        <div style={{marginBottom:16}}>
+            <div style={{display:'flex',alignItems:'center',marginBottom:10,paddingLeft:2}}>
+                <div style={{width:3,height:16,background:'var(--f1-red)',borderRadius:2,marginRight:10}}/>
+                <div style={{fontSize:13,fontWeight:800,letterSpacing:2,textTransform:'uppercase'}}>Погода на уикенд</div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {entries.map(([key, s]) => {
+                    if (!s || !s.available) return (
+                        <div key={key} style={{display:'flex',alignItems:'center',padding:'12px 14px',borderRadius:14,background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',opacity:0.55}}>
+                            <div style={{flex:1,fontSize:14,fontWeight:600}}>{names[key]||key}</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',textAlign:'right'}}>прогноз появится ближе к уикенду</div>
+                        </div>
+                    );
+                    const wet = (key==='qualifying' || key==='race') && (s.rain_prob||0) >= 40;
+                    return (
+                        <div key={key} style={{padding:'12px 14px',borderRadius:14,background:wet?'rgba(90,130,255,0.10)':'var(--f1-card-solid)',border:'1px solid '+(wet?'rgba(100,140,255,0.5)':'var(--f1-border)')}}>
+                            <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <div style={{fontSize:26,lineHeight:'26px'}}>{weatherEmoji(s.code)}</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:14,fontWeight:700}}>{names[key]||key}</div>
+                                    <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginTop:2}}>
+                                        {s.temp_c!=null?`${s.temp_c}° · `:''}дождь {s.rain_prob!=null?s.rain_prob:'—'}% · ветер {s.wind_kmh!=null?s.wind_kmh:'—'} км/ч
+                                    </div>
+                                </div>
+                            </div>
+                            {wet && <div style={{marginTop:8,fontSize:11,fontWeight:800,color:'#7C9BFF',letterSpacing:0.2}}>🌧️ Возможен дождь — непредсказуемая сессия!</div>}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab}) => {
     const chartReady = useLib(ensureChart);
     const [tyreData, setTyreData] = useState(null);
@@ -3979,6 +4044,11 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
                     </div>
                 );
             })()}
+
+            {/* Прогноз погоды на сессии — только для предстоящих гонок */}
+            {race.sessions && !race.podium && !raceResults && race.round != null && (
+                <RaceWeather round={race.round} season={season}/>
+            )}
 
             {/* Spoiler reveal button */}
             {isSpoilerHidden && (
