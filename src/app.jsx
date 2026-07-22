@@ -293,6 +293,52 @@ const DriverPhoto = ({url, size=32, style:s={}}) => (
 );
 
 // ==== HOME PAGE ====
+// «В этот день в F1» + история трассы (Ergast, вечнозелёный контент).
+// Самонаполняется: если сегодня в истории гонок не было — показываем, кто
+// побеждал на трассе следующего ГП, так карточка не бывает пустой.
+const F1History = ({circuitId}) => {
+    const [today, setToday] = useState(null);
+    const [circ, setCirc] = useState(null);
+    useEffect(() => {
+        let a = true;
+        api.get('/api/history/on-this-day').then(d => { if (a) setToday(d || {events:[]}); }).catch(() => { if (a) setToday({events:[]}); });
+        return () => { a = false; };
+    }, []);
+    useEffect(() => {
+        if (!circuitId) return;
+        let a = true;
+        api.get('/api/history/circuit/' + circuitId).then(d => { if (a) setCirc(d); }).catch(() => {});
+        return () => { a = false; };
+    }, [circuitId]);
+    if (!today) return null;
+    const events = today.events || [];
+    const useToday = events.length > 0;
+    const rows = useToday
+        ? events.slice(0,5).map(e => ({year:e.season, who:e.winner, label:e.race}))
+        : (circ && circ.winners ? circ.winners : []).slice(0,5).map(w => ({year:w.season, who:w.winner, label:w.race}));
+    if (!rows.length) return null;
+    const title = useToday ? 'В этот день в F1' : ('Побеждали на трассе' + (circ && circ.circuit ? ' · ' + circ.circuit : ''));
+    const sub = (!useToday && circ && circ.most_wins) ? `Рекорд: ${circ.most_wins.driver} — ${circ.most_wins.wins} побед` : null;
+    return (
+        <div className="card" style={{padding:'16px 12px'}}>
+            <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:sub?4:10}}>{title}</div>
+            {sub && <div style={{fontSize:12,color:'var(--f1-red)',fontWeight:700,marginBottom:10}}>{sub}</div>}
+            <div style={{display:'flex',flexDirection:'column'}}>
+                {rows.map((r,i) => (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 4px',borderBottom:i<rows.length-1?'1px solid var(--f1-border)':'none'}}>
+                        <div style={{color:'var(--f1-red)',fontSize:18,fontWeight:900,minWidth:52,fontVariantNumeric:'tabular-nums'}}>{r.year}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.who}</div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.label}</div>
+                        </div>
+                        <span style={{fontSize:18}}>{'🏆'}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, schedule, onChange, season, onSeasonChange, spoilerFree, onToggleSpoiler, onRaceClick, onRefresh, liveBroadcasts}) => {
     const ptr = usePullToRefresh(onRefresh);
     const [homeNews, setHomeNews] = useState(null);
@@ -364,6 +410,9 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                     </div>
                 </div>
             )}
+
+            {/* В этот день в F1 / история трассы */}
+            <F1History circuitId={nextRace?.circuit_id}/>
 
             {/* Upcoming races */}
             {schedule?.races && (() => {

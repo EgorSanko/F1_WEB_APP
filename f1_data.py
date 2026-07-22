@@ -962,6 +962,87 @@ async def get_race_weather(round_num: int, season: int = None) -> Dict[str, Any]
     return result
 
 
+# ============ F1 HISTORY (Ergast winners — «в этот день» + рекорды трасс) ============
+# Один датасет (все победители гонок 1950→) питает обе фичи. Тянется ~12
+# запросами раз в сутки, дальше всё из кэша (данные растут на 1 за уикенд).
+
+async def get_f1_history() -> List[Dict[str, Any]]:
+    """All race winners across F1 history (compact). Cached 24h in-memory."""
+    cache_key = "history:winners"
+    cached = cache_get(cache_key, ttl_override=86400)
+    if cached is not None:
+        return cached
+
+    client = get_client()
+    winners = []
+    offset, total, page = 0, None, 100
+    try:
+        while total is None or offset < total:
+            r = await client.get(
+                f"{ERGAST_API}/results/1.json",
+                params={"limit": page, "offset": offset},
+            )
+            if r.status_code != 200:
+                raise RuntimeError(f"ergast HTTP {r.status_code}")
+            md = r.json().get("MRData", {})
+            total = int(md.get("total", 0))
+            races = md.get("RaceTable", {}).get("Races", [])
+            if not races:
+                break
+            for race in races:
+                res = (race.get("Results") or [{}])[0]
+                drv = res.get("Driver", {})
+                con = res.get("Constructor", {})
+                winners.append({
+                    "season": race.get("season"),
+                    "round": race.get("round"),
+                    "date": race.get("date"),               # YYYY-MM-DD
+                    "race": race.get("raceName"),
+                    "circuit_id": race.get("Circuit", {}).get("circuitId"),
+                    "circuit": race.get("Circuit", {}).get("circuitName"),
+                    "winner": f"{drv.get('givenName','')} {drv.get('familyName','')}".strip(),
+                    "winner_code": drv.get("code"),
+                    "constructor": con.get("name"),
+                })
+            offset += page
+    except Exception as e:
+        logger.warning(f"f1 history fetch failed at offset {offset}: {e}")
+        stale = cache_get_stale(cache_key)
+        if stale is not None:
+            return stale[0]
+        return winners  # partial is better than nothing
+
+    cache_set(cache_key, winners)
+    return winners
+
+
+async def get_on_this_day(md_key: str = None) -> Dict[str, Any]:
+    """Races that happened on this calendar day (MM-DD) across history."""
+    winners = await get_f1_history()
+    if not md_key:
+        md_key = datetime.utcnow().strftime("%m-%d")
+    items = [w for w in winners if (w.get("date") or "")[5:] == md_key]
+    items.sort(key=lambda w: w.get("date") or "", reverse=True)
+    return {"day": md_key, "count": len(items), "events": items}
+
+
+async def get_circuit_history(circuit_id: str) -> Dict[str, Any]:
+    """Past winners at a circuit + who won here most (track record card)."""
+    winners = await get_f1_history()
+    here = [w for w in winners if w.get("circuit_id") == circuit_id]
+    here.sort(key=lambda w: w.get("date") or "", reverse=True)
+    from collections import Counter
+    by_driver = Counter(w["winner"] for w in here if w.get("winner"))
+    top = by_driver.most_common(1)
+    return {
+        "circuit_id": circuit_id,
+        "circuit": here[0]["circuit"] if here else None,
+        "total_races": len(here),
+        "most_wins": ({"driver": top[0][0], "wins": top[0][1]} if top else None),
+        "winners": here[:12],
+    }
+
+
 async def get_schedule(season: int = None) -> Dict[str, Any]:
     """Get full season schedule with enriched data."""
     s = season or CURRENT_SEASON

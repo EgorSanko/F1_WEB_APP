@@ -868,6 +868,19 @@ async def get_weather(round_num: int, season: int = CURRENT_SEASON):
     return await f1_data.get_race_weather(round_num, season=season)
 
 
+@app.get("/api/history/on-this-day")
+async def history_on_this_day(day: str = None):
+    """Гонки, прошедшие в этот календарный день (MM-DD) за всю историю F1.
+    day опционален (для теста), по умолчанию — сегодня по UTC."""
+    return await f1_data.get_on_this_day(md_key=day)
+
+
+@app.get("/api/history/circuit/{circuit_id}")
+async def history_circuit(circuit_id: str):
+    """Победители на этой трассе за историю + кто выигрывал чаще всех."""
+    return await f1_data.get_circuit_history(circuit_id)
+
+
 @app.get("/api/race/next")
 async def get_next_race(season: int = CURRENT_SEASON):
     return await f1_data.get_next_race(season=season)
