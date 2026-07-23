@@ -14,7 +14,13 @@
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
 html, body, #root { height:100dvh; overflow:hidden; }
-body { background:var(--f1-darker); color:var(--f1-text); font-family:'Titillium Web','Segoe UI',system-ui,-apple-system,sans-serif; overflow-x:hidden; }
+body { background:var(--f1-darker); color:var(--f1-text); font-family:'Exo 2','Titillium Web','Segoe UI',system-ui,-apple-system,sans-serif; overflow-x:hidden; }
+/* ===== Racing type system =====
+   Exo 2 (кириллица, 400-900) — весь UI; Russo One — дисплей: заголовки
+   страниц, имена, гигантские цифры. Titillium (без кириллицы!) остаётся
+   фолбэком для латиницы. */
+h1, h2, h3, .f1-display, .countdown-num { font-family:'Russo One','Exo 2',sans-serif; font-weight:400; letter-spacing:0.3px; }
+h1, h2 { text-transform:uppercase; }
 
 ::-webkit-scrollbar { width:3px; }
 ::-webkit-scrollbar-track { background:transparent; }
@@ -218,3 +224,6 @@ body { background:var(--f1-darker); color:var(--f1-text); font-family:'Titillium
 .vid-thumb img { width:100%; height:100%; object-fit:cover; }
 .vid-badge { position:absolute; left:8px; top:8px; color:white; font-size:9px; font-weight:800; letter-spacing:1px; padding:3px 7px; border-radius:5px; }
 .vid-play { position:absolute; left:8px; bottom:8px; width:30px; height:30px; border-radius:50%; border:2px solid; color:white; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; font-size:11px; }
+
+/* racing tail: Russo One одновесный — гасим поздние font-weight:900 */
+.countdown-num { font-weight:400; }

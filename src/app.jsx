@@ -1322,15 +1322,15 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                 {/* HERO: фото во весь экран, градиент от цвета команды (эстетика концепта) */}
                 <div style={{position:'relative',minHeight:480,overflow:'hidden',background:`linear-gradient(180deg, ${d.team_color}66 0%, ${d.team_color}22 40%, var(--f1-dark) 88%)`}}>
                     {/* гигантский номер как фоновая графика */}
-                    <div style={{position:'absolute',top:-10,right:-6,fontSize:190,fontWeight:900,lineHeight:1,color:'rgba(255,255,255,0.07)',pointerEvents:'none',fontVariantNumeric:'tabular-nums'}}>{d.driver_number}</div>
+                    <div style={{position:'absolute',top:-10,right:-6,fontSize:190,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1,color:'rgba(255,255,255,0.07)',pointerEvents:'none'}}>{d.driver_number}</div>
                     {heroPhoto && <img src={heroPhoto} alt="" onError={e=>{if(d.card_photo_url&&e.target.src!==hiResImg(d.card_photo_url,800)){e.target.src=hiResImg(d.card_photo_url,800);}else{e.target.style.display='none';}}}
                         style={{position:'absolute',right:-14,bottom:0,width:'72%',maxWidth:360,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 18px 40px rgba(0,0,0,0.55))',pointerEvents:'none'}}/>}
                     <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 55%, var(--f1-dark) 96%)',pointerEvents:'none'}}/>
                     <div style={{position:'relative',zIndex:2,padding:'14px 16px',display:'flex',flexDirection:'column',minHeight:480}}>
                         <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{alignSelf:'flex-start',background:'rgba(0,0,0,0.35)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:999,padding:'8px 16px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
                         <div style={{marginTop:'auto'}}>
-                            <div style={{fontSize:22,fontWeight:400,lineHeight:1.05,letterSpacing:-0.5,opacity:0.9}}>{d.first_name}</div>
-                            <div style={{fontSize:52,fontWeight:900,lineHeight:1,letterSpacing:-1.5,marginTop:2}}>{d.last_name}</div>
+                            <div style={{fontSize:20,fontWeight:500,lineHeight:1.05,letterSpacing:0.5,opacity:0.9}}>{d.first_name}</div>
+                            <div style={{fontSize:38,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',lineHeight:1.08,letterSpacing:0.5,marginTop:4}}>{d.last_name}</div>
                             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,color:'var(--f1-text-secondary)'}}>
                                 <span>{flagEmoji(d.country)}</span>
                                 <span style={{opacity:0.4}}>·</span>
@@ -1340,12 +1340,12 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                                 <div style={{display:'flex',alignItems:'flex-end',gap:22,marginTop:18}}>
                                     <div>
                                         <div style={{fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)',marginBottom:2}}>Очки</div>
-                                        <div style={{fontSize:46,fontWeight:900,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{ptsInt}{ptsFrac>0&&<span style={{color:'var(--f1-text-muted)',fontSize:26}}>.{ptsFrac}</span>}</div>
+                                        <div style={{fontSize:42,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}>{ptsInt}{ptsFrac>0&&<span style={{color:'var(--f1-text-muted)',fontSize:24}}>.{ptsFrac}</span>}</div>
                                     </div>
                                     {champPos && (
                                         <div>
                                             <div style={{fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)',marginBottom:2}}>В зачёте</div>
-                                            <div style={{fontSize:46,fontWeight:900,lineHeight:1,fontVariantNumeric:'tabular-nums'}}><span style={{color:d.team_color}}>P</span>{champPos}</div>
+                                            <div style={{fontSize:42,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}><span style={{color:d.team_color}}>P</span>{champPos}</div>
                                         </div>
                                     )}
                                 </div>
@@ -1358,7 +1358,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                     {/* Спеки в стиле концепта: мелкий uppercase-лейбл + крупное значение */}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
                         {[{val:stats.wins,label:'Побед'},{val:stats.podiums,label:'Подиумов'},{val:stats.best_finish?`P${stats.best_finish}`:'—',label:'Лучший финиш'},{val:stats.dnfs,label:'Сходов'}].map((s,i)=>(
-                            <div key={i} className="card" style={{textAlign:'center',padding:'12px 6px'}}><div style={{fontSize:24,fontWeight:900,fontVariantNumeric:'tabular-nums'}}>{s.val}</div><div style={{fontSize:9,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'var(--f1-text-muted)',marginTop:3}}>{s.label}</div></div>
+                            <div key={i} className="card" style={{textAlign:'center',padding:'12px 6px'}}><div style={{fontSize:22,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif"}}>{s.val}</div><div style={{fontSize:9,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'var(--f1-text-muted)',marginTop:3}}>{s.label}</div></div>
                         ))}
                     </div>
                     <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Результаты сезона</div>
