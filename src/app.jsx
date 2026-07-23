@@ -179,15 +179,41 @@ const usePullToRefresh = (onRefresh) => {
 };
 
 // ==== SVG NAV ICONS ====
+// Авторский набор пиктограмм: единый сток 1.7, скруглённые окончания,
+// без библиотечных форм (Material/Hero выдают «дешёвый» интерфейс).
+// Профиль — гоночный шлем, «видео» — мягкий пусковой клин, аналитика — темп-бары.
+const _ic = (children) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+);
 const NavIcons = {
-    home: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>,
-    calendar: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/></svg>,
-    trophy: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>,
-    play: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>,
-    user: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>,
-    news: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H6v-2h3v2zm0-4H6v-2h3v2zm0-4H6V7h3v2zm9 8h-7v-2h7v2zm0-4h-7v-2h7v2zm0-4h-7V7h7v2z"/></svg>,
-    analytics: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>,
+    home: _ic(<><path d="M4.5 11.2 12 4.8l7.5 6.4"/><path d="M6.5 10.2v8.6a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-8.6"/></>),
+    calendar: _ic(<><rect x="4.2" y="6" width="15.6" height="13.6" rx="2.6"/><path d="M4.5 10.6h15M9 4v3.4M15 4v3.4"/></>),
+    trophy: _ic(<><path d="M8.2 4.6h7.6v4.6a3.8 3.8 0 0 1-7.6 0z"/><path d="M8.2 6.4H6a2.2 2.2 0 0 0 2.3 3.4M15.8 6.4H18a2.2 2.2 0 0 1-2.3 3.4"/><path d="M12 13v3.6M8.8 19.4h6.4"/></>),
+    play: _ic(<path d="M9.2 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.25 5.97 9.2 6.55 9.2 7.5z"/>),
+    user: _ic(<><path d="M4.8 14.2a7.2 7.2 0 0 1 14.4 0v2.2a2.2 2.2 0 0 1-2.2 2.2H7a2.2 2.2 0 0 1-2.2-2.2z"/><path d="M11.4 12.6h7.6"/></>),
+    news: _ic(<><rect x="4.2" y="5" width="15.6" height="15" rx="2.4"/><path d="M7.6 9.2h5.2M7.6 12.6h8.8M7.6 16h8.8"/></>),
+    analytics: _ic(<path d="M6.2 19v-5.4M12 19V5.8M17.8 19v-8.6"/>),
 }
+
+// ==== TEAM ATMOSPHERES ====
+// Не сырой team_color, а художественная палитра: глубокий многостоповый
+// градиент (как на постерах команд) + цвет «света» за пилотом.
+const TEAM_ATMOS = {
+    'Ferrari':         {bg:'linear-gradient(165deg,#3a060d 0%,#7a0f1d 34%,#2b0509 72%,#120409 100%)', glow:'rgba(255,70,60,0.30)'},
+    'Mercedes':        {bg:'linear-gradient(165deg,#032220 0%,#0b4f46 36%,#02201c 74%,#050c0b 100%)', glow:'rgba(0,235,200,0.22)'},
+    'McLaren':         {bg:'linear-gradient(165deg,#1d0e03 0%,#8a4a00 36%,#3a1c04 72%,#140a03 100%)', glow:'rgba(255,150,20,0.26)'},
+    'Red Bull Racing': {bg:'linear-gradient(165deg,#050c26 0%,#1e2f6e 38%,#080e2c 74%,#04071a 100%)', glow:'rgba(90,130,255,0.24)'},
+    'Aston Martin':    {bg:'linear-gradient(165deg,#02231c 0%,#0b5c46 38%,#032018 74%,#020f0b 100%)', glow:'rgba(0,210,160,0.20)'},
+    'Alpine':          {bg:'linear-gradient(165deg,#04122e 0%,#14418f 38%,#071531 74%,#040a1a 100%)', glow:'rgba(255,110,180,0.16)'},
+    'Williams':        {bg:'linear-gradient(165deg,#03102b 0%,#0e3f8f 38%,#051433 74%,#030a1c 100%)', glow:'rgba(70,150,255,0.24)'},
+    'Haas':            {bg:'linear-gradient(165deg,#141419 0%,#4a4f5a 38%,#1a1a20 74%,#0d0d11 100%)', glow:'rgba(235,235,245,0.16)'},
+    'Audi':            {bg:'linear-gradient(165deg,#0a0f0d 0%,#1e3d2d 38%,#0b1510 74%,#070a08 100%)', glow:'rgba(60,255,150,0.16)'},
+    'Racing Bulls':    {bg:'linear-gradient(165deg,#0a0e2a 0%,#32418f 38%,#0d1233 74%,#060920 100%)', glow:'rgba(130,150,255,0.20)'},
+    'Cadillac':        {bg:'linear-gradient(165deg,#0d0d10 0%,#3d3524 38%,#15130d 74%,#0a0a0c 100%)', glow:'rgba(215,180,80,0.18)'},
+};
+const teamAtmos = (team, color) => TEAM_ATMOS[team] || {bg:`linear-gradient(165deg, ${color||'#333'}66 0%, ${color||'#333'}22 40%, var(--f1-dark) 88%)`, glow:'rgba(255,255,255,0.10)'};
+// Зерно плёнки: лёгкий SVG-шум для глубины фона (mix-blend overlay).
+const NOISE_URI = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.55'/></svg>\")";
 
 // ==== SKELETON ====
 const Skeleton = ({w='100%',h='16px',r='8px',className=''}) => <div className={`skeleton ${className}`} style={{width:w,height:h,borderRadius:r}}/>;
@@ -1317,20 +1343,28 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
         const heroPhoto = (d.photo_url && d.photo_url.includes('c_fill,g_north,ar_1:1,w_200'))
             ? d.photo_url.replace('c_fill,g_north,ar_1:1,w_200', 'c_fill,g_north,w_640,h_800')
             : (d.photo_url_large || (d.card_photo_url ? hiResImg(d.card_photo_url, 800) : null));
+        const atmos = teamAtmos(d.team, d.team_color);
         return (
             <div className="page-container fade-in" style={{padding:0}}>
-                {/* HERO: фото во весь экран, градиент от цвета команды (эстетика концепта) */}
-                <div style={{position:'relative',minHeight:480,overflow:'hidden',background:`linear-gradient(180deg, ${d.team_color}66 0%, ${d.team_color}22 40%, var(--f1-dark) 88%)`}}>
-                    {/* гигантский номер как фоновая графика */}
-                    <div style={{position:'absolute',top:-10,right:-6,fontSize:190,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1,color:'rgba(255,255,255,0.07)',pointerEvents:'none'}}>{d.driver_number}</div>
+                {/* HERO-постер: атмосфера команды → свет → номер → пилот → зерно/виньетка → текст ПОВЕРХ фото */}
+                <div style={{position:'relative',minHeight:500,overflow:'hidden',background:atmos.bg}}>
+                    {/* свет за пилотом */}
+                    <div style={{position:'absolute',inset:0,background:`radial-gradient(62% 46% at 68% 28%, ${atmos.glow}, transparent 72%)`,pointerEvents:'none'}}/>
+                    {/* гигантский номер — графика, не текст */}
+                    <div style={{position:'absolute',top:-18,right:-10,fontSize:230,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1,color:'rgba(255,255,255,0.08)',pointerEvents:'none'}}>{d.driver_number}</div>
                     {heroPhoto && <img src={heroPhoto} alt="" onError={e=>{if(d.card_photo_url&&e.target.src!==hiResImg(d.card_photo_url,800)){e.target.src=hiResImg(d.card_photo_url,800);}else{e.target.style.display='none';}}}
-                        style={{position:'absolute',right:-14,bottom:0,width:'72%',maxWidth:360,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 18px 40px rgba(0,0,0,0.55))',pointerEvents:'none'}}/>}
-                    <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 55%, var(--f1-dark) 96%)',pointerEvents:'none'}}/>
-                    <div style={{position:'relative',zIndex:2,padding:'14px 16px',display:'flex',flexDirection:'column',minHeight:480}}>
+                        style={{position:'absolute',right:-18,bottom:0,width:'76%',maxWidth:380,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 22px 44px rgba(0,0,0,0.6)) saturate(1.06) contrast(1.04)',pointerEvents:'none',zIndex:1}}/>}
+                    {/* зерно плёнки */}
+                    <div style={{position:'absolute',inset:0,backgroundImage:NOISE_URI,opacity:0.05,mixBlendMode:'overlay',pointerEvents:'none',zIndex:2}}/>
+                    {/* виньетка + переход в тёмный низ */}
+                    <div style={{position:'absolute',inset:0,background:'radial-gradient(130% 95% at 50% 34%, transparent 52%, rgba(0,0,0,0.42) 100%)',pointerEvents:'none',zIndex:2}}/>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 58%, var(--f1-dark) 97%)',pointerEvents:'none',zIndex:2}}/>
+                    <div style={{position:'relative',zIndex:3,padding:'14px 16px',display:'flex',flexDirection:'column',minHeight:500}}>
                         <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{alignSelf:'flex-start',background:'rgba(0,0,0,0.35)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:999,padding:'8px 16px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
                         <div style={{marginTop:'auto'}}>
-                            <div style={{fontSize:20,fontWeight:500,lineHeight:1.05,letterSpacing:0.5,opacity:0.9}}>{d.first_name}</div>
-                            <div style={{fontSize:38,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',lineHeight:1.08,letterSpacing:0.5,marginTop:4}}>{d.last_name}</div>
+                            <div style={{fontSize:19,fontWeight:500,lineHeight:1.05,letterSpacing:2.5,textTransform:'uppercase',opacity:0.85}}>{d.first_name}</div>
+                            {/* Фамилия — часть композиции: крупнее и ЗАХОДИТ на фото */}
+                            <div style={{fontSize:46,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',lineHeight:1.02,letterSpacing:0.5,marginTop:4,textShadow:'0 4px 30px rgba(0,0,0,0.45)',whiteSpace:'nowrap'}}>{d.last_name}</div>
                             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,color:'var(--f1-text-secondary)'}}>
                                 <span>{flagEmoji(d.country)}</span>
                                 <span style={{opacity:0.4}}>·</span>
