@@ -453,7 +453,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             {lastRace && lastRace.results && !spoilerFree && (
                 <div className="card" style={{padding:'16px 12px'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5}}>🏁 Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
+                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5}}>Последний результат · {lastRace.name?.replace('Grand Prix','ГП')}</div>
                         <div onClick={()=>onChange('standings')} style={{color:'var(--f1-red)',fontSize:11,fontWeight:800,letterSpacing:1,cursor:'pointer',whiteSpace:'nowrap'}}>ЧЕМПИОНАТ {'\u203a'}</div>
                     </div>
                     {/* Podium — positions 2, 1, 3 */}
@@ -496,7 +496,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             {/* Championship top-3 — bigger photos */}
             {standings?.not_started && (
                 <div className="card" style={{padding:'20px 16px',textAlign:'center'}}>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
+                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Чемпионат пилотов</div>
                     <div style={{fontSize:32,marginBottom:8}}>🏁</div>
                     <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Сезон {season} ещё не начался</div>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Результаты появятся после первой гонки</div>
@@ -504,7 +504,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             )}
             {standings?.standings && !spoilerFree && (
                 <div className="card" style={{padding:'16px 12px'}}>
-                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>🏆 Чемпионат пилотов</div>
+                    <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Чемпионат пилотов</div>
                     {standings.standings.slice(0,3).map((s,i)=>(
                         <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:i<2?'1px solid var(--f1-border)':'none'}}>
                             <div style={{fontSize:20,fontWeight:900,color:['#FFD700','#C0C0C0','#CD7F32'][i],minWidth:24,textAlign:'center'}}>{s.position}</div>
@@ -546,22 +546,22 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                 </div>
             )}
 
+            {/* Быстрые плитки — грамматика f1.com: акцент-полоска + Russo-лейбл,
+                без эмодзи (они читались «несерьёзно») */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                <div className="gradient-card" onClick={()=>onChange('predict')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(225,6,0,0.15),var(--f1-card))'}}>
-                    <div style={{fontSize:28}}>&#x1F52E;</div>
-                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Прогнозы</div>
-                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Угадай</div>
-                </div>
-                <div className="gradient-card" onClick={()=>onChange('games')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(255,128,0,0.15),var(--f1-card))'}}>
-                    <div style={{fontSize:28}}>🎮</div>
-                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Игры</div>
-                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Пит-стоп, реакция</div>
-                </div>
-                <div className="gradient-card" onClick={()=>onChange('schedule')} style={{textAlign:'center',cursor:'pointer',padding:'18px 8px',background:'linear-gradient(135deg,rgba(102,146,255,0.15),var(--f1-card))'}}>
-                    <div style={{fontSize:28}}>📅</div>
-                    <div style={{fontSize:13,fontWeight:700,marginTop:4}}>Календарь</div>
-                    <div style={{fontSize:10,color:'var(--f1-text-muted)'}}>Все гонки</div>
-                </div>
+                {[
+                    {id:'predict', color:'var(--f1-red)', label:'Прогнозы', sub:'Угадай победителя'},
+                    {id:'games',   color:'#FF8000',       label:'Игры',     sub:'Пит-стоп, реакция'},
+                    {id:'schedule',color:'#6692FF',       label:'Календарь',sub:'Все гонки'},
+                ].map(t => (
+                    <div key={t.id} className="gradient-card" onClick={()=>onChange(t.id)}
+                         style={{position:'relative',cursor:'pointer',padding:'16px 12px 12px',background:'var(--f1-card-solid)',overflow:'hidden'}}>
+                        <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:t.color}}/>
+                        <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:13,textTransform:'uppercase',letterSpacing:0.5,lineHeight:1.2}}>{t.label}</div>
+                        <div style={{fontSize:9.5,color:'var(--f1-text-muted)',marginTop:3,lineHeight:1.3}}>{t.sub}</div>
+                        <div style={{marginTop:8,color:t.color,fontSize:14,fontWeight:700}}>{'→'}</div>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -3718,7 +3718,7 @@ const AdminBroadcastPanel = ({userId}) => {
 
     return (
         <div className="card" style={{marginBottom:16}}>
-            <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>📺 Управление трансляциями</div>
+            <div style={{fontSize:11,color:'var(--f1-red)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Управление трансляциями</div>
 
             {/* Add form */}
             <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16,padding:12,background:'rgba(255,255,255,0.04)',borderRadius:10}}>
@@ -4057,7 +4057,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16,lineHeight:1.5}}>Результаты этого гран-при скрыты.<br/>Вкладка «Запись» доступна без спойлеров.</div>
                     <div style={{display:'flex',gap:8,justifyContent:'center'}}>
                         <button onClick={()=>setRevealed(true)} style={{padding:'10px 24px',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'var(--f1-red)',color:'white'}}>Показать результаты</button>
-                        {broadcastData && <button onClick={()=>setRaceTab('broadcast')} style={{padding:'10px 24px',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-secondary)'}}>📺 Запись</button>}
+                        {broadcastData && <button onClick={()=>setRaceTab('broadcast')} style={{padding:'10px 24px',borderRadius:10,border:'none',fontFamily:'inherit',fontWeight:700,fontSize:14,cursor:'pointer',background:'rgba(255,255,255,0.08)',color:'var(--f1-text-secondary)'}}>Запись</button>}
                     </div>
                 </div>
             )}
@@ -4173,7 +4173,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             {race.sprint_top_10?.length > 0 && (
                 <div className="card" style={{padding:'16px 12px', marginBottom:16}}>
                     <div style={{filter:isSpoilerHidden?'blur(15px)':'none',transition:'filter 0.3s',pointerEvents:isSpoilerHidden?'none':'auto'}}>
-                    <div style={{fontSize:11,color:'#FF8000',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>🏁 Спринт · Топ-10</div>
+                    <div style={{fontSize:11,color:'#FF8000',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Спринт · Топ-10</div>
                     {race.sprint_top_10.map((d, i) => (
                         <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<race.sprint_top_10.length-1?'1px solid var(--f1-border)':'none'}}>
                             <PosBadge pos={d.position}/>
@@ -4944,7 +4944,7 @@ const GamesPage = ({onChange}) => {
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-                <h2 style={{fontSize:22,fontWeight:900}}>🎮 Мини-игры</h2>
+                <h2 style={{fontSize:22,fontWeight:900}}>Мини-игры</h2>
                 {onChange && <div onClick={()=>onChange('home')} style={{cursor:'pointer',fontSize:13,color:'var(--f1-text-muted)'}}>← Главная</div>}
             </div>
             {games.map(g => {

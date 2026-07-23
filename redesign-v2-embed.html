@@ -5,6 +5,7 @@
 <title>F1 HUB</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="/static/fonts/manrope.css">
+<link rel="stylesheet" href="/static/fonts.css?v=9d9b94b7">
 <style>
 :root{
   --bg:#15151E;            /* dark navy base, not pure black */
@@ -302,6 +303,60 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#2a2a35;border-radius:0}
 ::-webkit-scrollbar-thumb:hover{background:#3a3a48}
+
+/* ============================================================
+   Brainwave-полировка (аддитивный слой, палитра на бренде F1).
+   Градиентные рамки на карточках, hover-свечение, бенто-ритм
+   быстрых кнопок, вертикальные рейлы секций. Легко откатывается —
+   удалить этот блок целиком.
+   ============================================================ */
+:root{ --bw-grad: conic-gradient(from 210deg, #E10600, #FF7A4D, #7C5CFF, #FF3CAC, #E10600); }
+
+/* Общий приём: 1px градиентная рамка через ::before + mask.
+   Тоньше по умолчанию, ярче + свечение на hover. */
+.news-card, .quick-row a, .podium-3 .card, .driver-pair .card,
+.editor-feature, .editor-list .it{ position:relative; }
+.news-card::before, .quick-row a::before, .podium-3 .card::before,
+.driver-pair .card::before, .editor-feature::before, .editor-list .it::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; z-index:4;
+  background:var(--bw-grad); opacity:.28; pointer-events:none;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  transition:opacity .22s ease;
+}
+.news-card:hover::before, .quick-row a:hover::before, .podium-3 .card:hover::before,
+.driver-pair .card:hover::before, .editor-feature:hover::before, .editor-list .it:hover::before{ opacity:.85; }
+
+/* Hover-свечение (тонированная тень) поверх существующего подъёма */
+.news-card:hover, .podium-3 .card:hover, .driver-pair .card:hover, .editor-feature:hover{
+  box-shadow:0 16px 44px rgba(0,0,0,.5), 0 0 34px rgba(225,6,0,.16);
+}
+
+/* Быстрые кнопки → бенто-плитки: чуть выше, градиентная рамка всегда видна,
+   шахматное смещение чётных (фирменный бенто-ритм Brainwave) */
+.quick-row a{ padding:20px; border-color:transparent; transition:transform .2s ease, background .2s ease, box-shadow .2s ease; }
+.quick-row a:hover{ transform:translateY(-3px); box-shadow:0 14px 34px rgba(0,0,0,.45), 0 0 28px rgba(225,6,0,.18); }
+@media(min-width:901px){ .quick-row a:nth-child(even){ transform:translateY(16px); }
+  .quick-row a:nth-child(even):hover{ transform:translateY(13px); } }
+
+/* Вертикальные рейлы секций — тонкий техно-скелет по краям контента */
+body::before, body::after{
+  content:''; position:fixed; top:0; bottom:0; width:1px; z-index:3; pointer-events:none;
+  background:linear-gradient(180deg, transparent, rgba(255,255,255,.08) 14%, rgba(255,255,255,.08) 86%, transparent);
+}
+body::before{ left:max(20px, calc((100vw - 1280px)/2 + 4px)); }
+body::after{  right:max(20px, calc((100vw - 1280px)/2 + 4px)); }
+@media(max-width:1360px){ body::before, body::after{ display:none; } }
+
+/* Дисплейные заголовки — чуть плотнее трекинг */
+.hero h1{ letter-spacing:-.03em; }
+
+/* ===== Racing type system (как в webapp): Exo 2 — UI, Russo One — дисплей ===== */
+html,body{font-family:'Exo 2','Manrope',ui-sans-serif,system-ui,sans-serif}
+.h-display,.hero h1{font-family:'Russo One','Exo 2',sans-serif;font-weight:400;letter-spacing:.2px}
+.h-section{font-family:'Russo One','Exo 2',sans-serif;font-weight:400}
+.podium-3 .card .pos,.driver-pair .card .no,
+.podium-3 .card .info .pts .num,.driver-pair .card .info .pts .num{font-family:'Russo One','Exo 2',sans-serif;font-weight:400}
 </style>
 <script src="/static/vendor/react.min.js" crossorigin></script>
 <script src="/static/vendor/react-dom.min.js" crossorigin></script>
