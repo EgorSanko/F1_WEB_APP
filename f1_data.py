@@ -1017,10 +1017,15 @@ async def get_f1_history() -> List[Dict[str, Any]]:
 
 
 async def get_on_this_day(md_key: str = None) -> Dict[str, Any]:
-    """Races that happened on this calendar day (MM-DD) across history."""
+    """Races that happened on this calendar day (MM-DD) across history.
+
+    «Сегодня» считаем по МСК (UTC+3), как и всё остальное в приложении
+    (расписание сессий показывается в МСК): иначе с полуночи до 03:00 МСК
+    карточка показывала вчерашний день — Егор это заметил как «данные залипли».
+    """
     winners = await get_f1_history()
     if not md_key:
-        md_key = datetime.utcnow().strftime("%m-%d")
+        md_key = (datetime.utcnow() + timedelta(hours=3)).strftime("%m-%d")
     items = [w for w in winners if (w.get("date") or "")[5:] == md_key]
     items.sort(key=lambda w: w.get("date") or "", reverse=True)
     return {"day": md_key, "count": len(items), "events": items}
