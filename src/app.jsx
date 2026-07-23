@@ -1311,7 +1311,12 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
         // Очки: целая часть гигантская, дробная приглушена (приём из концепта)
         const ptsInt = stats ? Math.trunc(stats.points) : 0;
         const ptsFrac = stats ? Math.round((stats.points - ptsInt) * 10) : 0;
-        const heroPhoto = d.photo_url_large || (d.card_photo_url ? hiResImg(d.card_photo_url, 800) : null);
+        // Вырезанный по контуру портрет (transparent webp с нового F1 CDN):
+        // берём photo_url и меняем transform на кроп по грудь. Альфа-канал при
+        // c_fill сохраняется (проверено). Фолбэк — старый jpg с фоном.
+        const heroPhoto = (d.photo_url && d.photo_url.includes('c_fill,g_north,ar_1:1,w_200'))
+            ? d.photo_url.replace('c_fill,g_north,ar_1:1,w_200', 'c_fill,g_north,w_640,h_800')
+            : (d.photo_url_large || (d.card_photo_url ? hiResImg(d.card_photo_url, 800) : null));
         return (
             <div className="page-container fade-in" style={{padding:0}}>
                 {/* HERO: фото во весь экран, градиент от цвета команды (эстетика концепта) */}
@@ -1319,11 +1324,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                     {/* гигантский номер как фоновая графика */}
                     <div style={{position:'absolute',top:-10,right:-6,fontSize:190,fontWeight:900,lineHeight:1,color:'rgba(255,255,255,0.07)',pointerEvents:'none',fontVariantNumeric:'tabular-nums'}}>{d.driver_number}</div>
                     {heroPhoto && <img src={heroPhoto} alt="" onError={e=>{if(d.card_photo_url&&e.target.src!==hiResImg(d.card_photo_url,800)){e.target.src=hiResImg(d.card_photo_url,800);}else{e.target.style.display='none';}}}
-                        style={{position:'absolute',right:-20,bottom:0,width:'78%',maxWidth:380,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 18px 40px rgba(0,0,0,0.5))',pointerEvents:'none',
-                                WebkitMaskImage:'linear-gradient(90deg, transparent 0%, #000 30%), linear-gradient(180deg, transparent 2%, #000 32%)',
-                                WebkitMaskComposite:'source-in',
-                                maskImage:'linear-gradient(90deg, transparent 0%, #000 30%), linear-gradient(180deg, transparent 2%, #000 32%)',
-                                maskComposite:'intersect'}}/>}
+                        style={{position:'absolute',right:-14,bottom:0,width:'72%',maxWidth:360,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 18px 40px rgba(0,0,0,0.55))',pointerEvents:'none'}}/>}
                     <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 55%, var(--f1-dark) 96%)',pointerEvents:'none'}}/>
                     <div style={{position:'relative',zIndex:2,padding:'14px 16px',display:'flex',flexDirection:'column',minHeight:480}}>
                         <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{alignSelf:'flex-start',background:'rgba(0,0,0,0.35)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:999,padding:'8px 16px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
