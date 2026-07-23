@@ -1331,88 +1331,80 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
 
     if (selectedDriver && driverDetail) {
         const d = driverDetail, stats = d.season_stats;
-        // Позиция в чемпионате — из уже загруженного зачёта
-        const champIdx = driversStandings?.standings?.findIndex(s=>s.driver_number===d.driver_number);
+        const champIdx = driversStandings?.standings?.findIndex(x=>x.driver_number===d.driver_number);
         const champPos = (champIdx != null && champIdx >= 0) ? champIdx + 1 : null;
-        // Очки: целая часть гигантская, дробная приглушена (приём из концепта)
         const ptsInt = stats ? Math.trunc(stats.points) : 0;
-        const ptsFrac = stats ? Math.round((stats.points - ptsInt) * 10) : 0;
-        // Вырезанный по контуру портрет (transparent webp с нового F1 CDN):
-        // берём photo_url и меняем transform на кроп по грудь. Альфа-канал при
-        // c_fill сохраняется (проверено). Фолбэк — старый jpg с фоном.
-        const heroPhoto = (d.photo_url && d.photo_url.includes('c_fill,g_north,ar_1:1,w_200'))
-            ? d.photo_url.replace('c_fill,g_north,ar_1:1,w_200', 'c_fill,g_north,w_640,h_800')
-            : (d.photo_url_large || (d.card_photo_url ? hiResImg(d.card_photo_url, 800) : null));
         const atmos = teamAtmos(d.team, d.team_color);
+        // Крупный кроп по пояс: пилот занимает почти весь экран
+        const heroPhoto = (d.photo_url && d.photo_url.includes('c_fill,g_north,ar_1:1,w_200'))
+            ? d.photo_url.replace('c_fill,g_north,ar_1:1,w_200', 'c_fill,g_north,w_720,h_1000')
+            : (d.photo_url_large || (d.card_photo_url ? hiResImg(d.card_photo_url, 800) : null));
+        // Стат-лента интегрирована в постер: числа + hairline-сепараторы, НИКАКИХ карточек
+        const heroStats = stats ? [
+            {v: ptsInt, l: 'Очки'},
+            champPos ? {v: <span><span style={{color:d.team_color}}>P</span>{champPos}</span>, l: 'В зачёте'} : null,
+            {v: stats.wins, l: 'Побед'},
+            {v: stats.podiums, l: 'Подиумов'},
+        ].filter(Boolean) : [];
         return (
             <div className="page-container fade-in" style={{padding:0}}>
-                {/* HERO-постер: атмосфера команды → свет → номер → пилот → зерно/виньетка → текст ПОВЕРХ фото */}
-                <div style={{position:'relative',minHeight:500,overflow:'hidden',background:atmos.bg}}>
-                    {/* свет за пилотом */}
-                    <div style={{position:'absolute',inset:0,background:`radial-gradient(62% 46% at 68% 28%, ${atmos.glow}, transparent 72%)`,pointerEvents:'none'}}/>
-                    {/* гигантский номер — графика, не текст */}
-                    <div style={{position:'absolute',top:-18,right:-10,fontSize:230,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1,color:'rgba(255,255,255,0.08)',pointerEvents:'none'}}>{d.driver_number}</div>
+                {/* ПОСТЕР: экран построен вокруг пилота, данные — поверх композиции */}
+                <div style={{position:'relative',minHeight:'86vh',overflow:'hidden',background:atmos.bg,display:'flex',flexDirection:'column'}}>
+                    <div style={{position:'absolute',inset:0,background:`radial-gradient(70% 52% at 62% 26%, ${atmos.glow}, transparent 74%)`,pointerEvents:'none'}}/>
+                    {/* Номер — обрезается краем экрана: графика, не текст */}
+                    <div style={{position:'absolute',top:-54,left:-30,fontSize:300,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1,color:'rgba(255,255,255,0.075)',pointerEvents:'none',letterSpacing:-8}}>{d.driver_number}</div>
+                    {/* Пилот — почти весь экран, уходит за правый край */}
                     {heroPhoto && <img src={heroPhoto} alt="" onError={e=>{if(d.card_photo_url&&e.target.src!==hiResImg(d.card_photo_url,800)){e.target.src=hiResImg(d.card_photo_url,800);}else{e.target.style.display='none';}}}
-                        style={{position:'absolute',right:-18,bottom:0,width:'76%',maxWidth:380,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 22px 44px rgba(0,0,0,0.6)) saturate(1.06) contrast(1.04)',pointerEvents:'none',zIndex:1}}/>}
-                    {/* зерно плёнки */}
+                        style={{position:'absolute',right:'-14%',bottom:0,width:'98%',maxWidth:470,objectFit:'contain',objectPosition:'bottom right',filter:'drop-shadow(0 26px 50px rgba(0,0,0,0.6)) saturate(1.06) contrast(1.04)',pointerEvents:'none',zIndex:1}}/>}
                     <div style={{position:'absolute',inset:0,backgroundImage:NOISE_URI,opacity:0.05,mixBlendMode:'overlay',pointerEvents:'none',zIndex:2}}/>
-                    {/* виньетка + переход в тёмный низ */}
-                    <div style={{position:'absolute',inset:0,background:'radial-gradient(130% 95% at 50% 34%, transparent 52%, rgba(0,0,0,0.42) 100%)',pointerEvents:'none',zIndex:2}}/>
-                    <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 58%, var(--f1-dark) 97%)',pointerEvents:'none',zIndex:2}}/>
-                    <div style={{position:'relative',zIndex:3,padding:'14px 16px',display:'flex',flexDirection:'column',minHeight:500}}>
-                        <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{alignSelf:'flex-start',background:'rgba(0,0,0,0.35)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:999,padding:'8px 16px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
-                        <div style={{marginTop:'auto'}}>
-                            <div style={{fontSize:19,fontWeight:500,lineHeight:1.05,letterSpacing:2.5,textTransform:'uppercase',opacity:0.85}}>{d.first_name}</div>
-                            {/* Фамилия — часть композиции: крупнее и ЗАХОДИТ на фото */}
-                            <div style={{fontSize:46,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',lineHeight:1.02,letterSpacing:0.5,marginTop:4,textShadow:'0 4px 30px rgba(0,0,0,0.45)',whiteSpace:'nowrap'}}>{d.last_name}</div>
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,color:'var(--f1-text-secondary)'}}>
-                                <span>{flagEmoji(d.country)}</span>
-                                <span style={{opacity:0.4}}>·</span>
-                                <span style={{color:d.team_color,fontWeight:700}}>{d.team}</span>
-                            </div>
-                            {stats && (
-                                <div style={{display:'flex',alignItems:'flex-end',gap:22,marginTop:18}}>
-                                    <div>
-                                        <div style={{fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)',marginBottom:2}}>Очки</div>
-                                        <div style={{fontSize:42,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}>{ptsInt}{ptsFrac>0&&<span style={{color:'var(--f1-text-muted)',fontSize:24}}>.{ptsFrac}</span>}</div>
-                                    </div>
-                                    {champPos && (
-                                        <div>
-                                            <div style={{fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)',marginBottom:2}}>В зачёте</div>
-                                            <div style={{fontSize:42,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}><span style={{color:d.team_color}}>P</span>{champPos}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                    <div style={{position:'absolute',inset:0,background:'radial-gradient(135% 100% at 50% 30%, transparent 50%, rgba(0,0,0,0.5) 100%)',pointerEvents:'none',zIndex:2}}/>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 52%, rgba(5,5,10,0.55) 78%, var(--f1-dark) 100%)',pointerEvents:'none',zIndex:2}}/>
+                    <button onClick={()=>{setSelectedDriver(null);setDriverDetail(null);}} style={{position:'absolute',top:14,left:16,zIndex:4,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:999,padding:'8px 16px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
+                    {/* Композиция низа: команда → имя (поверх пилота) → интегрированная стата */}
+                    <div style={{position:'relative',zIndex:3,marginTop:'auto',padding:'0 0 18px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 20px'}}>
+                            <div style={{width:26,height:3,background:d.team_color,borderRadius:2}}/>
+                            <div style={{fontSize:12,fontWeight:800,letterSpacing:3,textTransform:'uppercase',color:'rgba(255,255,255,0.85)'}}>{d.team}</div>
                         </div>
+                        <div style={{padding:'10px 20px 0',fontSize:18,fontWeight:300,letterSpacing:6,textTransform:'uppercase',opacity:0.8}}>{d.first_name}</div>
+                        <div style={{padding:'2px 0 0 20px',fontSize:'clamp(44px, 13.5vw, 62px)',fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',lineHeight:1.0,whiteSpace:'nowrap',textShadow:'0 6px 34px rgba(0,0,0,0.5)'}}>{d.last_name}</div>
+                        {heroStats.length > 0 && (
+                            <div style={{display:'flex',margin:'26px 20px 0',borderTop:'1px solid rgba(255,255,255,0.16)'}}>
+                                {heroStats.map((x,i)=>(
+                                    <div key={i} style={{flex:1,padding:'12px 0 0',borderLeft:i?'1px solid rgba(255,255,255,0.12)':'none',textAlign:i?'center':'left',paddingLeft:i?0:2}}>
+                                        <div style={{fontSize:26,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}>{x.v}</div>
+                                        <div style={{fontSize:8.5,fontWeight:700,letterSpacing:1.6,textTransform:'uppercase',color:'rgba(255,255,255,0.5)',marginTop:5}}>{x.l}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
-                <div style={{padding:'16px'}}>
-                {stats && (<>
-                    {/* Спеки в стиле концепта: мелкий uppercase-лейбл + крупное значение */}
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:16}}>
-                        {[{val:stats.wins,label:'Побед'},{val:stats.podiums,label:'Подиумов'},{val:stats.best_finish?`P${stats.best_finish}`:'—',label:'Лучший финиш'},{val:stats.dnfs,label:'Сходов'}].map((s,i)=>(
-                            <div key={i} className="card" style={{textAlign:'center',padding:'12px 6px'}}><div style={{fontSize:22,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif"}}>{s.val}</div><div style={{fontSize:9,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'var(--f1-text-muted)',marginTop:3}}>{s.label}</div></div>
-                        ))}
-                    </div>
-                    <div className="card"><div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:10}}>Результаты сезона</div>
-                        {stats.results?.map((r,i)=>(
-                            <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:i<stats.results.length-1?'1px solid var(--f1-border)':'none'}}>
-                                <span style={{width:30,fontSize:11,color:'var(--f1-text-muted)'}}>R{r.round}</span><span style={{flex:1,fontSize:13}}>{r.race?.replace('Grand Prix','ГП')}</span><PosBadge pos={r.position}/><span style={{width:36,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
+                {/* Результаты — лента, не карточка */}
+                {stats?.results?.length > 0 && (
+                    <div style={{padding:'26px 20px 6px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:6}}>
+                            <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Сезон {season}</div>
+                            <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
+                        </div>
+                        {stats.results.map((r,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 0',borderBottom:i<stats.results.length-1?'1px solid rgba(255,255,255,0.06)':'none'}}>
+                                <span style={{width:34,fontSize:11,color:'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>R{r.round}</span>
+                                <span style={{flex:1,fontSize:13.5,fontWeight:600}}>{r.race?.replace('Grand Prix','ГП')}</span>
+                                <PosBadge pos={r.position}/>
+                                <span style={{width:40,textAlign:'right',fontSize:13,fontWeight:700,color:r.points>0?'var(--f1-text)':'var(--f1-text-muted)',fontVariantNumeric:'tabular-nums'}}>{r.points>0?`+${r.points}`:'0'}</span>
                             </div>
                         ))}
-                    </div>
-                </>)}
-                {d.teammate && (
-                    <div className="card" style={{marginTop:12}}>
-                        <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:8}}>Напарник</div>
-                        <div style={{display:'flex',alignItems:'center',gap:10}}>
-                            {d.teammate.photo_url && <DriverPhoto url={d.teammate.photo_url} size={36}/>}
-                            <div><div style={{fontWeight:700,fontSize:14}}>{d.teammate.name}</div><div style={{fontSize:11,color:'var(--f1-text-muted)'}}>{flagEmoji(d.teammate.country)} {d.teammate.code}</div></div>
-                        </div>
                     </div>
                 )}
-                </div>
+                {/* Напарник — тонкая строка, не блок */}
+                {d.teammate && (
+                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 20px 28px',opacity:0.85}}>
+                        {d.teammate.photo_url && <DriverPhoto url={d.teammate.photo_url} size={26}/>}
+                        <span style={{fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Напарник</span>
+                        <span style={{fontSize:13,fontWeight:700}}>{d.teammate.name}</span>
+                    </div>
+                )}
             </div>
         );
     }
@@ -3552,7 +3544,7 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
                 <img src={thumb} alt="" loading="lazy" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:0.92}}/>
                 <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 50%,rgba(0,0,0,0.5))'}}/>
                 <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M9.2 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.25 5.97 9.2 6.55 9.2 7.5z"/></svg>
                 </div>
                 <div style={{position:'absolute',bottom:8,left:10,right:10,display:'flex',alignItems:'center',justifyContent:'space-between',color:'#fff'}}>
                     <span style={{fontSize:11,fontWeight:700,opacity:0.85}}>YouTube</span>
@@ -3607,7 +3599,7 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
         <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)'}}>
             <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>
                 <div style={{width:48,height:48,borderRadius:12,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M9.2 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.25 5.97 9.2 6.55 9.2 7.5z"/></svg>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:2}}>\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043f\u0438\u0441\u044c</div>
