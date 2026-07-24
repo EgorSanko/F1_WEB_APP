@@ -80,6 +80,15 @@ const hiResImg = (url, targetW = 800) => {
 };
 
 // ==== API CLIENT ====
+// Все фото с media.formula1.com идут через наш nginx-кэш (/f1media/):
+// CDN тянет по 2.5с из РФ и отдаёт Cache-Control:private — из-за этого
+// «карточки грузятся каждый раз». Одна точка переписи — здесь, в клиенте.
+const _f1media = (o) => {
+    if (typeof o === 'string') return o.startsWith('https://media.formula1.com/') ? o.replace('https://media.formula1.com/', '/f1media/') : o;
+    if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) o[i] = _f1media(o[i]); return o; }
+    if (o && typeof o === 'object') { for (const k in o) o[k] = _f1media(o[k]); return o; }
+    return o;
+};
 const api = {
     get: async (url) => {
         try {
@@ -89,7 +98,7 @@ const api = {
                 return null;
             }
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            return await res.json();
+            return _f1media(await res.json());
         } catch (err) { console.error('API GET ' + url + ':', err); return null; }
     },
     post: async (url, body) => {
@@ -194,6 +203,36 @@ const NavIcons = {
     news: _ic(<><rect x="4.2" y="5" width="15.6" height="15" rx="2.4"/><path d="M7.6 9.2h5.2M7.6 12.6h8.8M7.6 16h8.8"/></>),
     analytics: _ic(<path d="M6.2 19v-5.4M12 19V5.8M17.8 19v-8.6"/>),
 }
+
+// ==== TRACK FACTS ====
+// Факты трассы из уже имеющихся данных API: кругов + базовый круг (schedule)
+// и рекордсмен трассы (history/circuit, кэш 24ч на бэке). Hairline-стиль,
+// без карточек — по манифесту.
+const fmtBaseLap = (sec) => sec ? `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}` : null;
+const TrackFacts = ({race}) => {
+    const [rec, setRec] = useState(null);
+    useEffect(() => {
+        if (!race?.circuit_id) return;
+        let a = true;
+        api.get(`/api/history/circuit/${race.circuit_id}`).then(d => { if (a && d?.most_wins) setRec(d.most_wins); }).catch(()=>{});
+        return () => { a = false; };
+    }, [race?.circuit_id]);
+    const bits = [];
+    if (race?.laps) bits.push(`${race.laps} кругов`);
+    if (race?.base_lap) bits.push(`круг ~${fmtBaseLap(race.base_lap)}`);
+    if (rec) bits.push(`рекордсмен: ${rec.driver} ×${rec.wins}`);
+    if (!bits.length) return null;
+    return (
+        <div style={{display:'flex',alignItems:'center',gap:8,margin:'10px 0 2px',fontSize:11,color:'rgba(255,255,255,0.75)',flexWrap:'wrap'}}>
+            {bits.map((b,i)=>(
+                <span key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+                    {i>0 && <span style={{width:3,height:3,borderRadius:'50%',background:'rgba(255,255,255,0.4)'}}/>}
+                    <span style={{fontWeight:600,letterSpacing:0.3}}>{b}</span>
+                </span>
+            ))}
+        </div>
+    );
+};
 
 // ==== TEAM ATMOSPHERES ====
 // Не сырой team_color, а художественная палитра: глубокий многостоповый
@@ -409,6 +448,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                                 <div className="hero-name">{(() => { const m = nextRace.name.match(/^Гран[- ]при\s+(.+)$/i); return m ? <>Гран-при<br/>{m[1]}</> : nextRace.name; })()}</div>
                                 <div className="hero-place"><FlagImg code={nextRace.country_code} size={20}/><span>{nextRace.locality ? `${nextRace.locality}${nextRace.country ? ', ' + nextRace.country : ''}` : (nextRace.circuit || '')}</span></div>
                                 <div className="hero-round">РАУНД {String(nextRace.round).padStart(2,'0')} · {season}</div>
+                                <TrackFacts race={nextRace}/>
                                 <button className="hero-btn" onClick={()=>onRaceClick(nextRace.round)}>ОТКРЫТЬ ГРАН-ПРИ <span style={{fontSize:16,lineHeight:1}}>›</span></button>
                             </div>
                         </div>
@@ -1247,6 +1287,11 @@ const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree
                                 <div style={{fontSize:10,color:'var(--f1-text-secondary)',letterSpacing:2.5,fontWeight:700}}>ГРАН-ПРИ</div>
                                 <div style={{fontSize:18,lineHeight:'21px',fontWeight:800,letterSpacing:-0.3,marginTop:2}}>{title}</div>
                                 {race.circuit && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.circuit}</div>}
+                                {(race.laps || race.base_lap) && (
+                                    <div style={{fontSize:10.5,color:'var(--f1-text-muted)',marginTop:3,fontVariantNumeric:'tabular-nums'}}>
+                                        {[race.laps ? `${race.laps} кругов` : null, race.base_lap ? `круг ~${fmtBaseLap(race.base_lap)}` : null].filter(Boolean).join(' · ')}
+                                    </div>
+                                )}
                                 {race.sprint && <span style={{display:'inline-block',marginTop:5,background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:5,letterSpacing:1}}>СПРИНТ</span>}
                             </div>
                             {race.circuit_outline && <img src={race.circuit_outline} alt="" loading="lazy" style={{width:72,height:52,objectFit:'contain',opacity:isNext?1:0.95,flexShrink:0,filter:isNext?'drop-shadow(0 0 6px rgba(225,6,0,0.9))':'none'}} onError={e=>{e.target.style.display='none'}}/>}

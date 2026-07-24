@@ -1115,6 +1115,10 @@ async def get_schedule(season: int = None) -> Dict[str, Any]:
             has_sprint = SPRINT_ROUNDS_2026.get(circuit_id, False)
         entry["sprint"] = has_sprint
 
+        # Факты трассы для карточек (календарь/главная): кругов и базовый круг
+        entry["laps"] = CIRCUIT_LAPS.get(circuit_id)
+        entry["base_lap"] = CIRCUIT_BASE_LAP.get(circuit_id)
+
         # Determine status
         now = datetime.utcnow()
         try:
