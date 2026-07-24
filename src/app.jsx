@@ -1823,6 +1823,76 @@ const DriverPickRow = ({d, isSelected, rank, onClick, disabled}) => {
     );
 };
 
+// Секция «Трасса» в карточке ГП — постерно, по манифесту: схема трассы как
+// арт-объект со свечением, факты hairline-лентой (без карточек), рекордсмен
+// и последние победители из нашей истории (кэш 24ч на бэке).
+const TrackSection = ({race}) => {
+    const [hist, setHist] = useState(null);
+    useEffect(() => {
+        if (!race?.circuit_id) return;
+        let a = true;
+        api.get(`/api/history/circuit/${race.circuit_id}`).then(d => { if (a) setHist(d); }).catch(()=>{});
+        return () => { a = false; };
+    }, [race?.circuit_id]);
+    if (!race || (!race.circuit && !race.circuit_outline)) return null;
+    const facts = [
+        race.laps ? {v: race.laps, l: 'Кругов'} : null,
+        race.base_lap ? {v: `~${fmtBaseLap(race.base_lap)}`, l: 'Круг'} : null,
+        hist?.total_races ? {v: hist.total_races, l: 'Гонок в истории'} : null,
+    ].filter(Boolean);
+    return (
+        <div style={{margin:'4px 0 20px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+                <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Трасса</div>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
+            </div>
+            {race.circuit_outline && (
+                <div style={{position:'relative',display:'flex',justifyContent:'center',padding:'10px 0 2px'}}>
+                    <div style={{position:'absolute',inset:'-10% 0',background:'radial-gradient(55% 65% at 50% 50%, rgba(225,6,0,0.10), transparent 75%)',pointerEvents:'none'}}/>
+                    <img src={race.circuit_outline} alt="" loading="lazy"
+                         style={{width:'84%',maxWidth:400,filter:'brightness(1.15) drop-shadow(0 0 22px rgba(225,6,0,0.30))'}}
+                         onError={e=>{e.target.style.display='none'}}/>
+                </div>
+            )}
+            <div style={{textAlign:'center',marginTop:10}}>
+                {race.circuit && <div style={{fontSize:19,fontFamily:"'Russo One','Exo 2',sans-serif",textTransform:'uppercase',letterSpacing:0.5,lineHeight:1.15}}>{race.circuit}</div>}
+                {(race.locality || race.country) && (
+                    <div style={{fontSize:12,color:'var(--f1-text-secondary)',marginTop:5}}>
+                        {flagEmoji(race.country_code)} {race.locality}{race.country ? `, ${race.country}` : ''}
+                    </div>
+                )}
+            </div>
+            {facts.length > 0 && (
+                <div style={{display:'flex',margin:'18px 0 0',borderTop:'1px solid rgba(255,255,255,0.14)'}}>
+                    {facts.map((x,i)=>(
+                        <div key={i} style={{flex:1,padding:'11px 0 0',borderLeft:i?'1px solid rgba(255,255,255,0.10)':'none',textAlign:'center'}}>
+                            <div style={{fontSize:22,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}>{x.v}</div>
+                            <div style={{fontSize:8.5,fontWeight:700,letterSpacing:1.6,textTransform:'uppercase',color:'rgba(255,255,255,0.5)',marginTop:5}}>{x.l}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {hist?.most_wins && (
+                <div style={{textAlign:'center',marginTop:16,fontSize:12.5,color:'var(--f1-text-secondary)'}}>
+                    Рекордсмен трассы — <span style={{fontWeight:800,color:'var(--f1-text)'}}>{hist.most_wins.driver}</span> · {hist.most_wins.wins} побед
+                </div>
+            )}
+            {hist?.winners?.length > 0 && (
+                <div style={{marginTop:14}}>
+                    <div style={{fontSize:9.5,fontWeight:800,letterSpacing:1.8,textTransform:'uppercase',color:'var(--f1-text-muted)',marginBottom:6}}>Победители здесь</div>
+                    {hist.winners.slice(0,5).map((w,i)=>(
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:i<Math.min(hist.winners.length,5)-1?'1px solid rgba(255,255,255,0.05)':'none'}}>
+                            <span style={{width:46,fontSize:13,fontFamily:"'Russo One','Exo 2',sans-serif",color:'var(--f1-red)'}}>{w.season}</span>
+                            <span style={{flex:1,fontSize:13,fontWeight:600}}>{w.winner}</span>
+                            <span style={{fontSize:11,color:'var(--f1-text-muted)'}}>{w.constructor}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 // Оверлей, вынесенный прямо в <body>.
 //
 // Зачем: .page-container — это скроллер с -webkit-overflow-scrolling:touch.
@@ -4205,6 +4275,9 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
             {race.sessions && !race.podium && !raceResults && race.round != null && (
                 <RaceWeather round={race.round} season={season}/>
             )}
+
+            {/* Трасса — всё, что отдаёт API: схема как арт, факты, история */}
+            <TrackSection race={race}/>
 
             {/* Spoiler reveal button */}
             {isSpoilerHidden && (
