@@ -5,6 +5,7 @@ Merges OpenF1 (live) + Ergast/Jolpica (history) into unified responses.
 """
 
 import asyncio
+import re
 import time
 import logging
 import json
@@ -153,6 +154,8 @@ _SNAPSHOT_PATH = "/app/data/cache_snapshot.json"
 _SNAPSHOT_PREFIXES = (
     "schedule", "standings_drivers", "standings_constructors",
     "race_results", "qualifying_results", "champions", "history",
+    # прошлые гонки не меняются — переживают рестарт и live-локдаун OpenF1
+    "timeline", "pitstops",
 )
 
 
@@ -1129,17 +1132,65 @@ _RC_KIND = (
     ("SAFETY CAR", "sc"), ("VIRTUAL SAFETY", "sc"), ("VSC", "sc"),
     ("RED FLAG", "red"), ("RED LIGHT", None),
     ("PENALTY", "pen"), ("DISQUALIF", "pen"), ("INVESTIGAT", "pen"), ("DELETED", "pen"),
+    ("DRS ENABLED", "info"), ("DRS DISABLED", "info"), ("NO FURTHER", "pen"),
 )
 
 
-def _rc_translate(msg: str) -> str:
-    """Перевод сообщений race control (exact -> частичные замены)."""
-    if msg in RACE_CONTROL_RU:
-        return RACE_CONTROL_RU[msg]
+_RC_PATTERNS = [
+    (r"TURN (\d+) INCIDENT INVOLVING CARS (\d+) \(([A-Z]{3})\) AND (\d+) \(([A-Z]{3})\)",
+     r"инцидент в повороте \1 — \2 (\3) и \4 (\5)"),
+    (r"INCIDENT INVOLVING CARS (\d+) \(([A-Z]{3})\) AND (\d+) \(([A-Z]{3})\)",
+     r"инцидент — \1 (\2) и \3 (\4)"),
+    (r"CAR (\d+) \(([A-Z]{3})\) TIME \d+:\d+\.\d+ DELETED - TRACK LIMITS AT TURN (\d+)(?: LAP \d+)?",
+     r"\1 (\2): круг аннулирован — лимиты трассы, поворот \3"),
+    (r"(\d+) SECOND TIME PENALTY FOR CAR (\d+) \(([A-Z]{3})\)",
+     r"штраф +\1с — машина \2 (\3)"),
+    (r"DRIVE THROUGH PENALTY FOR CAR (\d+) \(([A-Z]{3})\)",
+     r"проезд по пит-лейну — машина \1 (\2)"),
+    (r"INCIDENT INVOLVING CAR (\d+) \(([A-Z]{3})\)", r"инцидент — машина \1 (\2)"),
+    (r"TURN (\d+) INCIDENT", r"инцидент в повороте \1"),
+    (r"FIA STEWARDS:\s*", "Стюарды: "),
+    (r"WILL BE INVESTIGATED AFTER THE (?:RACE|SESSION)", "будет рассмотрено после гонки"),
+    (r"UNDER INVESTIGATION", "идёт расследование"),
+    (r"REVIEWED NO FURTHER (?:INVESTIGATION|ACTION)(?: NECESSARY)?", "нарушений не найдено"),
+    (r"NO FURTHER (?:INVESTIGATION|ACTION)(?: NECESSARY)?", "без последствий"),
+    (r"CAUSING A COLLISION", "виновник столкновения"),
+    (r"FORCING ANOTHER DRIVER OFF THE TRACK", "вытеснил соперника с трассы"),
+    (r"LEAVING THE TRACK AND GAINING (?:AN|A LASTING) ADVANTAGE", "срезка с преимуществом"),
+    (r"UNSAFE RELEASE", "небезопасный выпуск из боксов"),
+    (r"SPEEDING IN THE PIT LANE", "превышение на пит-лейне"),
+    (r"LAP TIME DELETED", "круг аннулирован"),
+    (r"TRACK LIMITS AT TURN (\d+)", r"лимиты трассы, поворот \1"),
+    (r"SAFETY CAR IN THIS LAP", "сейфти-кар заезжает в боксы"),
+    (r"VIRTUAL SAFETY CAR DEPLOYED", "виртуальный сейфти-кар"),
+    (r"VIRTUAL SAFETY CAR ENDING", "виртуальный сейфти-кар завершается"),
+    (r"SAFETY CAR DEPLOYED", "сейфти-кар на трассе"),
+    (r"DRS ENABLED", "DRS разрешён"),
+    (r"DRS DISABLED", "DRS запрещён"),
+    (r"CHEQUERED FLAG", "клетчатый флаг — финиш"),
+    (r"GREEN LIGHT - PIT EXIT OPEN", "зелёный свет — пит-лейн открыт"),
+    (r"DOUBLE YELLOW(?: IN TRACK SECTOR (\d+))?", lambda m: "двойные жёлтые" + (f", сектор {m.group(1)}" if m.group(1) else "")),
+    (r"YELLOW(?: IN TRACK SECTOR (\d+))?", lambda m: "жёлтый флаг" + (f", сектор {m.group(1)}" if m.group(1) else "")),
+    (r"RED FLAG", "красный флаг"),
+    (r"GREEN FLAG", "зелёный флаг"),
+    (r"IN TRACK SECTOR (\d+)", r"в секторе \1"),
+    (r"PIT EXIT CLOSED", "выезд с пит-лейна закрыт"),
+    (r"PIT ENTRY CLOSED", "въезд на пит-лейн закрыт"),
+    (r"CAR SAFETY LIGHTS", "аварийные огни"),
+    (r"RISK OF RAIN FOR F1 RACE", "риск дождя в гонке"),
+    (r"\bNOTED\b", "взято на заметку"),
+    (r"\bCAR (\d+) \(([A-Z]{3})\)", r"машина \1 (\2)"),
+]
+
+
+def _rc_translate(msg):
     out = msg
-    for en, ru in RACE_CONTROL_RU.items():
-        if len(en) > 8 and en in out:
-            out = out.replace(en, ru)
+    for pat, repl in _RC_PATTERNS:
+        out = re.sub(pat, repl, out)
+    # убрать хвостовое время (14:22:09), нормализовать разделители
+    out = re.sub(r"\s*\(\d{2}:\d{2}:\d{2}\)\s*$", "", out)
+    out = re.sub(r"\s+-\s+", " · ", out)   # внутренние " - " -> " · "
+    out = re.sub(r"\s{2,}", " ", out).strip(" -·")
     return out
 
 
@@ -1183,8 +1234,8 @@ async def get_race_timeline(round_num: int, season: int = None) -> Dict[str, Any
         if not kind:
             continue
         events.append({"lap": m.get("lap_number"), "kind": kind, "text": _rc_translate(msg)[:120]})
-    # не захламляем: максимум 14 ключевых событий
-    result = {"available": bool(events), "events": events[:14]}
+    # ключевые события без шума жёлтых флагов; лимит 25
+    result = {"available": bool(events), "events": events[:25]}
     cache_set(cache_key, result)
     return result
 

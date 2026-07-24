@@ -2004,27 +2004,36 @@ const RacePitstops = ({round, season}) => {
         return () => { a = false; };
     }, [round, season]);
     if (!d?.available || !d.fastest) return null;
+    const rows = (d.top || []).slice(0, 5);
+    const fast = d.fastest.duration;
+    const slow = rows.length ? rows[rows.length - 1].duration : fast;
+    const span = Math.max(0.001, slow - fast);
+    const MEDAL = ['#FFCB05', '#C0C0C0', '#CD7F32'];
     return (
         <div style={{margin:'4px 0 22px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:3}}>
                 <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Пит-стопы</div>
                 <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
             </div>
-            <div style={{display:'flex',alignItems:'flex-end',gap:14,padding:'4px 0 10px'}}>
-                <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:40,lineHeight:1}}>{d.fastest.duration.toFixed(1)}<span style={{fontSize:17,color:'var(--f1-text-muted)',marginLeft:2}}>с</span></div>
-                <div style={{paddingBottom:3,minWidth:0}}>
-                    <div style={{fontSize:13.5,fontWeight:700}}>{d.fastest.name}</div>
-                    <div style={{fontSize:10.5,color:'var(--f1-text-secondary)',marginTop:1}}><span style={{color:d.fastest.team_color||'inherit',fontWeight:700}}>{d.fastest.team}</span> · быстрейший пит-лейн · круг {d.fastest.lap}</div>
-                </div>
-            </div>
-            {(d.top||[]).slice(1).map((t,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<d.top.length-2?'1px solid rgba(255,255,255,0.05)':'none'}}>
-                    <div style={{width:3,height:16,borderRadius:2,background:t.team_color||'#666',flexShrink:0}}/>
-                    <span style={{flex:1,fontSize:12.5,fontWeight:600}}>{t.name}</span>
-                    <span style={{fontSize:12.5,fontFamily:"'Russo One','Exo 2',sans-serif",fontVariantNumeric:'tabular-nums'}}>{t.duration.toFixed(1)}с</span>
-                </div>
-            ))}
-            <div style={{fontSize:10,color:'var(--f1-text-muted)',marginTop:8}}>Всего остановок: {d.total_stops}</div>
+            <div style={{fontSize:10.5,color:'var(--f1-text-muted)',marginBottom:12}}>Быстрейший проезд пит-лейна · {d.total_stops} остановок за гонку</div>
+            {rows.map((t,i)=>{
+                // бар: чем ближе к лучшему времени — тем длиннее (визуальный отрыв)
+                const frac = 1 - (t.duration - fast) / span;   // 1 у лидера, 0 у последнего
+                const w = 30 + frac * 70;
+                return (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:11,padding:'9px 0',borderBottom:i<rows.length-1?'1px solid rgba(255,255,255,0.05)':'none'}}>
+                        <div style={{width:22,textAlign:'center',fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,color:i<3?MEDAL[i]:'var(--f1-text-muted)',flexShrink:0}}>{i+1}</div>
+                        <div style={{width:3,height:26,borderRadius:2,background:t.team_color||'#666',flexShrink:0}}/>
+                        <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13.5,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.name}</div>
+                            <div style={{marginTop:4,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}>
+                                <div style={{width:`${w}%`,height:'100%',borderRadius:2,background:i===0?'var(--f1-red)':(t.team_color||'#888'),transition:'width .4s ease'}}/>
+                            </div>
+                        </div>
+                        <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:17,fontVariantNumeric:'tabular-nums',flexShrink:0}}>{t.duration.toFixed(1)}<span style={{fontSize:11,color:'var(--f1-text-muted)'}}>с</span></div>
+                    </div>
+                );
+            })}
         </div>
     );
 };
@@ -2715,9 +2724,9 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
             {/* Menu (app design) */}
                 <HallOfFame/>
             <div className="card" style={{padding:0,overflow:'hidden',marginBottom:16}}>
-                {[['predict','\ud83d\udcc8','Мои прогнозы'],['standings','\ud83c\udfc6','Чемпионат'],['news','\ud83d\udcf0','Новости'],['schedule','\ud83d\udcc5','Календарь'],['videos','\u25b6\ufe0f','Видео']].map(([id,ic,label],i,arr)=>(
+                {[['predict',NavIcons.trophy,'Мои прогнозы'],['standings',NavIcons.analytics,'Чемпионат'],['news',NavIcons.news,'Новости'],['schedule',NavIcons.calendar,'Календарь'],['videos',NavIcons.play,'Видео']].map(([id,ic,label],i,arr)=>(
                     <div key={id} onClick={()=>onNavigate && onNavigate(id)} style={{display:'flex',alignItems:'center',gap:14,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid var(--f1-border)':'none',cursor:'pointer'}}>
-                        <div style={{width:30,height:30,borderRadius:8,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{ic}</div>
+                        <div style={{width:30,height:30,borderRadius:8,background:'rgba(225,6,0,0.12)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--f1-red)'}}><span style={{width:17,height:17,display:'inline-flex'}}>{ic}</span></div>
                         <div style={{flex:1,fontSize:15}}>{label}</div>
                         <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'\u203a'}</div>
                     </div>
