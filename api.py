@@ -881,6 +881,22 @@ async def history_circuit(circuit_id: str):
     return await f1_data.get_circuit_history(circuit_id)
 
 
+@app.get("/api/history/champions")
+async def history_champions():
+    """Зал славы: все чемпионы мира по годам (кэш 24ч + снапшот)."""
+    return await f1_data.get_champions()
+
+
+@app.get("/api/race/{round_num}/pitstops")
+async def race_pitstops(round_num: int, season: int = CURRENT_SEASON):
+    return await f1_data.get_race_pitstops(round_num, season=season)
+
+
+@app.get("/api/race/{round_num}/timeline")
+async def race_timeline(round_num: int, season: int = CURRENT_SEASON):
+    return await f1_data.get_race_timeline(round_num, season=season)
+
+
 @app.get("/api/race/next")
 async def get_next_race(season: int = CURRENT_SEASON):
     return await f1_data.get_next_race(season=season)

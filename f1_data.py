@@ -152,7 +152,7 @@ import json as _json
 _SNAPSHOT_PATH = "/app/data/cache_snapshot.json"
 _SNAPSHOT_PREFIXES = (
     "schedule", "standings_drivers", "standings_constructors",
-    "race_results", "qualifying_results",
+    "race_results", "qualifying_results", "champions", "history",
 )
 
 
@@ -1046,6 +1046,147 @@ async def get_circuit_history(circuit_id: str) -> Dict[str, Any]:
         "most_wins": ({"driver": top[0][0], "wins": top[0][1]} if top else None),
         "winners": here[:12],
     }
+
+
+# ============ HALL OF FAME / PITSTOPS / RACE TIMELINE ============
+
+async def get_champions() -> Dict[str, Any]:
+    """Все чемпионы мира по годам. Jolpica не отдаёт кросс-сезонно (400) —
+    собираем циклом по годам через fetch_ergast (лимитер+breaker). Первый
+    прогрев ~25с, дальше кэш 24ч + дисковый снапшот (переживает рестарт)."""
+    cache_key = "champions:all"
+    cached = cache_get(cache_key, ttl_override=86400)
+    if cached is not None:
+        return cached
+    out = []
+    cur_year = datetime.utcnow().year
+    for y in range(1950, cur_year):
+        data = await fetch_ergast(f"{y}/driverStandings/1")
+        try:
+            sl = data.get("StandingsTable", {}).get("StandingsLists", [])
+            ds = sl[0]["DriverStandings"][0]
+            drv = ds.get("Driver", {})
+            con = (ds.get("Constructors") or [{}])[0]
+            out.append({
+                "season": y,
+                "driver": f"{drv.get('givenName','')} {drv.get('familyName','')}".strip(),
+                "code": drv.get("code"),
+                "nationality": drv.get("nationality"),
+                "constructor": con.get("name"),
+                "points": ds.get("points"),
+                "wins": ds.get("wins"),
+            })
+        except (KeyError, IndexError, TypeError, AttributeError):
+            continue
+    out.sort(key=lambda x: -x["season"])
+    result = {"total": len(out), "champions": out}
+    if out:
+        cache_set(cache_key, result)
+    return result
+
+
+async def get_race_pitstops(round_num: int, season: int = None) -> Dict[str, Any]:
+    """Пит-стопы гонки (Ergast): быстрейший + топ-5. duration у Ergast — время
+    прохода пит-лейна, подписываем честно «пит-лейн»."""
+    s = season or CURRENT_SEASON
+    cache_key = f"pitstops:{s}:{round_num}"
+    cached = cache_get(cache_key, ttl_override=6 * 3600)
+    if cached is not None:
+        return cached
+    data = await fetch_ergast(f"{s}/{round_num}/pitstops", limit=100)
+    if not data:
+        stale = _stale_payload(cache_key)
+        return stale if stale is not None else {"available": False}
+    races = data.get("RaceTable", {}).get("Races", [])
+    stops = races[0].get("PitStops", []) if races else []
+    parsed = []
+    for st in stops:
+        try:
+            dur = float(st.get("duration", "").replace(":", "")) if ":" not in st.get("duration", "") else None
+        except (ValueError, TypeError):
+            dur = None
+        if dur is None:
+            continue
+        num = ergast_driver_id_to_number(st.get("driverId", ""), s)
+        parsed.append({"driver_id": st.get("driverId"), "driver_number": num,
+                       "lap": st.get("lap"), "duration": dur})
+    if not parsed:
+        result = {"available": False}
+        cache_set(cache_key, result)
+        return result
+    parsed.sort(key=lambda x: x["duration"])
+    top = []
+    for p in parsed[:5]:
+        e = enrich_driver(p["driver_number"], {"lap": p["lap"], "duration": p["duration"]}, season=s) if p["driver_number"] else dict(p, name=p["driver_id"])
+        top.append({"name": e.get("name") or p["driver_id"], "team": e.get("team"),
+                    "team_color": e.get("team_color"), "lap": p["lap"], "duration": p["duration"]})
+    result = {"available": True, "total_stops": len(parsed), "fastest": top[0], "top": top}
+    cache_set(cache_key, result)
+    return result
+
+
+_RC_KIND = (
+    ("SAFETY CAR", "sc"), ("VIRTUAL SAFETY", "sc"), ("VSC", "sc"),
+    ("RED FLAG", "red"), ("RED LIGHT", None),
+    ("PENALTY", "pen"), ("DISQUALIF", "pen"), ("INVESTIGAT", "pen"), ("DELETED", "pen"),
+)
+
+
+def _rc_translate(msg: str) -> str:
+    """Перевод сообщений race control (exact -> частичные замены)."""
+    if msg in RACE_CONTROL_RU:
+        return RACE_CONTROL_RU[msg]
+    out = msg
+    for en, ru in RACE_CONTROL_RU.items():
+        if len(en) > 8 and en in out:
+            out = out.replace(en, ru)
+    return out
+
+
+async def get_race_timeline(round_num: int, season: int = None) -> Dict[str, Any]:
+    """Хроника гонки: ключевые события race control (SC/красные/пенальти) из
+    OpenF1 по session_key, найденному по дате гонки. Без шума жёлтых флагов."""
+    s = season or CURRENT_SEASON
+    cache_key = f"timeline:{s}:{round_num}"
+    cached = cache_get(cache_key, ttl_override=7 * 86400)
+    if cached is not None:
+        return cached
+    sched = await get_schedule(s)
+    race = next((r for r in sched.get("races", []) if r.get("round") == round_num), None)
+    if not race or not race.get("race_datetime"):
+        return {"available": False, "events": []}
+    rd = race["race_datetime"][:10]
+    sessions = await fetch_openf1("sessions", {"year": s, "session_name": "Race"})
+    key = None
+    for x in sessions or []:
+        if (x.get("date_start") or "")[:10] == rd:
+            key = x.get("session_key"); break
+    if key is None:
+        return {"available": False, "events": []}
+    rc = await fetch_openf1("race_control", {"session_key": key})
+    if not isinstance(rc, list) or not rc:
+        return {"available": False, "events": []}
+    events = []
+    for m in rc:
+        msg = (m.get("message") or "").strip()
+        cat = m.get("category") or ""
+        up = msg.upper()
+        kind = None
+        if cat == "SafetyCar":
+            kind = "sc"
+        else:
+            for pat, k in _RC_KIND:
+                if pat in up and k:
+                    kind = k; break
+        if cat == "SessionStatus" and up in ("GREEN LIGHT", "CHEQUERED FLAG"):
+            kind = "info"
+        if not kind:
+            continue
+        events.append({"lap": m.get("lap_number"), "kind": kind, "text": _rc_translate(msg)[:120]})
+    # не захламляем: максимум 14 ключевых событий
+    result = {"available": bool(events), "events": events[:14]}
+    cache_set(cache_key, result)
+    return result
 
 
 async def get_schedule(season: int = None) -> Dict[str, Any]:

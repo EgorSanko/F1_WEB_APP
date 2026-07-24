@@ -1425,6 +1425,8 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
                         )}
                     </div>
                 </div>
+                <CareerStrip ergastId={driversStandings?.standings?.[champIdx]?.ergast_id}/>
+
                 {/* Результаты — лента, не карточка */}
                 {stats?.results?.length > 0 && (
                     <div style={{padding:'26px 20px 6px'}}>
@@ -1889,6 +1891,140 @@ const TrackSection = ({race}) => {
                     ))}
                 </div>
             )}
+        </div>
+    );
+};
+
+// «За карьеру» — вторая hairline-лента под постером пилота (наш /api/driver/career).
+const CareerStrip = ({ergastId}) => {
+    const [c, setC] = useState(null);
+    useEffect(() => {
+        if (!ergastId) return; let a = true;
+        api.get('/api/driver/career/' + ergastId).then(d => { if (a && d?.career) setC(d.career); }).catch(()=>{});
+        return () => { a = false; };
+    }, [ergastId]);
+    if (!c) return null;
+    const items = [
+        {v: c.championships, l: 'Титулов'}, {v: c.wins, l: 'Побед'}, {v: c.podiums, l: 'Подиумов'},
+        {v: c.poles, l: 'Поулов'}, {v: c.races, l: 'Гонок'},
+    ].filter(x => x.v != null);
+    if (!items.length) return null;
+    return (
+        <div style={{padding:'18px 20px 0'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:2}}>
+                <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>За карьеру{c.debut_season ? ` · с ${c.debut_season}` : ''}</div>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
+            </div>
+            <div style={{display:'flex'}}>
+                {items.map((x,i)=>(
+                    <div key={i} style={{flex:1,padding:'9px 0 0',borderLeft:i?'1px solid rgba(255,255,255,0.08)':'none',textAlign:i?'center':'left'}}>
+                        <div style={{fontSize:20,fontWeight:400,fontFamily:"'Russo One','Exo 2',sans-serif",lineHeight:1}}>{x.v}</div>
+                        <div style={{fontSize:8,fontWeight:700,letterSpacing:1.4,textTransform:'uppercase',color:'rgba(255,255,255,0.45)',marginTop:4}}>{x.l}</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Зал славы — вход в профиле + полноэкранная хроника чемпионов (1950 -> ...).
+const HallOfFame = () => {
+    const [open, setOpen] = useState(false);
+    const [data, setData] = useState(null);
+    useEffect(() => {
+        if (!open || data) return; let a = true;
+        api.get('/api/history/champions').then(d => { if (a) setData(d); }).catch(()=>{});
+        return () => { a = false; };
+    }, [open]);
+    return (<>
+        <div onClick={()=>setOpen(true)} style={{display:'flex',alignItems:'center',gap:12,padding:'16px 18px',borderRadius:16,background:'linear-gradient(135deg, rgba(212,175,55,0.13), var(--f1-card-solid))',border:'1px solid rgba(212,175,55,0.28)',cursor:'pointer',marginBottom:16}}>
+            <div style={{flex:1}}>
+                <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,textTransform:'uppercase',letterSpacing:1}}>Зал славы</div>
+                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:3}}>Все чемпионы мира с 1950 года</div>
+            </div>
+            <div style={{color:'#D4AF37',fontSize:17,fontWeight:700}}>{'→'}</div>
+        </div>
+        {open && (
+            <BodyPortal>
+                <div style={{position:'fixed',inset:0,zIndex:3000,background:'var(--f1-darker)',display:'flex',flexDirection:'column'}}>
+                    <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:14,borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0}}>
+                        <button onClick={()=>setOpen(false)} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:999,padding:'7px 14px',color:'#fff',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>← Назад</button>
+                        <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,textTransform:'uppercase',letterSpacing:1.5}}>Зал славы</div>
+                    </div>
+                    <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'6px 18px 40px'}}>
+                        {!data ? <F1Loader text="Загрузка чемпионов..."/> : (data.champions||[]).map((c)=>(
+                            <div key={c.season} style={{display:'flex',alignItems:'baseline',gap:14,padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                                <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:21,color:'#D4AF37',width:62,flexShrink:0}}>{c.season}</div>
+                                <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:14.5,fontWeight:700}}>{c.driver}</div>
+                                    <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:1}}>{c.constructor}{c.wins ? ` · ${c.wins} побед` : ''}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </BodyPortal>
+        )}
+    </>);
+};
+
+// Хроника гонки — ключевые события race control (SC/красные/пенальти), лента.
+const RaceTimeline = ({round, season}) => {
+    const [d, setD] = useState(null);
+    useEffect(() => {
+        if (round == null) return; let a = true;
+        api.get(`/api/race/${round}/timeline?season=${season}`).then(x => { if (a) setD(x); }).catch(()=>{});
+        return () => { a = false; };
+    }, [round, season]);
+    if (!d?.available || !d.events?.length) return null;
+    const COL = {sc:'#FFCB05', red:'#E10600', pen:'#FF8000', info:'#6692FF'};
+    return (
+        <div style={{margin:'4px 0 18px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+                <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Хроника гонки</div>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
+            </div>
+            {d.events.map((e,i)=>(
+                <div key={i} style={{display:'flex',gap:12,padding:'8px 0',borderBottom:i<d.events.length-1?'1px solid rgba(255,255,255,0.05)':'none'}}>
+                    <div style={{width:42,flexShrink:0,textAlign:'right',fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:12,color:'var(--f1-text-muted)',paddingTop:1}}>{e.lap ? `L${e.lap}` : '—'}</div>
+                    <div style={{width:3,borderRadius:2,background:COL[e.kind]||'#666',flexShrink:0}}/>
+                    <div style={{flex:1,fontSize:12.5,lineHeight:1.4}}>{e.text}</div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Пит-стопы гонки — быстрейший пит-лейн крупно + топ-5 лентой (Ergast).
+const RacePitstops = ({round, season}) => {
+    const [d, setD] = useState(null);
+    useEffect(() => {
+        if (round == null) return; let a = true;
+        api.get(`/api/race/${round}/pitstops?season=${season}`).then(x => { if (a) setD(x); }).catch(()=>{});
+        return () => { a = false; };
+    }, [round, season]);
+    if (!d?.available || !d.fastest) return null;
+    return (
+        <div style={{margin:'4px 0 22px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+                <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Пит-стопы</div>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
+            </div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:14,padding:'4px 0 10px'}}>
+                <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:40,lineHeight:1}}>{d.fastest.duration.toFixed(1)}<span style={{fontSize:17,color:'var(--f1-text-muted)',marginLeft:2}}>с</span></div>
+                <div style={{paddingBottom:3,minWidth:0}}>
+                    <div style={{fontSize:13.5,fontWeight:700}}>{d.fastest.name}</div>
+                    <div style={{fontSize:10.5,color:'var(--f1-text-secondary)',marginTop:1}}><span style={{color:d.fastest.team_color||'inherit',fontWeight:700}}>{d.fastest.team}</span> · быстрейший пит-лейн · круг {d.fastest.lap}</div>
+                </div>
+            </div>
+            {(d.top||[]).slice(1).map((t,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<d.top.length-2?'1px solid rgba(255,255,255,0.05)':'none'}}>
+                    <div style={{width:3,height:16,borderRadius:2,background:t.team_color||'#666',flexShrink:0}}/>
+                    <span style={{flex:1,fontSize:12.5,fontWeight:600}}>{t.name}</span>
+                    <span style={{fontSize:12.5,fontFamily:"'Russo One','Exo 2',sans-serif",fontVariantNumeric:'tabular-nums'}}>{t.duration.toFixed(1)}с</span>
+                </div>
+            ))}
+            <div style={{fontSize:10,color:'var(--f1-text-muted)',marginTop:8}}>Всего остановок: {d.total_stops}</div>
         </div>
     );
 };
@@ -2577,6 +2713,7 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
             })()}
 
             {/* Menu (app design) */}
+                <HallOfFame/>
             <div className="card" style={{padding:0,overflow:'hidden',marginBottom:16}}>
                 {[['predict','\ud83d\udcc8','Мои прогнозы'],['standings','\ud83c\udfc6','Чемпионат'],['news','\ud83d\udcf0','Новости'],['schedule','\ud83d\udcc5','Календарь'],['videos','\u25b6\ufe0f','Видео']].map(([id,ic,label],i,arr)=>(
                     <div key={id} onClick={()=>onNavigate && onNavigate(id)} style={{display:'flex',alignItems:'center',gap:14,padding:'13px 16px',borderBottom:i<arr.length-1?'1px solid var(--f1-border)':'none',cursor:'pointer'}}>
@@ -4457,7 +4594,8 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
                 </div>
             )}
 
-
+            <RaceTimeline round={race.round} season={season}/>
+            <RacePitstops round={race.round} season={season}/>
             </>)}
         </div>
     );
