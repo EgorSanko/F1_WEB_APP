@@ -227,6 +227,23 @@ async def broadcast(app: Application, text: str, keyboard=None):
 # ============ SCHEDULED JOBS ============
 
 NOTIFICATIONS_DIR = "/app/data/notifications"
+POSTER_DIR = "/app/data/posters"
+
+
+def _poster_for(race_round) -> str:
+    """Путь к готовому постеру гонки (генерит poster_gen заранее). None если нет.
+    Предпочитаем cinematic, иначе любой стиль этого раунда."""
+    try:
+        preferred = os.path.join(POSTER_DIR, f"round{race_round}-cinematic.png")
+        if os.path.exists(preferred):
+            return preferred
+        if os.path.isdir(POSTER_DIR):
+            for fname in sorted(os.listdir(POSTER_DIR)):
+                if fname.startswith(f"round{race_round}-") and fname.endswith(".png"):
+                    return os.path.join(POSTER_DIR, fname)
+    except OSError:
+        pass
+    return None
 
 
 def _was_sent(key: str) -> bool:
@@ -295,28 +312,50 @@ async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
 
     for low, high, key, message in notifications:
         if low < hours_until < high and not _was_sent(key):
-            # Send to all users
+            # ЕДИНСТВЕННЫЙ отправитель напоминаний о гонке (poster_gen больше
+            # не рассылает — только генерит постер). Каждое из 3 уведомлений
+            # (24ч/1ч/10мин) идёт С ФОТО, если постер готов, иначе текстом.
             users = db.execute("SELECT user_id FROM users")
-            sent = 0
-            keyboard = [[InlineKeyboardButton(
+            bot = context.application.bot
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(
                 "🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL}
-            )]]
+            )]])
+            poster_path = _poster_for(race_round)
+            photo_ref = None  # file_id после первой загрузки — не грузим файл N раз
+            sent = 0
             for user in users:
                 try:
-                    await context.application.bot.send_message(
-                        chat_id=user["user_id"],
-                        text=message,
-                        parse_mode="HTML",
-                        reply_markup=InlineKeyboardMarkup(keyboard),
-                        disable_web_page_preview=True,
-                    )
+                    if poster_path:
+                        if photo_ref is None:
+                            with open(poster_path, "rb") as fh:
+                                msg = await bot.send_photo(
+                                    chat_id=user["user_id"], photo=fh,
+                                    caption=message, parse_mode="HTML",
+                                    reply_markup=keyboard,
+                                )
+                            # запоминаем file_id — дальше рассылаем ссылкой
+                            if msg.photo:
+                                photo_ref = msg.photo[-1].file_id
+                        else:
+                            await bot.send_photo(
+                                chat_id=user["user_id"], photo=photo_ref,
+                                caption=message, parse_mode="HTML",
+                                reply_markup=keyboard,
+                            )
+                    else:
+                        await bot.send_message(
+                            chat_id=user["user_id"], text=message,
+                            parse_mode="HTML", reply_markup=keyboard,
+                            disable_web_page_preview=True,
+                        )
                     sent += 1
                     if sent % 30 == 0:
                         await asyncio.sleep(1)
                 except Exception:
                     pass
             _mark_sent(key, sent)
-            logger.info(f"[NOTIFY] {key}: sent to {sent}/{len(users)} users")
+            logger.info(f"[NOTIFY] {key}: sent to {sent}/{len(users)} users "
+                        f"({'photo' if poster_path else 'text'})")
             break
 
     # Clean up old marker files (older than 7 days)
