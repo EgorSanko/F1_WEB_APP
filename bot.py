@@ -230,11 +230,12 @@ NOTIFICATIONS_DIR = "/app/data/notifications"
 POSTER_DIR = "/app/data/posters"
 
 
-def _poster_for(race_round) -> str:
-    """Путь к готовому постеру гонки (генерит poster_gen заранее). None если нет.
-    Предпочитаем cinematic, иначе любой стиль этого раунда."""
+def _poster_for(race_round, style) -> str:
+    """Путь к постеру гонки для конкретного тира — СВОЙ стиль под каждое время
+    (24ч→cinematic, 1ч→retro, 10мин→fans). Если нужного стиля нет — берём любой
+    другой стиль этого раунда (лишь бы фото было), иначе None."""
     try:
-        preferred = os.path.join(POSTER_DIR, f"round{race_round}-cinematic.png")
+        preferred = os.path.join(POSTER_DIR, f"round{race_round}-{style}.png")
         if os.path.exists(preferred):
             return preferred
         if os.path.isdir(POSTER_DIR):
@@ -293,34 +294,35 @@ async def check_session_reminder(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now(timezone.utc)
     hours_until = (race_dt - now).total_seconds() / 3600
 
+    # 4-й элемент — СТИЛЬ постера под каждое время (три разных фото, не одно).
     notifications = [
-        (23.8, 24.2, f"24h_{race_round}",
+        (23.8, 24.2, f"24h_{race_round}", "cinematic",
          f"🏁 <b>{race_name}</b> — через 24 часа!\n\n"
          f"⏰ Старт: {race_dt.strftime('%d.%m в %H:%M')} UTC\n\n"
          f"🔮 Успей сделать прогноз!"),
 
-        (0.8, 1.2, f"1h_{race_round}",
+        (0.8, 1.2, f"1h_{race_round}", "retro",
          f"🚨 <b>{race_name}</b> — через 1 час!\n\n"
          f"🏎 Готовь попкорн!\n\n"
          f"📱 Смотри Live тайминги в F1 Hub"),
 
-        (0.1, 0.25, f"10m_{race_round}",
+        (0.1, 0.25, f"10m_{race_round}", "fans",
          "🔴🔴🔴🔴🔴\n"
          f"<b>LIGHTS OUT через 10 минут!</b>\n\n"
          f"🏁 {race_name}"),
     ]
 
-    for low, high, key, message in notifications:
+    for low, high, key, style, message in notifications:
         if low < hours_until < high and not _was_sent(key):
             # ЕДИНСТВЕННЫЙ отправитель напоминаний о гонке (poster_gen больше
-            # не рассылает — только генерит постер). Каждое из 3 уведомлений
-            # (24ч/1ч/10мин) идёт С ФОТО, если постер готов, иначе текстом.
+            # не рассылает — только генерит постеры). Каждое из 3 уведомлений
+            # (24ч/1ч/10мин) идёт С ФОТО своего стиля, иначе текстом.
             users = db.execute("SELECT user_id FROM users")
             bot = context.application.bot
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(
                 "🏎️ Открыть F1 Hub", web_app={"url": WEBAPP_URL}
             )]])
-            poster_path = _poster_for(race_round)
+            poster_path = _poster_for(race_round, style)
             photo_ref = None  # file_id после первой загрузки — не грузим файл N раз
             sent = 0
             for user in users:

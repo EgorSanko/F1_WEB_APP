@@ -251,8 +251,10 @@ def broadcast(path, caption):
 # Постер генерится ЗАРАНЕЕ (до окна 24ч), рассылку делает bot.py (единый
 # отправитель — 24ч/1ч/10мин, с этим фото). Здесь broadcast НЕ вызывается,
 # чтобы не было дублей и расхождений в тексте (см. правку 2026-07-25).
-POSTER_STYLE = "cinematic"
-GEN_WITHIN_H = 30.0  # начинаем готовить постер за 30ч до гонки (запас перед 24ч)
+# ТРИ РАЗНЫХ постера — свой стиль под каждое уведомление (правка 2026-07-26):
+#   24ч → cinematic | 1ч → retro | 10мин → fans
+POSTER_STYLES = ["cinematic", "retro", "fans"]
+GEN_WITHIN_H = 30.0  # начинаем готовить постеры за 30ч до гонки (запас перед 24ч)
 
 
 def run_auto():
@@ -261,17 +263,22 @@ def run_auto():
     dt = datetime.fromisoformat(race["race_datetime"].replace("Z", ""))
     left = (dt - datetime.utcnow()).total_seconds()
     left_h = left / 3600
-    out = os.path.join(OUT_DIR, f"round{race['round']}-{POSTER_STYLE}.png")
-    if os.path.exists(out):
-        print(f"poster ready: R{race['round']} {race['name']} ({left_h:.2f}h left)")
+    missing = [s for s in POSTER_STYLES
+               if not os.path.exists(os.path.join(OUT_DIR, f"round{race['round']}-{s}.png"))]
+    if not missing:
+        print(f"posters ready ({len(POSTER_STYLES)}): R{race['round']} {race['name']} ({left_h:.2f}h left)")
         return
     if left < 0 or left_h > GEN_WITHIN_H:
         print(f"auto: no gen ({left_h:.2f}h to race, window <= {GEN_WITHIN_H}h)")
         return
     key = load_key()
-    print(f"auto: pre-generating poster R{race['round']} {race['name']}, {left_h:.2f}h left")
-    bg = gen_background(race, POSTER_STYLE, key)
-    save_poster(bg, race, POSTER_STYLE)
+    # генерим по одному стилю за запуск cron (*/5) — не грузим прокси/OpenRouter
+    # тремя тяжёлыми запросами разом; за 30ч запаса все три успеют подготовиться.
+    style = missing[0]
+    print(f"auto: pre-generating '{style}' R{race['round']} {race['name']}, "
+          f"{left_h:.2f}h left ({len(missing)} of {len(POSTER_STYLES)} left)")
+    bg = gen_background(race, style, key)
+    out = save_poster(bg, race, style)
     print(f"poster saved: {out}")
 
 
