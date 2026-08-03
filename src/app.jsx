@@ -1241,8 +1241,22 @@ const toMSK = (utcTime) => {
     return `${String(msk).padStart(2,'0')}:${m} МСК`;
 };
 
+// Рукописное зачёркивание номера пройденной гонки (по мотивам Норриса).
+const RaceStrike = ({color = 'var(--f1-red)'}) => (
+    <svg viewBox="0 0 100 44" preserveAspectRatio="none"
+         style={{position:'absolute',left:'-10%',top:'50%',width:'120%',height:'80%',
+                 transform:'translateY(-50%) rotate(-5deg)',pointerEvents:'none',overflow:'visible'}}>
+        <path d="M3 27 C 22 13, 40 31, 60 17 S 90 23, 98 11" fill="none"
+              stroke={color} strokeWidth="5.5" strokeLinecap="round" opacity="0.92"/>
+        <path d="M5 15 C 27 27, 45 11, 67 25 S 91 13, 97 23" fill="none"
+              stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.7"/>
+    </svg>
+);
+
 const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree}) => {
     const [filter, setFilter] = useState('all');
+    const resultsByRound = {};
+    if (seasonResults && seasonResults.races) seasonResults.races.forEach(r => { resultsByRound[r.round] = r; });
     const races = (seasonResults && seasonResults.races && seasonResults.races.length ? seasonResults.races : null) || (schedule && schedule.races) || [];
     if (!races.length) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка расписания..."/></div>;
 
@@ -1251,55 +1265,82 @@ const SchedulePage = ({seasonResults, schedule, season, onRaceClick, spoilerFree
     const future = races.filter(r => raceTime(r) > now.getTime());
     const nextRound = future.length ? future[0].round : null;
     const filtered = filter === 'up' ? future : filter === 'past' ? races.filter(r => raceTime(r) <= now.getTime()) : races;
+    const SERIF = "Georgia, 'Times New Roman', serif";
+
+    const winnerOf = (race) => {
+        const res = resultsByRound[race.round] || race;
+        const p = res.podium && res.podium[0];
+        return race.winner || res.winner || (p && (p.driver || p.name || p.driver_name)) || null;
+    };
 
     return (
-        <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div style={{fontSize:30,fontWeight:800,letterSpacing:-0.5,textTransform:'uppercase'}}>КАЛЕНДАРЬ</div>
-                <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',borderRadius:999,padding:'8px 16px',fontSize:14,fontWeight:700}}>{season}</div>
+        <div className="page-container fade-in" style={{padding:'14px 16px 20px'}}>
+            {/* Двухслойный заголовок: Russo + serif-водяной знак сезона + росчерк */}
+            <div style={{position:'relative', marginBottom:20, paddingTop:8, overflow:'hidden'}}>
+                <div style={{position:'absolute', right:-6, top:-14, fontFamily:SERIF, fontStyle:'italic',
+                             fontSize:'clamp(90px,30vw,150px)', lineHeight:1, color:'rgba(255,255,255,0.05)',
+                             pointerEvents:'none', userSelect:'none', letterSpacing:-4}}>{season}</div>
+                <div style={{position:'relative', fontFamily:"'Russo One','Exo 2',sans-serif", fontWeight:400,
+                             fontSize:'clamp(34px,11vw,50px)', textTransform:'uppercase', lineHeight:0.94, letterSpacing:-1}}>
+                    Календарь
+                </div>
+                <div style={{position:'relative', fontFamily:SERIF, fontStyle:'italic', fontSize:'clamp(15px,4.6vw,20px)',
+                             color:'rgba(255,255,255,0.34)', marginTop:2}}>сезон {season}</div>
+                <svg viewBox="0 0 220 20" preserveAspectRatio="none" style={{display:'block',width:150,height:13,marginTop:6,overflow:'visible'}}>
+                    <path d="M2 12 C 50 3, 100 17, 150 7 S 205 10, 218 5" fill="none" stroke="var(--f1-red)" strokeWidth="4" strokeLinecap="round"/>
+                </svg>
             </div>
 
-            <div className="tab-switch" style={{marginBottom:16}}>
+            <div className="tab-switch" style={{marginBottom:6}}>
                 {[['all','ВСЕ'],['up','БЛИЖАЙШИЕ'],['past','ПРОШЕДШИЕ']].map(([id,label]) => (
                     <button key={id} className={`tab-switch-btn ${filter===id?'active':''}`} style={{letterSpacing:2,fontSize:11,fontWeight:800}} onClick={()=>setFilter(id)}>{label}</button>
                 ))}
             </div>
 
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {filtered.map((race) => {
+            {/* Протокол-таблица: строка = гонка, гигантский № (зачёркнут у пройденных) */}
+            <div>
+                {filtered.map((race, i) => {
                     const isPast = raceTime(race) <= now.getTime();
                     const isNext = race.round === nextRound;
                     const d = new Date((race.race_datetime || race.date || '').replace('Z',''));
-                    const dateRu = d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'}).toUpperCase();
-                    const title = (race.name || '').replace(/^Гран[- ]при\s+/i,'').toUpperCase();
+                    const dateRu = d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'}).replace('.','').toUpperCase();
+                    const country = (race.country || race.name || '').replace(/^Гран[- ]при\s+/i,'').toUpperCase();
+                    const winner = isPast ? winnerOf(race) : null;
                     return (
                         <div key={race.round} onClick={()=>onRaceClick(race.round)}
-                             style={{background:'var(--f1-card-solid)',borderRadius:22,border:'1px solid '+(isNext?'rgba(225,6,0,0.55)':'var(--f1-border)'),
-                                     boxShadow:isNext?'0 6px 18px rgba(225,6,0,0.22)':'none',
-                                     display:'flex',alignItems:'center',padding:'16px 14px 16px 18px',cursor:'pointer',opacity:isPast?0.55:1,flexShrink:0}}>
-                            <div style={{width:74,flexShrink:0}}>
-                                <div style={{fontSize:36,lineHeight:'38px',fontWeight:800,letterSpacing:-1}}>{String(race.round).padStart(2,'0')}</div>
-                                <div style={{fontSize:10,color:'var(--f1-red)',marginTop:8,letterSpacing:1.5,fontWeight:800}}>{dateRu}</div>
-                                {race.locality && <div style={{fontSize:9,letterSpacing:1.2,fontWeight:700,marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.locality.toUpperCase()}</div>}
+                             style={{display:'flex',alignItems:'center',gap:12,padding:'15px 2px',cursor:'pointer',position:'relative',
+                                     borderBottom:i<filtered.length-1?'1px solid rgba(255,255,255,0.07)':'none',
+                                     background:isNext?'linear-gradient(90deg, rgba(225,6,0,0.10), transparent 70%)':'transparent'}}>
+                            {isNext && <div style={{position:'absolute',left:-16,top:0,bottom:0,width:3,background:'var(--f1-red)',boxShadow:'0 0 10px rgba(225,6,0,0.8)'}}/>}
+                            <div style={{position:'relative',width:58,flexShrink:0,textAlign:'left'}}>
+                                <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:40,lineHeight:1,letterSpacing:-2,
+                                             color:isPast?'rgba(255,255,255,0.32)':'#fff'}}>{String(race.round).padStart(2,'0')}</div>
+                                {isPast && <RaceStrike/>}
                             </div>
-                            <div style={{margin:'0 8px',flexShrink:0}}>{race.country_code ? <FlagImg code={race.country_code} size={26}/> : <span style={{fontSize:24}}>{circuitFlags[race.circuit_id]||''}</span>}</div>
-                            <div style={{flex:1,minWidth:0,marginLeft:4}}>
-                                <div style={{fontSize:10,color:'var(--f1-text-secondary)',letterSpacing:2.5,fontWeight:700}}>ГРАН-ПРИ</div>
-                                <div style={{fontSize:18,lineHeight:'21px',fontWeight:800,letterSpacing:-0.3,marginTop:2}}>{title}</div>
-                                {race.circuit && <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.circuit}</div>}
-                                {(race.laps || race.base_lap) && (
-                                    <div style={{fontSize:10.5,color:'var(--f1-text-muted)',marginTop:3,fontVariantNumeric:'tabular-nums'}}>
-                                        {[race.laps ? `${race.laps} кругов` : null, race.base_lap ? `круг ~${fmtBaseLap(race.base_lap)}` : null].filter(Boolean).join(' · ')}
-                                    </div>
-                                )}
-                                {race.sprint && <span style={{display:'inline-block',marginTop:5,background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:5,letterSpacing:1}}>СПРИНТ</span>}
+                            <div style={{flex:1,minWidth:0}}>
+                                <div style={{display:'flex',alignItems:'center',gap:9}}>
+                                    {race.country_code ? <FlagImg code={race.country_code} size={22}/> : <span style={{fontSize:20}}>{circuitFlags[race.circuit_id]||''}</span>}
+                                    <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:'clamp(17px,5.4vw,23px)',
+                                                 textTransform:'uppercase',letterSpacing:-0.4,lineHeight:1,whiteSpace:'nowrap',
+                                                 overflow:'hidden',textOverflow:'ellipsis',opacity:isPast?0.6:1}}>{country}</div>
+                                    {race.sprint && <span style={{background:'rgba(255,128,0,0.18)',color:'#FF8000',fontSize:8,fontWeight:800,padding:'2px 5px',borderRadius:4,letterSpacing:1,flexShrink:0}}>SPR</span>}
+                                </div>
+                                <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                    {winner ? <span style={{color:'var(--f1-text-secondary)'}}>{'\U0001F3C6'} {winner}</span> : (race.circuit || race.locality || '')}
+                                </div>
                             </div>
-                            {race.circuit_outline && <img src={race.circuit_outline} alt="" loading="lazy" style={{width:72,height:52,objectFit:'contain',opacity:isNext?1:0.95,flexShrink:0,filter:isNext?'drop-shadow(0 0 6px rgba(225,6,0,0.9))':'none'}} onError={e=>{e.target.style.display='none'}}/>}
-                            <div style={{color:'var(--f1-text-muted)',fontSize:17,marginLeft:8}}>{'\u203a'}</div>
+                            <div style={{textAlign:'right',flexShrink:0,display:'flex',alignItems:'center',gap:8}}>
+                                <div>
+                                    <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,
+                                                 color:isPast?'var(--f1-text-muted)':'var(--f1-red)',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{dateRu}</div>
+                                    <div style={{fontSize:9.5,color:'var(--f1-text-muted)',marginTop:4,fontVariantNumeric:'tabular-nums'}}>{race.laps ? `${race.laps} кр.` : (isPast?'завершён':'')}</div>
+                                </div>
+                                <div style={{color:'var(--f1-text-muted)',fontSize:16}}>{'›'}</div>
+                            </div>
                         </div>
                     );
                 })}
-                {filtered.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)'}}>Гонок не найдено</div>}
+                {filtered.length === 0 && <div style={{textAlign:'center',color:'var(--f1-text-muted)',padding:24}}>Гонок не найдено</div>}
             </div>
         </div>
     );
@@ -1831,7 +1872,7 @@ const DriverPickRow = ({d, isSelected, rank, onClick, disabled}) => {
 // 3D-неоновая схема трассы (по мотивам landonorris.com/calendar) — чистый
 // контур из телеметрии (эндпоинт /api/circuit/{id}/track), псевдо-3D пол в
 // перспективе + светящаяся лента + «горячий круг» бегущей кометой.
-const Track3D = ({circuitId, accent, onState}) => {
+const Track3D = ({circuitId, accent, onState, big}) => {
     const wrapRef = useRef(null);
     const canvasRef = useRef(null);
     const [pts, setPts] = useState(null);
@@ -1866,7 +1907,7 @@ const Track3D = ({circuitId, accent, onState}) => {
         let W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
         const resize = () => {
             const cw = wrapRef.current ? wrapRef.current.clientWidth : 340;
-            W = cw; H = Math.round(cw * 0.74);
+            W = cw; H = Math.round(cw * (big ? 1.02 : 0.74));
             canvas.width = W * dpr; canvas.height = H * dpr;
             canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1985,6 +2026,7 @@ function hexA(hex, a) {
 const TrackSection = ({race}) => {
     const [hist, setHist] = useState(null);
     const [has3d, setHas3d] = useState(null);   // null=грузится, true=3D, false=PNG-фолбэк
+    const [expanded, setExpanded] = useState(false);
     useEffect(() => {
         if (!race?.circuit_id) return;
         let a = true;
@@ -2003,9 +2045,19 @@ const TrackSection = ({race}) => {
                 <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Трасса</div>
                 <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
             </div>
-            {/* 3D-неоновая схема трассы — герой; плоский PNG только если 3D нет */}
+            {/* 3D-неоновая схема трассы — герой; тап = на весь экран */}
             {race.circuit_id && has3d !== false && (
-                <Track3D circuitId={race.circuit_id} onState={setHas3d}/>
+                <div style={{position:'relative',cursor:'pointer'}} onClick={()=>has3d && setExpanded(true)}>
+                    <Track3D circuitId={race.circuit_id} onState={setHas3d}/>
+                    {has3d && (
+                        <div style={{position:'absolute',right:6,top:6,display:'flex',alignItems:'center',gap:5,
+                                     padding:'5px 9px',borderRadius:999,background:'rgba(0,0,0,0.45)',backdropFilter:'blur(4px)',
+                                     border:'1px solid rgba(255,255,255,0.14)',fontSize:9.5,fontWeight:700,letterSpacing:1,
+                                     textTransform:'uppercase',color:'rgba(255,255,255,0.8)',pointerEvents:'none'}}>
+                            <span style={{fontSize:12,lineHeight:1}}>⤢</span> Развернуть
+                        </div>
+                    )}
+                </div>
             )}
             {race.circuit_outline && has3d === false && (
                 <div style={{position:'relative',display:'flex',justifyContent:'center',padding:'10px 0 2px'}}>
@@ -2049,6 +2101,27 @@ const TrackSection = ({race}) => {
                         </div>
                     ))}
                 </div>
+            )}
+            {/* Полноэкранный режим 3D-трассы */}
+            {expanded && (
+                <BodyPortal>
+                    <div style={{position:'fixed',inset:0,zIndex:3200,background:'var(--f1-darker)',display:'flex',flexDirection:'column'}}>
+                        <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+                            <button onClick={()=>setExpanded(false)} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:999,padding:'8px 15px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Закрыть</button>
+                            <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,textTransform:'uppercase',letterSpacing:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{race.circuit || race.name}</div>
+                        </div>
+                        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'0 10px 30px'}}>
+                            <Track3D circuitId={race.circuit_id} big/>
+                            <div style={{textAlign:'center',marginTop:16}}>
+                                {(race.locality || race.country) && <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>{flagEmoji(race.country_code)} {race.locality}{race.country ? `, ${race.country}` : ''}</div>}
+                                <div style={{display:'flex',justifyContent:'center',gap:22,marginTop:12}}>
+                                    {race.laps && <div style={{textAlign:'center'}}><div style={{fontSize:24,fontFamily:"'Russo One','Exo 2',sans-serif"}}>{race.laps}</div><div style={{fontSize:8.5,letterSpacing:1.5,color:'var(--f1-text-muted)',textTransform:'uppercase',marginTop:3}}>Кругов</div></div>}
+                                    {race.base_lap && <div style={{textAlign:'center'}}><div style={{fontSize:24,fontFamily:"'Russo One','Exo 2',sans-serif"}}>~{fmtBaseLap(race.base_lap)}</div><div style={{fontSize:8.5,letterSpacing:1.5,color:'var(--f1-text-muted)',textTransform:'uppercase',marginTop:3}}>Круг</div></div>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </BodyPortal>
             )}
         </div>
     );
