@@ -411,8 +411,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
     if (!nextRace && !lastRace) return (
         <div className="page-container fade-in" style={{padding:16}}>
             <div style={{textAlign:'center',padding:'8px 0'}}>
-                <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · {season}</div>
-                <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
+                <img src="/static/logo-f1hub.png?v=1" alt="F1 Hub" style={{width:'min(94%,360px)',height:'auto',margin:'0 auto',display:'block'}}/>
                 <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
                     {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
                 </div>
@@ -424,8 +423,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
         <div className="page-container fade-in" ref={ptr.containerRef} onTouchStart={ptr.onTouchStart} onTouchMove={ptr.onTouchMove} onTouchEnd={ptr.onTouchEnd} style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
             {ptr.indicatorEl}
             <div style={{textAlign:'center',padding:'8px 0'}}>
-                <div style={{fontSize:12,color:'var(--f1-text-muted)',letterSpacing:3,textTransform:'uppercase'}}>Formula 1 · {season}</div>
-                <h1 style={{fontSize:26,fontWeight:900,margin:'4px 0'}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></h1>
+                <img src="/static/logo-f1hub.png?v=1" alt="F1 Hub" style={{width:'min(94%,360px)',height:'auto',margin:'0 auto',display:'block'}}/>
                 <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
                     {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
                 </div>
@@ -2468,12 +2466,13 @@ const PredictionsPage = ({user}) => {
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
             {/* Header */}
-            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16}}>
-                <div style={{minWidth:0}}>
+            <div style={{position:'relative',display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16,minHeight:96}}>
+                <img src="/static/betting.png?v=1" alt="" style={{position:'absolute',right:-14,top:-16,height:150,width:'auto',objectFit:'contain',opacity:0.85,pointerEvents:'none',zIndex:0}}/>
+                <div style={{minWidth:0,position:'relative',zIndex:1}}>
                     <div style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase'}}>ПРОГНОЗЫ</div>
                     {raceName && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{raceName}</div>}
                 </div>
-                <button onClick={()=>setView(view==='make'?'mine':'make')} style={{display:'flex',alignItems:'center',gap:7,background:view==='mine'?'#E10600':'var(--f1-card-solid)',border:'1px solid '+(view==='mine'?'#E10600':'var(--f1-border)'),borderRadius:999,padding:'10px 16px',color:view==='mine'?'#fff':'var(--f1-text)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+                <button onClick={()=>setView(view==='make'?'mine':'make')} style={{position:'relative',zIndex:2,display:'flex',alignItems:'center',gap:7,background:view==='mine'?'#E10600':'var(--f1-card-solid)',border:'1px solid '+(view==='mine'?'#E10600':'var(--f1-border)'),borderRadius:999,padding:'10px 16px',color:view==='mine'?'#fff':'var(--f1-text)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
                     {'📋'} Мои
                 </button>
             </div>
@@ -2802,7 +2801,10 @@ const VideosPage = ({schedule, onOpen}) => {
     const order = {review:-1, race:0, sprint:1, qualifying:2, sprint_qualifying:3, fp3:4, fp2:5, fp1:6};
     return (
         <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-            <div style={{fontSize:26,fontWeight:800,fontStyle:'italic',margin:'4px 4px 0'}}>ВИДЕО</div>
+            <div style={{position:'relative',margin:'4px 4px 0',minHeight:104}}>
+                <div style={{fontSize:26,fontWeight:800,fontStyle:'italic'}}>ВИДЕО</div>
+                <img src="/static/popcorn.png?v=1" alt="" style={{position:'absolute',right:0,top:-14,height:126,width:'auto',objectFit:'contain',pointerEvents:'none',filter:'drop-shadow(0 6px 14px rgba(0,0,0,0.5))'}}/>
+            </div>
             {rounds.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)'}}>Записей пока нет</div>}
             {rounds.map(round => {
                 const race = raceByRound[round];
@@ -2872,7 +2874,7 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
                 <div style={{flex:1,minWidth:0,position:'relative',overflow:'hidden',paddingRight:4}}>
                     <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.first_name}</div>
                     {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2}}>@{user.username}</div>}
-                    <img src="/static/leclerc.webp?v=2" alt="" style={{position:'absolute',right:-6,top:-16,width:'auto',height:92,objectFit:'contain',opacity:0.9,pointerEvents:'none'}}/>
+                    <img src="/static/merc-duo.webp?v=1" alt="" style={{position:'absolute',right:-10,top:-20,width:148,height:'auto',maxHeight:120,objectFit:'contain',opacity:0.95,pointerEvents:'none'}}/>
                 </div>
             </div>
 
