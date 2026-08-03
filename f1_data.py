@@ -9,6 +9,7 @@ import re
 import time
 import logging
 import json
+import math
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
@@ -1063,24 +1064,74 @@ CIRCUIT_TRACK_SESSION = {
 }
 
 
+# circuit_id -> id трассы в открытом датасете bacinger/f1-circuits (все трассы).
+# Фолбэк, когда нет нашей телеметрии — покрывает ВЕСЬ календарь.
+CIRCUIT_GEOJSON_ID = {
+    "albert_park": "au-1953", "shanghai": "cn-2004", "catalunya": "es-1991",
+    "monaco": "mc-1929", "villeneuve": "ca-1978", "red_bull_ring": "at-1969",
+    "silverstone": "gb-1948", "hungaroring": "hu-1986", "spa": "be-1925",
+    "monza": "it-1922", "marina_bay": "sg-2008", "suzuka": "jp-1962",
+    "americas": "us-2012", "rodriguez": "mx-1962", "interlagos": "br-1940",
+    "yas_marina": "ae-2009", "jeddah": "sa-2021", "miami": "us-2022",
+    "losail": "qa-2004", "vegas": "us-2023", "imola": "it-1953",
+    "zandvoort": "nl-1948", "bahrain": "bh-2002", "baku": "az-2016",
+    "madring": "es-2026", "madrid": "es-2026",
+}
+_GEOJSON_CACHE = None
+
+
+def _load_circuit_geojson_points(circuit_id):
+    """Точки контура из geojson-датасета (lat/lng -> плоские x/y). None если нет."""
+    global _GEOJSON_CACHE
+    gid = CIRCUIT_GEOJSON_ID.get(circuit_id)
+    if not gid:
+        return None
+    if _GEOJSON_CACHE is None:
+        try:
+            path = os.path.join(os.path.dirname(TRACK_CACHE_DIR), "f1-circuits.geojson")
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            _GEOJSON_CACHE = {ft["properties"]["id"]: ft["geometry"]["coordinates"]
+                              for ft in data.get("features", [])
+                              if ft.get("geometry", {}).get("type") == "LineString"}
+        except (IOError, json.JSONDecodeError, KeyError):
+            _GEOJSON_CACHE = {}
+    coords = _GEOJSON_CACHE.get(gid)
+    if not coords or len(coords) < 20:
+        return None
+    lat0 = sum(c[1] for c in coords) / len(coords)
+    k = math.cos(math.radians(lat0))
+    # lng*cos(lat) -> x (восток), lat -> y (север); масштаб произвольный (нормализуем)
+    return [(c[0] * k, c[1]) for c in coords]
+
+
 def get_circuit_track(circuit_id: str) -> Dict[str, Any]:
     """Чистый контур трассы, нормализованный в бокс 0..1000 с сохранением
-    пропорций (y инвертирован — экранная система координат). Для 3D-схемы."""
+    пропорций (y инвертирован — экранная СК). Источник: наша телеметрия
+    (реальная траектория) либо geojson-датасет (все трассы). Для 3D-схемы."""
     cache_key = f"circuit_track:{circuit_id}"
     cached = cache_get(cache_key, ttl_override=30 * 86400)
     if cached is not None:
         return cached
+    pts = None
+    source = None
+    # 1) наша телеметрия — приоритет (реальная траектория круга)
     sk = CIRCUIT_TRACK_SESSION.get(circuit_id)
-    if not sk:
-        return {"available": False, "circuit_id": circuit_id}
-    cache_file = os.path.join(TRACK_CACHE_DIR, f"{sk}.json")
-    try:
-        with open(cache_file, "r") as f:
-            raw = json.load(f)
-    except (IOError, json.JSONDecodeError):
-        return {"available": False, "circuit_id": circuit_id}
-    pts = [(p["x"], p["y"]) for p in raw if "x" in p and "y" in p]
-    if len(pts) < 20:
+    if sk:
+        try:
+            with open(os.path.join(TRACK_CACHE_DIR, f"{sk}.json"), "r") as f:
+                raw = json.load(f)
+            tp = [(p["x"], p["y"]) for p in raw if "x" in p and "y" in p]
+            if len(tp) >= 20:
+                pts, source = tp, "telemetry"
+        except (IOError, json.JSONDecodeError):
+            pass
+    # 2) geojson-фолбэк — покрывает все трассы
+    if pts is None:
+        gp = _load_circuit_geojson_points(circuit_id)
+        if gp:
+            pts, source = gp, "geojson"
+    if not pts:
         return {"available": False, "circuit_id": circuit_id}
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
@@ -1093,7 +1144,7 @@ def get_circuit_track(circuit_id: str) -> Dict[str, Any]:
              "y": round(1000 - ((y - miny) / rng * 1000 + offy), 1)}
             for x, y in pts]
     aspect = round((maxx - minx) / (maxy - miny), 3) if (maxy - miny) else 1.0
-    result = {"available": True, "circuit_id": circuit_id,
+    result = {"available": True, "circuit_id": circuit_id, "source": source,
               "points": norm, "count": len(norm), "aspect": aspect}
     cache_set(cache_key, result)
     return result
