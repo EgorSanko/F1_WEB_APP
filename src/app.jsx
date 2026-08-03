@@ -2549,7 +2549,6 @@ const PredictionsPage = ({user}) => {
                             <div style={{fontSize:17,fontWeight:800,letterSpacing:1,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(race.locality||race.country||'').toUpperCase()}</div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{race.race_datetime ? new Date(race.race_datetime.replace('Z','')).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})+' г.' : ''}</div>
                         </div>
-                        <img src="/static/leclerc.webp?v=3" alt="" style={{position:'absolute',right:-4,top:-14,width:'auto',height:96,objectFit:'contain',opacity:0.95,pointerEvents:'none'}}/>
                     </div>
                     <div style={{height:1,background:'rgba(225,6,0,0.18)',margin:'0 14px'}}/>
                     {cd && (
