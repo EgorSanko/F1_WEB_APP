@@ -428,7 +428,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                     {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
                 </div>
                 <button onClick={onToggleSpoiler} style={{marginTop:8,display:'flex',alignItems:'center',gap:6,margin:'8px auto 0',background:spoilerFree?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(spoilerFree?'rgba(225,6,0,0.3)':'var(--f1-border)'),borderRadius:8,padding:'5px 14px',color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
-                    {spoilerFree ? '🙈' : '👁️'} Антиспойлер {spoilerFree ? 'вкл' : 'выкл'}
+                    <img src="/static/antispoiler.png?v=1" alt="" style={{width:19,height:19,borderRadius:4,objectFit:'cover',verticalAlign:'middle',marginRight:2,opacity:spoilerFree?1:0.5}}/> Антиспойлер {spoilerFree ? 'вкл' : 'выкл'}
                 </button>
             </div>
 
@@ -588,7 +588,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
 
             {spoilerFree && (lastRace?.results || standings?.standings) && (
                 <div className="card" style={{padding:'20px 16px',textAlign:'center'}}>
-                    <div style={{fontSize:32,marginBottom:8}}>🙈</div>
+                    <img src="/static/antispoiler.png?v=1" alt="" style={{width:58,height:58,borderRadius:14,objectFit:'cover',margin:'0 auto 8px',display:'block'}}/>
                     <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Антиспойлер включён</div>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)'}}>Результаты и чемпионат скрыты</div>
                 </div>
@@ -2740,7 +2740,7 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
 
             {!reveal ? (
                 <div className="card" onClick={()=>setReveal(true)} style={{textAlign:'center',padding:'24px 16px',cursor:'pointer',border:'1px solid rgba(225,6,0,0.2)',marginBottom:16}}>
-                    <div style={{fontSize:28,marginBottom:8}}>{'\ud83d\ude48'}</div>
+                    <img src="/static/antispoiler.png?v=1" alt="" style={{width:52,height:52,borderRadius:12,objectFit:'cover',margin:'0 auto 8px',display:'block'}}/>
                     <div style={{fontSize:14,fontWeight:800,color:'var(--f1-red)'}}>Комментарии скрыты</div>
                     <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:4}}>Могут содержать спойлеры результатов. Нажми, чтобы показать.</div>
                 </div>
@@ -2942,7 +2942,7 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
                         <div style={{display:'flex',gap:8}}>{badges.map((b,i)=><Hex key={i} b={b}/>)}</div>
                         <div style={{height:1,background:'var(--f1-border)',margin:'16px 0 4px'}}/>
                         <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0 2px'}}>
-                            <div style={{width:36,height:36,borderRadius:10,background:'rgba(225,6,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>{spoilerFree?'\ud83d\ude48':'\ud83d\udc41\ufe0f'}</div>
+                            <div style={{width:36,height:36,borderRadius:10,overflow:'hidden',flexShrink:0}}><img src="/static/antispoiler.png?v=1" alt="" style={{width:'100%',height:'100%',objectFit:'cover',opacity:spoilerFree?1:0.55}}/></div>
                             <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:14,fontWeight:800}}>Антиспойлер</div>
                                 <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>Скрывает результаты гонок и таблицу сезона</div>
@@ -4176,7 +4176,7 @@ const SpoilerWarningOverlay = ({onDismiss, onBack}) => {
     return (
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'#000',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
             <div className="card" style={{maxWidth:340,width:'100%',textAlign:'center',padding:'28px 24px'}}>
-                <div style={{fontSize:48,marginBottom:12}}>🙈</div>
+                <img src="/static/antispoiler.png?v=1" alt="" style={{width:64,height:64,borderRadius:16,objectFit:'cover',margin:'0 auto 12px',display:'block'}}/>
                 <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>Антиспойлер включён</div>
                 <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:20,lineHeight:1.5}}>
                     Таблица чемпионата содержит спойлеры последних гонок. Хотите всё равно посмотреть?
@@ -4573,7 +4573,7 @@ const RaceDetailPage = ({race, onBack, season, spoilerFree, allRaces, defaultTab
 
             {isSpoilerHidden && isPastRace && (
                 <div className="card" style={{padding:'28px 20px',textAlign:'center',marginBottom:16}}>
-                    <div style={{fontSize:40,marginBottom:10}}>🙈</div>
+                    <img src="/static/antispoiler.png?v=1" alt="" style={{width:56,height:56,borderRadius:16,objectFit:'cover',margin:'0 auto 10px',display:'block'}}/>
                     <div style={{fontSize:16,fontWeight:900,marginBottom:6}}>Антиспойлер включён</div>
                     <div style={{fontSize:13,color:'var(--f1-text-secondary)',marginBottom:16,lineHeight:1.5}}>Результаты этого гран-при скрыты.<br/>Вкладка «Запись» доступна без спойлеров.</div>
                     <div style={{display:'flex',gap:8,justifyContent:'center'}}>
