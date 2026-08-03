@@ -441,7 +441,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
                     <div className="hero-card">
                         {nextRace.circuit_image && <div className="hero-bg" style={{backgroundImage:`url(${hiResImg(nextRace.circuit_image, 1200)})`}}/>}
                         <div className="hero-shade"/>
-                        <img className="hero-car" src="/static/leclerc.webp" alt="" loading="lazy"/>
+                        <img className="hero-car" src="/static/leclerc.webp?v=2" alt="" loading="lazy"/>
                         <div className="hero-inner">
                             <div className="hero-badge">СЛЕДУЮЩИЙ ГРАН-ПРИ</div>
                             <div>
@@ -2551,7 +2551,7 @@ const PredictionsPage = ({user}) => {
                             <div style={{fontSize:17,fontWeight:800,letterSpacing:1,textTransform:'uppercase',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(race.locality||race.country||'').toUpperCase()}</div>
                             <div style={{fontSize:11,color:'var(--f1-text-muted)',marginTop:2}}>{race.race_datetime ? new Date(race.race_datetime.replace('Z','')).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})+' г.' : ''}</div>
                         </div>
-                        <img src="/static/leclerc.webp" alt="" style={{position:'absolute',right:-4,top:-14,width:'auto',height:96,objectFit:'contain',opacity:0.95,pointerEvents:'none'}}/>
+                        <img src="/static/leclerc.webp?v=2" alt="" style={{position:'absolute',right:-4,top:-14,width:'auto',height:96,objectFit:'contain',opacity:0.95,pointerEvents:'none'}}/>
                     </div>
                     <div style={{height:1,background:'rgba(225,6,0,0.18)',margin:'0 14px'}}/>
                     {cd && (
@@ -2872,7 +2872,7 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
                 <div style={{flex:1,minWidth:0,position:'relative',overflow:'hidden',paddingRight:4}}>
                     <div style={{fontSize:24,fontWeight:800,letterSpacing:-0.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.first_name}</div>
                     {user.username && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2}}>@{user.username}</div>}
-                    <img src="/static/leclerc.webp" alt="" style={{position:'absolute',right:-6,top:-16,width:'auto',height:92,objectFit:'contain',opacity:0.9,pointerEvents:'none'}}/>
+                    <img src="/static/leclerc.webp?v=2" alt="" style={{position:'absolute',right:-6,top:-16,width:'auto',height:92,objectFit:'contain',opacity:0.9,pointerEvents:'none'}}/>
                 </div>
             </div>
 
