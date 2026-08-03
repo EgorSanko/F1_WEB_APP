@@ -2464,15 +2464,16 @@ const PredictionsPage = ({user}) => {
 
     return (
         <div className="page-container fade-in" style={{padding:'12px 16px'}}>
-            {/* Header */}
-            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16}}>
-                <div style={{minWidth:0}}>
+            {/* Header + маскот-ставка справа (интегрирован по размеру) */}
+            <div style={{position:'relative',minHeight:150,marginBottom:8}}>
+                <div style={{position:'relative',zIndex:1,maxWidth:'58%'}}>
                     <div style={{fontSize:30,fontWeight:800,fontStyle:'italic',letterSpacing:-0.5,textTransform:'uppercase'}}>ПРОГНОЗЫ</div>
                     {raceName && <div style={{fontSize:13,color:'var(--f1-text-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{raceName}</div>}
+                    <button onClick={()=>setView(view==='make'?'mine':'make')} style={{marginTop:14,display:'inline-flex',alignItems:'center',gap:7,background:view==='mine'?'#E10600':'var(--f1-card-solid)',border:'1px solid '+(view==='mine'?'#E10600':'var(--f1-border)'),borderRadius:999,padding:'9px 16px',color:view==='mine'?'#fff':'var(--f1-text)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                        {'📋'} Мои
+                    </button>
                 </div>
-                <button onClick={()=>setView(view==='make'?'mine':'make')} style={{display:'flex',alignItems:'center',gap:7,background:view==='mine'?'#E10600':'var(--f1-card-solid)',border:'1px solid '+(view==='mine'?'#E10600':'var(--f1-border)'),borderRadius:999,padding:'10px 16px',color:view==='mine'?'#fff':'var(--f1-text)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
-                    {'📋'} Мои
-                </button>
+                <img src="/static/betting.png?v=1" alt="" style={{position:'absolute',right:-8,bottom:0,height:152,width:'auto',objectFit:'contain',pointerEvents:'none',zIndex:0,filter:'drop-shadow(0 6px 16px rgba(0,0,0,0.45))'}}/>
             </div>
 
             {!user && (
@@ -2801,7 +2802,7 @@ const VideosPage = ({schedule, onOpen}) => {
         <div className="page-container fade-in" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
             <div style={{position:'relative',margin:'4px 4px 0',minHeight:104}}>
                 <div style={{fontSize:26,fontWeight:800,fontStyle:'italic'}}>ВИДЕО</div>
-                <img src="/static/popcorn.png?v=1" alt="" style={{position:'absolute',right:0,top:-14,height:126,width:'auto',objectFit:'contain',pointerEvents:'none',filter:'drop-shadow(0 6px 14px rgba(0,0,0,0.5))'}}/>
+                <img src="/static/popcorn-anim.webp?v=1" alt="" style={{position:'absolute',right:-6,top:-16,height:140,width:'auto',objectFit:'contain',pointerEvents:'none',filter:'drop-shadow(0 6px 14px rgba(0,0,0,0.5))'}}/>
             </div>
             {rounds.length === 0 && <div className="card" style={{textAlign:'center',color:'var(--f1-text-muted)'}}>Записей пока нет</div>}
             {rounds.map(round => {
