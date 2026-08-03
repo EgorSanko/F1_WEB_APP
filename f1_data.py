@@ -155,7 +155,7 @@ _SNAPSHOT_PREFIXES = (
     "schedule", "standings_drivers", "standings_constructors",
     "race_results", "qualifying_results", "champions", "history",
     # прошлые гонки не меняются — переживают рестарт и live-локдаун OpenF1
-    "timeline", "pitstops",
+    "timeline", "pitstops", "circuit_track",
 )
 
 
@@ -1049,6 +1049,54 @@ async def get_circuit_history(circuit_id: str) -> Dict[str, Any]:
         "most_wins": ({"driver": top[0][0], "wins": top[0][1]} if top else None),
         "winners": here[:12],
     }
+
+
+# ============ CIRCUIT TRACK OUTLINE (для 3D-схемы трассы) ============
+
+# circuit_id -> session_key со СВЕЖИМ сохранённым контуром (data/tracks/*.json).
+# Источник — телеметрия одного круга (чистый замкнутый контур ~370 точек).
+CIRCUIT_TRACK_SESSION = {
+    "zandvoort": "9920", "spa": "9939", "silverstone": "9947",
+    "interlagos": "9869", "yas_marina": "9839", "jeddah": "10022",
+    "shanghai": "9998", "red_bull_ring": "9955", "albert_park": "11228",
+    "suzuka": "11247",
+}
+
+
+def get_circuit_track(circuit_id: str) -> Dict[str, Any]:
+    """Чистый контур трассы, нормализованный в бокс 0..1000 с сохранением
+    пропорций (y инвертирован — экранная система координат). Для 3D-схемы."""
+    cache_key = f"circuit_track:{circuit_id}"
+    cached = cache_get(cache_key, ttl_override=30 * 86400)
+    if cached is not None:
+        return cached
+    sk = CIRCUIT_TRACK_SESSION.get(circuit_id)
+    if not sk:
+        return {"available": False, "circuit_id": circuit_id}
+    cache_file = os.path.join(TRACK_CACHE_DIR, f"{sk}.json")
+    try:
+        with open(cache_file, "r") as f:
+            raw = json.load(f)
+    except (IOError, json.JSONDecodeError):
+        return {"available": False, "circuit_id": circuit_id}
+    pts = [(p["x"], p["y"]) for p in raw if "x" in p and "y" in p]
+    if len(pts) < 20:
+        return {"available": False, "circuit_id": circuit_id}
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
+    rng = max(maxx - minx, maxy - miny) or 1
+    # центрируем в 1000-боксе, сохраняем пропорции, y вниз (экранная СК)
+    offx = (1000 - (maxx - minx) / rng * 1000) / 2
+    offy = (1000 - (maxy - miny) / rng * 1000) / 2
+    norm = [{"x": round((x - minx) / rng * 1000 + offx, 1),
+             "y": round(1000 - ((y - miny) / rng * 1000 + offy), 1)}
+            for x, y in pts]
+    aspect = round((maxx - minx) / (maxy - miny), 3) if (maxy - miny) else 1.0
+    result = {"available": True, "circuit_id": circuit_id,
+              "points": norm, "count": len(norm), "aspect": aspect}
+    cache_set(cache_key, result)
+    return result
 
 
 # ============ HALL OF FAME / PITSTOPS / RACE TIMELINE ============

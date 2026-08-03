@@ -1828,8 +1828,163 @@ const DriverPickRow = ({d, isSelected, rank, onClick, disabled}) => {
 // Секция «Трасса» в карточке ГП — постерно, по манифесту: схема трассы как
 // арт-объект со свечением, факты hairline-лентой (без карточек), рекордсмен
 // и последние победители из нашей истории (кэш 24ч на бэке).
+// 3D-неоновая схема трассы (по мотивам landonorris.com/calendar) — чистый
+// контур из телеметрии (эндпоинт /api/circuit/{id}/track), псевдо-3D пол в
+// перспективе + светящаяся лента + «горячий круг» бегущей кометой.
+const Track3D = ({circuitId, accent, onState}) => {
+    const wrapRef = useRef(null);
+    const canvasRef = useRef(null);
+    const [pts, setPts] = useState(null);
+    const [failed, setFailed] = useState(false);
+    const rafRef = useRef(0);
+    const visRef = useRef(true);
+    const col = accent || '#E10600';
+
+    useEffect(() => {
+        if (!circuitId) return;
+        let a = true;
+        api.get(`/api/circuit/${circuitId}/track`).then(d => {
+            if (!a) return;
+            if (d?.available && d.points?.length > 20) { setPts(d.points); onState && onState(true); }
+            else { setFailed(true); onState && onState(false); }
+        }).catch(() => { if (a) { setFailed(true); onState && onState(false); } });
+        return () => { a = false; };
+    }, [circuitId]);
+
+    useEffect(() => {
+        if (!pts || !canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const io = new IntersectionObserver(
+            (e) => { visRef.current = e[0].isIntersecting; },
+            { threshold: 0.05 });
+        io.observe(canvas);
+
+        // проекция «пол в перспективе»: далёкий край сильно уже и выше,
+        // ближний — шире и ниже (наклонная плоскость, как у Норриса).
+        const PERSP = 0.62;   // насколько сужается дальний край
+        let W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const resize = () => {
+            const cw = wrapRef.current ? wrapRef.current.clientWidth : 340;
+            W = cw; H = Math.round(cw * 0.74);
+            canvas.width = W * dpr; canvas.height = H * dpr;
+            canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        const project = (nx, ny) => {
+            // nx,ny в 0..1000. depth: 0 (далеко/верх) .. 1 (близко/низ).
+            // Вертикаль тоже перспективная: дальние ряды сжаты (нелинейно).
+            const u = nx / 1000 - 0.5;
+            const depth = ny / 1000;
+            const s = 1 - PERSP * (1 - depth);        // гориз. сжатие вдаль
+            const vy = Math.pow(depth, 1.35);          // верт. перспектива
+            const padX = W * 0.10, topY = H * 0.10, botY = H * 0.94;
+            const px = W / 2 + u * (W - padX * 2) * s;
+            const py = topY + vy * (botY - topY);
+            return [px, py, s];
+        };
+
+        const proj = pts.map(p => project(p.x, p.y));
+        const n = proj.length;
+
+        const drawPath = (lw, style, blur) => {
+            ctx.beginPath();
+            for (let i = 0; i < n; i++) {
+                const [px, py] = proj[i];
+                i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+            }
+            ctx.closePath();
+            ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            ctx.lineWidth = lw; ctx.strokeStyle = style;
+            ctx.shadowColor = col; ctx.shadowBlur = blur || 0;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        };
+
+        let head = 0;
+        const TRAIL = Math.round(n * 0.16);
+        const render = () => {
+            rafRef.current = requestAnimationFrame(render);
+            if (!visRef.current) return;
+            ctx.clearRect(0, 0, W, H);
+            // фон-пол: радиальное свечение снизу
+            const g = ctx.createRadialGradient(W/2, H*0.72, 10, W/2, H*0.72, H*0.9);
+            g.addColorStop(0, 'rgba(255,255,255,0.04)');
+            g.addColorStop(0.4, hexA(col, 0.06));
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            // пол-сетка в перспективе: горизонтальные ряды вдаль + вертикали,
+            // сходящиеся к дальнему краю (читается наклонная плоскость)
+            ctx.lineWidth = 1;
+            for (let d = 0; d <= 1.0001; d += 0.125) {
+                const [lx, ly] = project(-90, d * 1000);
+                const [rx, ry] = project(1090, d * 1000);
+                ctx.strokeStyle = `rgba(255,255,255,${0.02 + d * 0.05})`;
+                ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(rx, ry); ctx.stroke();
+            }
+            for (let ux = -90; ux <= 1090; ux += 147.5) {
+                const [tx, ty] = project(ux, 0);
+                const [bx, by] = project(ux, 1000);
+                ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+                ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(bx, by); ctx.stroke();
+            }
+            // подложка-«асфальт»
+            drawPath(9, 'rgba(0,0,0,0.85)', 0);
+            drawPath(6, 'rgba(255,255,255,0.06)', 0);
+            // неон: широкий мягкий + тонкий яркий кор
+            drawPath(4.5, hexA(col, 0.9), 16);
+            drawPath(1.6, 'rgba(255,255,255,0.85)', 6);
+            // старт/финиш — клетчатая метка у points[0]
+            const [sx, sy] = proj[0];
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+            ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+            // «горячий круг» — комета с хвостом
+            head = (head + 0.6) % n;
+            for (let t = 0; t < TRAIL; t++) {
+                const idx = (Math.floor(head) - t + n) % n;
+                const [px, py] = proj[idx];
+                const a = (1 - t / TRAIL);
+                ctx.beginPath();
+                ctx.arc(px, py, 1 + a * 2.2, 0, Math.PI*2);
+                ctx.fillStyle = t === 0 ? '#fff' : hexA(col, a * 0.8);
+                ctx.shadowColor = t === 0 ? '#fff' : col;
+                ctx.shadowBlur = t === 0 ? 14 : 8 * a;
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+        };
+        render();
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            window.removeEventListener('resize', resize);
+            io.disconnect();
+        };
+    }, [pts, col]);
+
+    if (failed) return null;   // фолбэк на плоский PNG делает TrackSection
+    return (
+        <div ref={wrapRef} style={{position:'relative', width:'100%', margin:'2px 0 4px'}}>
+            <canvas ref={canvasRef} style={{display:'block', width:'100%'}}/>
+            {!pts && <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--f1-text-muted)'}}>схема трассы…</div>}
+        </div>
+    );
+};
+
+// helpers для Track3D
+function hexA(hex, a) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+}
 const TrackSection = ({race}) => {
     const [hist, setHist] = useState(null);
+    const [has3d, setHas3d] = useState(null);   // null=грузится, true=3D, false=PNG-фолбэк
     useEffect(() => {
         if (!race?.circuit_id) return;
         let a = true;
@@ -1848,7 +2003,11 @@ const TrackSection = ({race}) => {
                 <div style={{fontSize:12,fontFamily:"'Russo One','Exo 2',sans-serif",letterSpacing:2,textTransform:'uppercase',color:'var(--f1-text-muted)'}}>Трасса</div>
                 <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
             </div>
-            {race.circuit_outline && (
+            {/* 3D-неоновая схема трассы — герой; плоский PNG только если 3D нет */}
+            {race.circuit_id && has3d !== false && (
+                <Track3D circuitId={race.circuit_id} onState={setHas3d}/>
+            )}
+            {race.circuit_outline && has3d === false && (
                 <div style={{position:'relative',display:'flex',justifyContent:'center',padding:'10px 0 2px'}}>
                     <div style={{position:'absolute',inset:'-10% 0',background:'radial-gradient(55% 65% at 50% 50%, rgba(225,6,0,0.10), transparent 75%)',pointerEvents:'none'}}/>
                     <img src={race.circuit_outline} alt="" loading="lazy"

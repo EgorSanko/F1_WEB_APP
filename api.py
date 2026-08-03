@@ -881,6 +881,12 @@ async def history_circuit(circuit_id: str):
     return await f1_data.get_circuit_history(circuit_id)
 
 
+@app.get("/api/circuit/{circuit_id}/track")
+async def circuit_track(circuit_id: str):
+    """Чистый контур трассы (точки телеметрии) для 3D-схемы."""
+    return f1_data.get_circuit_track(circuit_id)
+
+
 @app.get("/api/history/champions")
 async def history_champions():
     """Зал славы: все чемпионы мира по годам (кэш 24ч + снапшот)."""
