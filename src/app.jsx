@@ -413,7 +413,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             <div style={{textAlign:'center',padding:'8px 0'}}>
                 <img src="/static/logo-f1hub.png?v=1" alt="F1 Hub" style={{width:'min(94%,360px)',height:'auto',margin:'0 auto',display:'block'}}/>
                 <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
-                    {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
+                    {[2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:'var(--f1-red)',border:'1px solid var(--f1-red)',borderRadius:8,padding:'6px 18px',color:'white',fontSize:13,fontWeight:700,cursor:'default',fontFamily:'inherit'}}>{y}</button>)}
                 </div>
             </div>
             <F1Loader text="Разогрев моторов..."/>
@@ -425,7 +425,7 @@ const HomePage = ({nextRace, lastRace, standings, user, streams, seasonResults, 
             <div style={{textAlign:'center',padding:'8px 0'}}>
                 <img src="/static/logo-f1hub.png?v=1" alt="F1 Hub" style={{width:'min(94%,360px)',height:'auto',margin:'0 auto',display:'block'}}/>
                 <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
-                    {[2025,2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:season===y?'var(--f1-red)':'rgba(255,255,255,0.06)',border:'1px solid '+(season===y?'var(--f1-red)':'var(--f1-border)'),borderRadius:8,padding:'6px 16px',color:season===y?'white':'var(--f1-text-muted)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>{y}</button>)}
+                    {[2026].map(y=><button key={y} onClick={()=>onSeasonChange(y)} style={{background:'var(--f1-red)',border:'1px solid var(--f1-red)',borderRadius:8,padding:'6px 18px',color:'white',fontSize:13,fontWeight:700,cursor:'default',fontFamily:'inherit'}}>{y}</button>)}
                 </div>
                 <button onClick={onToggleSpoiler} style={{marginTop:8,display:'flex',alignItems:'center',gap:6,margin:'8px auto 0',background:spoilerFree?'rgba(225,6,0,0.15)':'rgba(255,255,255,0.06)',border:'1px solid '+(spoilerFree?'rgba(225,6,0,0.3)':'var(--f1-border)'),borderRadius:8,padding:'5px 14px',color:spoilerFree?'var(--f1-red)':'var(--f1-text-muted)',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'all 0.2s'}}>
                     <img src="/static/antispoiler.png?v=1" alt="" style={{width:19,height:19,borderRadius:4,objectFit:'cover',verticalAlign:'middle',marginRight:2,opacity:spoilerFree?1:0.5}}/> Антиспойлер {spoilerFree ? 'вкл' : 'выкл'}
@@ -2160,11 +2160,17 @@ const CareerStrip = ({ergastId}) => {
 const HallOfFame = () => {
     const [open, setOpen] = useState(false);
     const [data, setData] = useState(null);
+    const [err, setErr] = useState(false);
+    const [tick, setTick] = useState(0);
     useEffect(() => {
-        if (!open || data) return; let a = true;
-        api.get('/api/history/champions').then(d => { if (a) setData(d); }).catch(()=>{});
+        if (!open || data) return;
+        let a = true; setErr(false);
+        api.get('/api/history/champions').then(d => {
+            if (!a) return;
+            if (d && d.champions && d.champions.length) setData(d); else setErr(true);
+        }).catch(() => { if (a) setErr(true); });
         return () => { a = false; };
-    }, [open]);
+    }, [open, tick]);
     return (<>
         <div onClick={()=>setOpen(true)} style={{display:'flex',alignItems:'center',gap:12,padding:'16px 18px',borderRadius:16,background:'linear-gradient(135deg, rgba(212,175,55,0.13), var(--f1-card-solid))',border:'1px solid rgba(212,175,55,0.28)',cursor:'pointer',marginBottom:16}}>
             <div style={{flex:1}}>
@@ -2181,7 +2187,12 @@ const HallOfFame = () => {
                         <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:15,textTransform:'uppercase',letterSpacing:1.5}}>Зал славы</div>
                     </div>
                     <div style={{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'6px 18px 40px'}}>
-                        {!data ? <F1Loader text="Загрузка чемпионов..."/> : (data.champions||[]).map((c)=>(
+                        {!data && err ? (
+                            <div style={{textAlign:'center',padding:'44px 20px'}}>
+                                <div style={{fontSize:14,color:'var(--f1-text-secondary)',marginBottom:16}}>Не удалось загрузить чемпионов</div>
+                                <button onClick={()=>{setErr(false);setTick(t=>t+1);}} style={{background:'var(--f1-red)',border:'none',borderRadius:999,padding:'10px 22px',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Повторить</button>
+                            </div>
+                        ) : !data ? <F1Loader text="Загрузка чемпионов..."/> : (data.champions||[]).map((c)=>(
                             <div key={c.season} style={{display:'flex',alignItems:'baseline',gap:14,padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                                 <div style={{fontFamily:"'Russo One','Exo 2',sans-serif",fontSize:21,color:'#D4AF37',width:62,flexShrink:0}}>{c.season}</div>
                                 <div style={{flex:1,minWidth:0}}>

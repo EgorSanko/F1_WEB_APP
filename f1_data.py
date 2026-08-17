@@ -1152,10 +1152,63 @@ def get_circuit_track(circuit_id: str) -> Dict[str, Any]:
 
 # ============ HALL OF FAME / PITSTOPS / RACE TIMELINE ============
 
+_champions_refreshing = False
+
+
+async def _rebuild_champions() -> Dict[str, Any]:
+    """Собрать чемпионов циклом по годам (~80с). Не вызывать в горячем пути —
+    только при полном отсутствии данных или в фоне."""
+    global _champions_refreshing
+    _champions_refreshing = True
+    try:
+        out = []
+        cur_year = datetime.utcnow().year
+        for y in range(1950, cur_year):
+            data = await fetch_ergast(f"{y}/driverStandings/1")
+            try:
+                sl = data.get("StandingsTable", {}).get("StandingsLists", [])
+                ds = sl[0]["DriverStandings"][0]
+                drv = ds.get("Driver", {})
+                con = (ds.get("Constructors") or [{}])[0]
+                out.append({
+                    "season": y,
+                    "driver": f"{drv.get('givenName','')} {drv.get('familyName','')}".strip(),
+                    "code": drv.get("code"),
+                    "nationality": drv.get("nationality"),
+                    "constructor": con.get("name"),
+                    "points": ds.get("points"),
+                    "wins": ds.get("wins"),
+                })
+            except (KeyError, IndexError, TypeError, AttributeError):
+                continue
+        out.sort(key=lambda x: -x["season"])
+        result = {"total": len(out), "champions": out}
+        if out:
+            cache_set(cache_key_champions, result)
+        return result
+    finally:
+        _champions_refreshing = False
+
+
+cache_key_champions = "champions:all"
+
+
 async def get_champions() -> Dict[str, Any]:
-    """Все чемпионы мира по годам. Jolpica не отдаёт кросс-сезонно (400) —
-    собираем циклом по годам через fetch_ergast (лимитер+breaker). Первый
-    прогрев ~25с, дальше кэш 24ч + дисковый снапшот (переживает рестарт)."""
+    """Зал славы. Никогда НЕ блокируем юзера 80с-циклом: свежий кэш -> мгновенно;
+    истёк, но есть снапшот/stale -> отдаём его мгновенно + обновляем в фоне;
+    только если данных нет вообще -> собираем (одноразово, прогрев)."""
+    cached = cache_get(cache_key_champions, ttl_override=7 * 86400)
+    if cached is not None:
+        return cached
+    stale = cache_get_stale(cache_key_champions)
+    if stale is not None and isinstance(stale[0], dict) and stale[0].get("champions"):
+        if not _champions_refreshing:
+            asyncio.ensure_future(_rebuild_champions())  # фон, не ждём
+        return stale[0]
+    return await _rebuild_champions()
+
+
+async def _get_champions_legacy_unused() -> Dict[str, Any]:
     cache_key = "champions:all"
     cached = cache_get(cache_key, ttl_override=86400)
     if cached is not None:
