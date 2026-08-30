@@ -44,3 +44,4 @@ services:
         condition: service_healthy
     extra_hosts:
       - "api.telegram.org:149.154.167.220"
+      - "t.me:149.154.167.220"
