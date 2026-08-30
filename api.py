@@ -347,11 +347,20 @@ def validate_telegram_data(init_data: str) -> Dict[str, Any]:
                 key, value = part.split("=", 1)
                 parsed[key] = unquote(value)
 
-        # Auto-detect: WebApp initData has "user" field, Login Widget has "id"
+        # Auto-detect: WebApp initData has "user" field, Login Widget has "id".
+        # Заодно тегируем платформу: WebApp = Telegram Mini App, Login Widget =
+        # нативное RuStore-приложение (оно логинится через Login Widget).
         if "user" in parsed:
-            return _validate_webapp_initdata(parsed)
+            u = _validate_webapp_initdata(parsed)
+            u["_platform"] = "tma"
+            sp = parsed.get("start_param")
+            if sp:
+                u["_source"] = sp[:64]
+            return u
         elif "id" in parsed:
-            return _validate_login_widget(parsed)
+            u = _validate_login_widget(parsed)
+            u["_platform"] = "rustore"
+            return u
         else:
             raise HTTPException(status_code=401, detail="Unknown auth format")
 
@@ -619,6 +628,8 @@ async def user_me(request: Request):
         first_name=tg_user.get("first_name"),
         last_name=tg_user.get("last_name"),
         photo_url=tg_user.get("photo_url"),
+        platform=tg_user.get("_platform"),
+        source=tg_user.get("_source"),
     )
 
     # Always update photo_url from initData (TG sends fresh avatar URL each session)
@@ -663,6 +674,8 @@ async def auth_widget(request: Request):
         first_name=tg_user.get("first_name"),
         last_name=tg_user.get("last_name"),
         photo_url=tg_user.get("photo_url"),
+        platform=tg_user.get("_platform"),
+        source=tg_user.get("_source"),
     )
     return {"ok": True, "user": user}
 

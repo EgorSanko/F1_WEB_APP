@@ -259,27 +259,32 @@ def verify_auth_code(code: str):
 
 def get_or_create_user(user_id: int, username: str = None,
                        first_name: str = None, last_name: str = None,
-                       photo_url: str = None) -> Dict[str, Any]:
-    """Get existing user or create a new one. Updates last_active."""
+                       photo_url: str = None, platform: str = None,
+                       source: str = None) -> Dict[str, Any]:
+    """Get existing user or create a new one. Updates last_active.
+    platform: 'tma' (Telegram Mini App) | 'rustore' (нативка). source: start_param.
+    На существующем platform обновляется на актуальный (last-seen), source —
+    только first-touch (COALESCE, не перетираем первый источник)."""
     user = execute_one("SELECT * FROM users WHERE user_id = ?", (user_id,))
 
     if user:
-        # Update last_active and basic info
         execute_write(
             """UPDATE users SET last_active = CURRENT_TIMESTAMP,
                username = COALESCE(?, username),
                first_name = COALESCE(?, first_name),
                last_name = COALESCE(?, last_name),
-               photo_url = COALESCE(?, photo_url)
+               photo_url = COALESCE(?, photo_url),
+               platform = COALESCE(?, platform),
+               source = COALESCE(source, ?)
                WHERE user_id = ?""",
-            (username, first_name, last_name, photo_url, user_id)
+            (username, first_name, last_name, photo_url, platform, source, user_id)
         )
         user = execute_one("SELECT * FROM users WHERE user_id = ?", (user_id,))
     else:
         execute_write(
-            """INSERT INTO users (user_id, username, first_name, last_name, photo_url)
-               VALUES (?, ?, ?, ?, ?)""",
-            (user_id, username, first_name, last_name, photo_url)
+            """INSERT INTO users (user_id, username, first_name, last_name, photo_url, platform, source)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, username, first_name, last_name, photo_url, platform, source)
         )
         user = execute_one("SELECT * FROM users WHERE user_id = ?", (user_id,))
 
