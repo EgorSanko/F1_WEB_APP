@@ -381,7 +381,15 @@ def get_current_user(request: Request) -> Dict[str, Any]:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("TgLogin "):
             init_data = auth_header[8:]
-    return validate_telegram_data(init_data)
+    u = validate_telegram_data(init_data)
+    # Платформа по факту клиента, а не по типу токена: TgLogin шлют И сайт, И
+    # WebView-обёртка RuStore. Обёртка метит UA «F1HubApp» (+ Android WebView
+    # добавляет «; wv)»), старая нативка — okhttp/Expo. Остальное — web.
+    if u.get("_platform") == "rustore":
+        ua = (request.headers.get("user-agent") or "").lower()
+        if not ("f1hubapp" in ua or "okhttp" in ua or "expo" in ua or "; wv)" in ua):
+            u["_platform"] = "web"
+    return u
 
 
 async def fetch_telegram_avatar(user_id: int) -> Optional[str]:
@@ -725,7 +733,7 @@ async def auth_code(request: Request):
     secret_key = hashlib.sha256(TELEGRAM_TOKEN.encode()).digest()
     h = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
     params["hash"] = h
-    token = urllib.parse.urlencode(params)
+    token = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)  # %20, не + (иначе 401 у имён с пробелом)
     return {"ok": True, "token": token, "user": user}
 
 # ============ MOBILE PUSH ============
@@ -951,7 +959,23 @@ async def get_last_race():
 # ============ COMBINED ENDPOINTS (fewer requests from frontend) ============
 
 @app.get("/api/home")
-async def get_home(season: int = CURRENT_SEASON):
+async def get_home(request: Request, season: int = None):
+    # Kill-switch старой нативки 1.0.x: она зовёт /api/home БЕЗ ?season=
+    # (новый мини-апп и сайт всегда с season), UA RN-Android = okhttp.
+    if season is None:
+        ua = (request.headers.get("user-agent") or "").lower()
+        if "okhttp" in ua or "expo/" in ua:
+            return {
+                "next_race": {
+                    "round": 0, "name": "Обновите приложение",
+                    "circuit_name": "Вышла версия 2.0 — скачайте в RuStore",
+                    "country": "Старая версия больше не поддерживается",
+                    "race_datetime": "2030-01-01T00:00:00Z",
+                },
+                "news": [{"title": "F1 Hub 2.0 уже в RuStore! Новый дизайн, 3D-трассы, Зал славы и прогнозы. Обновитесь — эта версия отключена.", "source": "F1 Hub"}],
+                "upgrade_required": True,
+            }
+    season = season or CURRENT_SEASON
     """Combined endpoint: next race + last race + top standings. One call for home screen."""
     return await f1_data.get_home_data(season=season)
 

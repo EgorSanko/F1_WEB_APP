@@ -1159,7 +1159,7 @@ async def _rebuild_champions() -> Dict[str, Any]:
     """Собрать чемпионов циклом по годам (~80с). Не вызывать в горячем пути —
     только при полном отсутствии данных или в фоне."""
     global _champions_refreshing
-    _champions_refreshing = True
+    _champions_refreshing = True   # идемпотентно (вызывающий уже поставил)
     try:
         out = []
         cur_year = datetime.utcnow().year
@@ -1200,11 +1200,17 @@ async def get_champions() -> Dict[str, Any]:
     cached = cache_get(cache_key_champions, ttl_override=7 * 86400)
     if cached is not None:
         return cached
+    global _champions_refreshing
     stale = cache_get_stale(cache_key_champions)
     if stale is not None and isinstance(stale[0], dict) and stale[0].get("champions"):
         if not _champions_refreshing:
-            asyncio.ensure_future(_rebuild_champions())  # фон, не ждём
+            _champions_refreshing = True   # синхронно ДО ensure_future — иначе гонка двух ребилдов
+            asyncio.ensure_future(_rebuild_champions())
         return stale[0]
+    if _champions_refreshing:
+        # холодный кэш, но ребилд уже идёт — не запускаем второй 80с-цикл
+        return {"total": 0, "champions": [], "building": True}
+    _champions_refreshing = True
     return await _rebuild_champions()
 
 
