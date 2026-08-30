@@ -5508,39 +5508,69 @@ const GamesPage = ({onChange}) => {
 };
 
 // ==== PUBLIC LOGIN (Login Widget) ====
+const _TgIcon = ({size=20}) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M21.9 4.3 18.6 20c-.25 1.1-.9 1.37-1.82.85l-5.04-3.72-2.43 2.34c-.27.27-.5.5-1 .5l.36-5.13L18 6.34c.4-.36-.09-.56-.62-.2L6.9 13.03l-4.98-1.56c-1.08-.34-1.1-1.08.23-1.6L20.5 2.6c.9-.33 1.68.2 1.4 1.7Z" fill="#fff"/></svg>
+);
+
 const PublicLoginPage = ({ onLogin }) => {
-    const containerRef = useRef(null);
-    useEffect(() => {
-        if (!containerRef.current) return;
-        // Telegram Login Widget callback
-        window.__onTelegramAuth = (tgUser) => {
-            // Build query string from widget data
-            const params = new URLSearchParams();
-            Object.keys(tgUser).forEach(k => params.set(k, tgUser[k]));
-            const qs = params.toString();
-            localStorage.setItem('f1hub_auth_token', qs);
-            onLogin(tgUser);
-        };
-        const script = document.createElement('script');
-        script.src = 'https://telegram.org/js/telegram-widget.js?22';
-        script.setAttribute('data-telegram-login', 'F1_egor_bot');
-        script.setAttribute('data-size', 'large');
-        script.setAttribute('data-radius', '12');
-        script.setAttribute('data-onauth', '__onTelegramAuth(user)');
-        script.setAttribute('data-request-access', 'write');
-        script.async = true;
-        containerRef.current.appendChild(script);
-    }, []);
+    const [step, setStep] = useState('start');   // start | code
+    const [code, setCode] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState('');
+
+    const submitCode = async () => {
+        const c = code.trim();
+        if (!c || busy) return;
+        setBusy(true); setErr('');
+        try {
+            const res = await api.post('/api/auth/code', { code: c });
+            if (res && res.token) {
+                localStorage.setItem('f1hub_auth_token', res.token);
+                onLogin(res.user || null);
+            } else { setErr('Неверный или просроченный код'); }
+        } catch (e) { setErr('Неверный или просроченный код'); }
+        setBusy(false);
+    };
+
+    const box = {width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:12,position:'relative'};
     return (
-        <div style={{height:'100dvh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,padding:32}}>
-            <div style={{fontSize:28,fontWeight:900}}>F1 <span style={{color:'var(--f1-red)'}}>Hub</span></div>
-            <div style={{fontSize:14,color:'var(--f1-text-secondary)',textAlign:'center',maxWidth:300,lineHeight:1.5}}>
-                Войдите через Telegram, чтобы получить доступ к прогнозам, играм и персональной статистике
+        <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:'-12%',left:'50%',transform:'translateX(-50%)',width:'160%',height:'48%',background:'radial-gradient(60% 100% at 50% 0%, rgba(225,6,0,0.24), transparent 72%)',pointerEvents:'none'}}/>
+            <img src="/static/logo-f1hub.png?v=1" alt="F1 Hub" style={{width:'min(80%,300px)',marginBottom:24,position:'relative',filter:'drop-shadow(0 10px 30px rgba(0,0,0,0.55))'}} onError={e=>{e.target.style.display='none'}}/>
+            <div style={{fontSize:14.5,color:'var(--f1-text-secondary)',textAlign:'center',maxWidth:330,lineHeight:1.55,marginBottom:26,position:'relative'}}>
+                Прогнозы, игры, статистика и Зал славы.<br/>Вход через Telegram — 10 секунд.
             </div>
-            <div ref={containerRef}></div>
-            <button onClick={() => onLogin(null)} className="btn-primary" style={{marginTop:8,background:'transparent',border:'1px solid var(--f1-border)',fontSize:13,padding:'10px 20px'}}>
-                Продолжить без входа
-            </button>
+
+            {step === 'start' && (
+                <div style={box}>
+                    <a href="https://t.me/F1_egor_bot?start=code" target="_blank" rel="noopener" onClick={()=>setStep('code')}
+                       style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,background:'#229ED9',color:'#fff',borderRadius:14,padding:'15px',fontSize:15,fontWeight:800,textDecoration:'none',boxShadow:'0 8px 26px rgba(34,158,217,0.4)'}}>
+                        <_TgIcon/> Войти через Telegram
+                    </a>
+                    <button onClick={()=>setStep('code')} style={{background:'transparent',border:'1px solid var(--f1-border)',borderRadius:14,padding:'13px',color:'var(--f1-text-secondary)',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                        У меня уже есть код
+                    </button>
+                    <button onClick={()=>onLogin(null)} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,marginTop:6,cursor:'pointer',fontFamily:'inherit'}}>Продолжить без входа</button>
+                </div>
+            )}
+
+            {step === 'code' && (
+                <div style={box}>
+                    <div style={{fontSize:12.5,color:'var(--f1-text-muted)',textAlign:'center',lineHeight:1.5}}>
+                        Бот <b style={{color:'var(--f1-text)'}}>@F1_egor_bot</b> прислал код в Telegram — введи его:
+                    </div>
+                    <input value={code} onChange={e=>{setCode(e.target.value.replace(/\s/g,''));setErr('');}} onKeyDown={e=>e.key==='Enter'&&submitCode()}
+                        inputMode="numeric" autoFocus placeholder="Код"
+                        style={{background:'var(--f1-card-solid)',border:'1px solid '+(err?'var(--f1-red)':'var(--f1-border)'),borderRadius:14,padding:'15px',color:'#fff',fontSize:22,fontWeight:800,textAlign:'center',letterSpacing:8,fontFamily:'inherit',outline:'none'}}/>
+                    {err && <div style={{fontSize:12.5,color:'var(--f1-red)',textAlign:'center'}}>{err}</div>}
+                    <button onClick={submitCode} disabled={busy||!code.trim()}
+                        style={{background:code.trim()?'var(--f1-red)':'var(--f1-gray)',border:'none',borderRadius:14,padding:'15px',color:'#fff',fontSize:15,fontWeight:800,cursor:code.trim()?'pointer':'default',fontFamily:'inherit',opacity:busy?0.6:1,transition:'background .2s'}}>
+                        {busy?'Проверяем…':'Войти'}
+                    </button>
+                    <a href="https://t.me/F1_egor_bot?start=code" target="_blank" rel="noopener" style={{textAlign:'center',color:'#229ED9',fontSize:13,fontWeight:700,textDecoration:'none'}}>Получить код в боте →</a>
+                    <button onClick={()=>{setStep('start');setErr('');}} style={{background:'none',border:'none',color:'var(--f1-text-muted)',fontSize:13,marginTop:2,cursor:'pointer',fontFamily:'inherit'}}>← Назад</button>
+                </div>
+            )}
         </div>
     );
 };

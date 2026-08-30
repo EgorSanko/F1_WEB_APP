@@ -25,6 +25,14 @@ async function build() {
         define: { '__IS_WEBAPP__': 'true' },
     });
 
+    // Build 1b: WebView JS — src/app.jsx с IS_WEBAPP=false (нативная RuStore-обёртка)
+    await esbuild.build({
+        ...jsxOpts,
+        entryPoints: ['src/app.jsx'],
+        outfile: 'static/webview.min.js',
+        define: { '__IS_WEBAPP__': 'false' },
+    });
+
     // Build 2: Public JS — from src/public/app.jsx (separate entry, desktop design — production)
     await esbuild.build({
         ...jsxOpts,
@@ -68,6 +76,11 @@ async function build() {
     let waHtml = fs.readFileSync('webapp.html', 'utf8');
     waHtml = waHtml.replace(/webapp\.min\.js(\?v=[a-f0-9]*)?/, 'webapp.min.js?v=' + waHash);
     fs.writeFileSync('webapp.html', waHtml);
+
+    const wvHash = md5('static/webview.min.js');
+    let wvHtml = fs.readFileSync('webview.html', 'utf8');
+    wvHtml = wvHtml.replace(/webview\.min\.js(\?v=[a-f0-9]*)?/, 'webview.min.js?v=' + wvHash);
+    fs.writeFileSync('webview.html', wvHtml);
 
     let v2Html = fs.readFileSync('public-v2.html', 'utf8');
     v2Html = v2Html.replace(/public-v2\.min\.js(\?v=[a-f0-9]*)?/, 'public-v2.min.js?v=' + v2JsHash);

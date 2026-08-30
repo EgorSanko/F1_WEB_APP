@@ -484,6 +484,12 @@ async def health():
 
 # ============ STATIC ============
 
+@app.get("/webview", response_class=HTMLResponse)
+async def webview_root():
+    """Полный мини-апп для нативной RuStore-обёртки (WebView, вне Telegram)."""
+    return FileResponse("webview.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/")
 async def serve_index(request: Request):
     """Serve webapp.html for TG WebApp (f1.lead-seek.ru), public-v2.html for public site (f1hub.lead-seek.ru)."""

@@ -14,6 +14,7 @@ services:
       - ./f1_live.py:/app/f1_live.py:ro
       - ./settle_predictions.py:/app/settle_predictions.py:ro
       - ./webapp.html:/app/webapp.html:ro
+      - ./webview.html:/app/webview.html:ro
       - ./public.html:/app/public.html:ro
       - ./public-v2.html:/app/public-v2.html:ro
       - ./redesign-v2-embed.html:/app/redesign-v2-embed.html:ro
