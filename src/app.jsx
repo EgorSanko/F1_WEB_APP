@@ -5678,7 +5678,12 @@ const App = () => {
                 setSession(s);
                 if (token) {
                     const u = await api.get('/api/user/me');
-                    if (u) { setUser(u); setLoading(false); return; }
+                    if (u) {
+                        setUser(u); setLoading(false);
+                        // админка доступна и вне Telegram (RuStore-обёртка / сайт)
+                        api.get('/api/user/is-admin').then(d => { if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id]; }).catch(()=>{});
+                        return;
+                    }
                     // Token expired, clear it
                     localStorage.removeItem('f1hub_auth_token');
                 }
@@ -5751,7 +5756,12 @@ const App = () => {
         return <PublicLoginPage onLogin={(tgUser) => {
             setShowLogin(false);
             if (tgUser) {
-                api.get('/api/user/me').then(u => { if (u) setUser(u); });
+                api.get('/api/user/me').then(u => {
+                    if (u) {
+                        setUser(u);
+                        api.get('/api/user/is-admin').then(d => { if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id]; }).catch(()=>{});
+                    }
+                });
             }
         }} />;
     }
@@ -5761,7 +5771,12 @@ const App = () => {
     if (needsAuth) {
         return <PublicLoginPage onLogin={(tgUser) => {
             if (tgUser) {
-                api.get('/api/user/me').then(u => { if (u) setUser(u); });
+                api.get('/api/user/me').then(u => {
+                    if (u) {
+                        setUser(u);
+                        api.get('/api/user/is-admin').then(d => { if (d?.is_admin) window.__F1_ADMIN_IDS = [u.user_id]; }).catch(()=>{});
+                    }
+                });
             } else {
                 setTab('home');
             }

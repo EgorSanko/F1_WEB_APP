@@ -2620,7 +2620,7 @@ async def proxy_stream(request: Request, url: str):
 
     # Only allow rutube/googlevideo/youtube. Exact host or true subdomain — plain
     # endswith('rutube.ru') would match an attacker's evilrutube.ru (SSRF).
-    allowed = ['rutube.ru', 'googlevideo.com', 'youtube.com']
+    allowed = ['rutube.ru', 'rtbcdn.ru', 'googlevideo.com', 'youtube.com']
     from urllib.parse import urlparse
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
