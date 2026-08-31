@@ -1792,6 +1792,44 @@ async def get_article(url: str):
     if cached:
         return cached
 
+    # --- Пост Telegram-канала (t.me запинен): парсим embed-вид ---
+    if "t.me/" in url:
+        try:
+            client = f1_data.get_client()
+            embed_url = url + ("&" if "?" in url else "?") + "embed=1"
+            resp = await client.get(embed_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}, timeout=6.0)
+            if resp.status_code != 200:
+                return {"error": "not_found"}
+            page = resp.text
+            text_m = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', page, re.DOTALL)
+            if not text_m:
+                return {"error": "not_found"}
+            raw = re.sub(r'<br\s*/?>', '\n', text_m.group(1))
+            text = re.sub(r'<[^>]+>', '', raw)
+            import html as _htmlmod
+            text = _htmlmod.unescape(text).strip()
+            lines = [l.strip() for l in text.split('\n')]
+            title = (lines[0] if lines else '')[:200]
+            body = '\n'.join(lines[1:]).strip()
+            paragraphs = [p.replace('\n', '<br/>') for p in re.split(r'\n\s*\n', body) if p.strip()]
+            photo_m = re.search(r"background-image:url\('([^']+)'\)", page)
+            date_m = re.search(r'<time[^>]*datetime="([^"]+)"', page)
+            result = {
+                "title": title,
+                "date": date_m.group(1) if date_m else "",
+                "image": photo_m.group(1) if photo_m else "",
+                "paragraphs": paragraphs,
+                "quotes": [],
+                "source": "@stanizlavsky",
+                "source_url": url,
+            }
+            if title:
+                f1_data.cache_set(cache_key, result)
+            return result
+        except Exception as e:
+            logger.error(f"TG article parse error: {type(e).__name__}: {e}")
+            return {"error": "tg_parse"}
+
     try:
         client = f1_data.get_client()
         resp = await client.get(

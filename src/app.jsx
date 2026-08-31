@@ -150,6 +150,39 @@ const flagEmoji = (code) => {
 
 const openLink = (url) => { if (tg?.openLink) tg.openLink(url, {try_instant_view: false, try_browser: true}); else window.open(url, '_blank'); };
 
+// ---- Аппаратная «назад» (нативная обёртка / браузер) ----
+// Экраны-оверлеи регистрируются в браузерной истории: открытие = pushState,
+// системная «назад» = popstate = закрыть верхний экран (а не всё приложение).
+// В TG-мини-аппе не используется (там свой BackButton и нет хардварной назад).
+const _backStack = [];
+let _suppressPop = 0;
+if (!IS_WEBAPP && typeof window !== 'undefined') {
+    window.addEventListener('popstate', () => {
+        if (_suppressPop > 0) { _suppressPop--; return; }
+        const top = _backStack.pop();
+        if (top) top.close();
+    });
+}
+const useHistoryBack = (open, closeFn) => {
+    const ref = useRef(closeFn);
+    ref.current = closeFn;
+    useEffect(() => {
+        if (IS_WEBAPP || !open) return;
+        const entry = { close: () => { if (ref.current) ref.current(); } };
+        _backStack.push(entry);
+        try { history.pushState({ f1: _backStack.length }, ''); } catch (e) {}
+        return () => {
+            const i = _backStack.indexOf(entry);
+            if (i >= 0) {
+                // закрыли крестиком/кодом — синхронизируем историю
+                _backStack.splice(i, 1);
+                _suppressPop++;
+                try { history.back(); } catch (e) { _suppressPop--; }
+            }
+        };
+    }, [open]);
+};
+
 // ==== PULL TO REFRESH HOOK ====
 const usePullToRefresh = (onRefresh) => {
     const [pulling, setPulling] = useState(false);
@@ -1161,7 +1194,7 @@ const ArticlePage = ({ articleUrl, onBack }) => {
                 ))}
                 <div style={{marginTop:24,padding:16,background:'rgba(255,255,255,0.05)',borderRadius:12,textAlign:'center'}}>
                     <div style={{fontSize:12,color:'var(--f1-text-muted)',marginBottom:8}}>Источник</div>
-                    <a href={article.source_url} onClick={e=>{e.preventDefault();openLink(article.source_url);}} style={{color:'var(--f1-red)',fontSize:14,fontWeight:600,textDecoration:'none'}}>Открыть на championat.com ↗</a>
+                    <a href={article.source_url} onClick={e=>{e.preventDefault();openLink(article.source_url);}} style={{color:'var(--f1-red)',fontSize:14,fontWeight:600,textDecoration:'none'}}>{(article.source_url||'').includes('t.me') ? 'Открыть в Telegram ↗' : 'Открыть на championat.com ↗'}</a>
                 </div>
             </div>
         </div>
@@ -1411,6 +1444,7 @@ const StandingsPage = ({driversStandings, constructorsStandings, season, onRefre
         return () => { if (progressChartInstance.current) progressChartInstance.current.destroy(); };
     }, [progressData, tab, chartReady]);
 
+    useHistoryBack(selectedDriver != null, () => { setSelectedDriver(null); setDriverDetail(null); });
     const openDriver = async (num) => { setSelectedDriver(num); setDriverDetail(await api.get(`/api/driver/${num}?season=${season}`)); };
 
     if (selectedDriver && driverDetail) {
@@ -2024,6 +2058,7 @@ const TrackSection = ({race}) => {
     const [hist, setHist] = useState(null);
     const [has3d, setHas3d] = useState(null);   // null=грузится, true=3D, false=PNG-фолбэк
     const [expanded, setExpanded] = useState(false);
+    useHistoryBack(expanded, () => setExpanded(false));
     useEffect(() => {
         if (!race?.circuit_id) return;
         let a = true;
@@ -2159,6 +2194,7 @@ const CareerStrip = ({ergastId}) => {
 // Зал славы — вход в профиле + полноэкранная хроника чемпионов (1950 -> ...).
 const HallOfFame = () => {
     const [open, setOpen] = useState(false);
+    useHistoryBack(open, () => setOpen(false));
     const [data, setData] = useState(null);
     const [err, setErr] = useState(false);
     const [tick, setTick] = useState(0);
@@ -2800,6 +2836,7 @@ const VIDEO_SESSION_COLOR = {race:'#E10600', qualifying:'#27F4D2', sprint:'#FF80
 const VIDEO_SESSION_BADGE = {race:'ГОНКА', qualifying:'QUALI', sprint:'SPRINT', sprint_qualifying:'SQ', fp1:'FP1', fp2:'FP2', fp3:'FP3', review:'ОБЗОР'};
 const VideosPage = ({schedule, onOpen}) => {
     const [broadcasts, setBroadcasts] = useState(null);
+    const [openRounds, setOpenRounds] = useState(() => new Set());
     useEffect(() => { api.get('/api/broadcasts').then(d => setBroadcasts((d && d.broadcasts) || [])).catch(()=>setBroadcasts([])); }, []);
     if (broadcasts === null) return <div className="page-container fade-in" style={{padding:16}}><F1Loader text="Загрузка записей..."/></div>;
     const raceByRound = {};
@@ -2832,7 +2869,7 @@ const VideosPage = ({schedule, onOpen}) => {
                             </div>
                         </div>
                         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                            {items.map(b => {
+                            {(openRounds.has(round) ? items : items.slice(0, 4)).map(b => {
                                 const color = VIDEO_SESSION_COLOR[b.session_type] || '#E10600';
                                 return (
                                     <div key={b.id} className="vid-card" onClick={()=>onOpen(b, raceName)} style={{borderColor:b.session_type==='race'?color+'55':'var(--f1-border)'}}>
@@ -2850,6 +2887,12 @@ const VideosPage = ({schedule, onOpen}) => {
                                     </div>
                                 );
                             })}
+                            {items.length > 4 && !openRounds.has(round) && (
+                                <button onClick={()=>setOpenRounds(prev=>{const s2=new Set(prev);s2.add(round);return s2;})}
+                                    style={{background:'var(--f1-card-solid)',border:'1px solid var(--f1-border)',borderRadius:12,padding:'11px',color:'var(--f1-text-secondary)',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                                    Ещё {items.length - 4} · показать все
+                                </button>
+                            )}
                         </div>
                     </div>
                 );
@@ -2858,7 +2901,7 @@ const VideosPage = ({schedule, onOpen}) => {
     );
 };
 
-const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
+const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler, onLogout}) => {
     const [leaderboard, setLeaderboard] = useState(null);
     const [achievements, setAchievements] = useState(null);
     useEffect(() => { api.get('/api/leaderboard').then(setLeaderboard); api.get('/api/user/achievements').then(setAchievements); }, []);
@@ -2975,6 +3018,11 @@ const ProfilePage = ({user, onNavigate, spoilerFree, onToggleSpoiler}) => {
                     </div>
                 ))}
             </div>
+            {onLogout && (
+                <button onClick={onLogout} style={{width:'100%',background:'transparent',border:'1px solid rgba(225,6,0,0.35)',borderRadius:14,padding:'13px',color:'var(--f1-red)',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginBottom:16}}>
+                    Выйти из аккаунта
+                </button>
+            )}
 
             <div className="card" style={{marginBottom:16}}>
                 <div style={{fontSize:11,color:'var(--f1-text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:1.5,marginBottom:12}}>Статистика</div>
@@ -5601,6 +5649,10 @@ const App = () => {
     const [selectedArticle, setSelectedArticle] = useState(null);
     const [spoilerFree, setSpoilerFree] = useState(() => localStorage.getItem('f1hub_spoiler_free') === 'true');
     const isLive = session?.is_live;
+    // системная «назад» закрывает экран, а не приложение (нативная обёртка)
+    useHistoryBack(tab === 'article', () => { setSelectedArticle(null); setTab('news'); });
+    useHistoryBack(tab === 'broadcastView', () => setTab('videos'));
+    useHistoryBack(tab === 'raceDetail', () => setTab('schedule'));
     const toggleSpoiler = () => { const v = !spoilerFree; setSpoilerFree(v); localStorage.setItem('f1hub_spoiler_free', String(v)); };
 
     useEffect(() => {
@@ -5722,7 +5774,7 @@ const App = () => {
             case 'predict': return <PredictionsPage user={user}/>;
             case 'videos': return <VideosPage schedule={schedule} onOpen={(b,rn)=>{setSelectedBroadcast({b,rn});setTab('broadcastView');}}/>;
             case 'broadcastView': return selectedBroadcast ? <BroadcastViewPage broadcast={selectedBroadcast.b} raceName={selectedBroadcast.rn} onBack={()=>setTab('videos')} user={user} spoilerFree={spoilerFree}/> : null;
-            case 'profile': return <ProfilePage user={user} onNavigate={setTab} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler}/>;
+            case 'profile': return <ProfilePage user={user} onNavigate={setTab} spoilerFree={spoilerFree} onToggleSpoiler={toggleSpoiler} onLogout={IS_WEBAPP ? null : ()=>{try{localStorage.removeItem('f1hub_auth_token');}catch(e){} setUser(null); setTab('home');}}/>;
             case 'analytics': return <AnalyticsPage/>;
             case 'games': return <GamesPage onChange={setTab}/>;
             default: return null;
