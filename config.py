@@ -65,9 +65,10 @@ INITIAL_USER_POINTS = 100
 # ============ PREDICTION POINTS ============
 PREDICTION_POINTS = {
     "winner": {"correct": 50},
-    "podium": {"all_3": 100, "2_of_3": 30, "1_of_3": 10},
+    # exact_order — все трое на СВОИХ местах; all_3 — состав верен, порядок нет
+    "podium": {"exact_order": 100, "all_3": 50, "2_of_3": 25, "1_of_3": 10},
     "top10": {"exact_position": 20, "in_top10": 5},
-    "fastest_lap": {"correct": 30},
+    "fastest_lap": {"correct": 60},  # угадать сложнее победителя (50)
     "dnf_count": {"exact": 40, "off_by_1": 15},
     "safety_car": {"correct": 20},
 }

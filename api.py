@@ -1420,8 +1420,8 @@ async def predictions_available(request: Request):
 
     types = [
         {"type": "winner", "label": "Победитель гонки", "description": "Выбери 1 пилота", "max_points": 50},
-        {"type": "podium", "label": "Подиум (TOP-3)", "description": "Выбери 3 пилотов", "max_points": 100},
-        {"type": "fastest_lap", "label": "Быстрый круг", "description": "Кто покажет лучший круг?", "max_points": 30},
+        {"type": "podium", "label": "Подиум (TOP-3)", "description": "3 пилота по местам — точный порядок = 100, просто угадал тройку = 50", "max_points": 100},
+        {"type": "fastest_lap", "label": "Быстрый круг", "description": "Кто покажет лучший круг?", "max_points": 60},
         {"type": "dnf_count", "label": "Количество DNF", "description": "Сколько сходов будет?", "max_points": 40},
         {"type": "safety_car", "label": "Safety Car", "description": "Будет ли машина безопасности?", "max_points": 20},
     ]
@@ -2773,13 +2773,16 @@ async def admin_settle(race_round: int, request: Request, season: int = 0):
         if ptype == "winner" and pvalue == winner:
             points, status = PREDICTION_POINTS["winner"]["correct"], "correct"
         elif ptype == "podium" and isinstance(pvalue, list):
-            matches = len(set(pvalue) & set(podium))
-            if matches == 3:
-                points, status = PREDICTION_POINTS["podium"]["all_3"], "correct"
-            elif matches == 2:
-                points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
-            elif matches == 1:
-                points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
+            if pvalue == podium:
+                points, status = PREDICTION_POINTS["podium"]["exact_order"], "correct"
+            else:
+                matches = len(set(pvalue) & set(podium))
+                if matches == 3:
+                    points, status = PREDICTION_POINTS["podium"]["all_3"], "partial"
+                elif matches == 2:
+                    points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
+                elif matches == 1:
+                    points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
         elif ptype == "fastest_lap" and pvalue == fastest_lap_driver:
             points, status = PREDICTION_POINTS["fastest_lap"]["correct"], "correct"
         elif ptype == "dnf_count":

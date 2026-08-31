@@ -136,13 +136,17 @@ def main():
             if ptype == "winner" and pvalue == winner:
                 points, status = PREDICTION_POINTS["winner"]["correct"], "correct"
             elif ptype == "podium" and isinstance(pvalue, list):
-                matches = len(set(pvalue) & set(podium))
-                if matches == 3:
-                    points, status = PREDICTION_POINTS["podium"]["all_3"], "correct"
-                elif matches == 2:
-                    points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
-                elif matches == 1:
-                    points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
+                if pvalue == podium:
+                    # точный порядок P1-P2-P3
+                    points, status = PREDICTION_POINTS["podium"]["exact_order"], "correct"
+                else:
+                    matches = len(set(pvalue) & set(podium))
+                    if matches == 3:
+                        points, status = PREDICTION_POINTS["podium"]["all_3"], "partial"
+                    elif matches == 2:
+                        points, status = PREDICTION_POINTS["podium"]["2_of_3"], "partial"
+                    elif matches == 1:
+                        points, status = PREDICTION_POINTS["podium"]["1_of_3"], "partial"
             elif ptype == "fastest_lap" and pvalue == fastest_lap_driver:
                 points, status = PREDICTION_POINTS["fastest_lap"]["correct"], "correct"
             elif ptype == "dnf_count":
