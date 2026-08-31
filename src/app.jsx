@@ -156,10 +156,14 @@ const openLink = (url) => { if (tg?.openLink) tg.openLink(url, {try_instant_view
 // В TG-мини-аппе не используется (там свой BackButton и нет хардварной назад).
 const _backStack = [];
 let _suppressPop = 0;
+const _notifyNative = () => {
+    try { window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'stack', depth: _backStack.length })); } catch (e) {}
+};
 if (!IS_WEBAPP && typeof window !== 'undefined') {
     window.addEventListener('popstate', () => {
         if (_suppressPop > 0) { _suppressPop--; return; }
         const top = _backStack.pop();
+        _notifyNative();
         if (top) top.close();
     });
 }
@@ -170,12 +174,14 @@ const useHistoryBack = (open, closeFn) => {
         if (IS_WEBAPP || !open) return;
         const entry = { close: () => { if (ref.current) ref.current(); } };
         _backStack.push(entry);
+        _notifyNative();
         try { history.pushState({ f1: _backStack.length }, ''); } catch (e) {}
         return () => {
             const i = _backStack.indexOf(entry);
             if (i >= 0) {
                 // закрыли крестиком/кодом — синхронизируем историю
                 _backStack.splice(i, 1);
+                _notifyNative();
                 _suppressPop++;
                 try { history.back(); } catch (e) { _suppressPop--; }
             }
@@ -5781,7 +5787,7 @@ const App = () => {
         }
     };
 
-    return (<>{renderTab()}<BottomNav active={tab} onChange={setTab} isLive={isLive}/></>);
+    return (<>{renderTab()}{tab !== 'broadcastView' && <BottomNav active={tab} onChange={setTab} isLive={isLive}/>}</>);
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
