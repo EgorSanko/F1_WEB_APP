@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Игры · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+.quiz-wrap{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:44px;align-items:start;margin-bottom:60px}
+.quiz{position:relative;overflow:hidden;background:var(--s2);padding:38px 40px}
+.quiz::after{content:'';position:absolute;right:-26%;top:-70%;width:76%;height:220%;border-radius:50%;
+  background:radial-gradient(circle,rgba(225,6,0,.18),transparent 64%);pointer-events:none}
+.quiz .cat{font-size:11.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--red);position:relative;z-index:2}
+.quiz h2{margin:16px 0 28px;font-family:'F1Display','Russo One',sans-serif;font-size:clamp(22px,2.5vw,32px);
+  line-height:1.16;position:relative;z-index:2}
+.opts{display:flex;flex-direction:column;gap:10px;position:relative;z-index:2}
+.opt{display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.04);border:1px solid transparent;
+  padding:16px 20px;cursor:pointer;transition:background .18s,border-color .18s;text-align:left;
+  font-family:'F1Text','Exo 2',sans-serif;font-size:16px;color:#fff}
+.opt:hover{background:rgba(255,255,255,.08)}
+.opt .l{font-family:'F1Display','Russo One',sans-serif;font-size:15px;color:var(--txt-3);width:22px;flex-shrink:0}
+.opt.right{background:rgba(49,208,122,.14);border-color:rgba(49,208,122,.5)}
+.opt.wrong{background:rgba(225,6,0,.14);border-color:rgba(225,6,0,.5)}
+.opt[disabled]{cursor:default}
+.quiz .after{margin-top:24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;position:relative;z-index:2}
+.quiz .verdict{font-family:'F1Display','Russo One',sans-serif;font-size:19px;text-transform:uppercase}
+.quiz .verdict.ok{color:#31D07A}
+.quiz .verdict.no{color:#FF6B63}
+.score{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:26px}
+.score div{background:var(--bg);padding:20px 24px;flex:1}
+.score span{display:block;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:8px}
+.score b{font-family:'F1Display','Russo One',sans-serif;font-size:28px;font-weight:400}
+.gboard{border-top:1px solid var(--line)}
+.grow{display:grid;grid-template-columns:52px 48px minmax(0,1fr) auto;gap:16px;align-items:center;
+  padding:14px 0;border-bottom:1px solid var(--line)}
+.grow .p{font-family:'F1Display','Russo One',sans-serif;font-size:20px;color:var(--txt-3)}
+.grow:nth-child(1) .p{color:#FFB800}
+.grow img{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--s3)}
+.grow .nm{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grow .nm span{display:block;font-size:13px;color:var(--txt-2);font-weight:400;margin-top:2px}
+.grow .sc{font-family:'F1Display','Russo One',sans-serif;font-size:22px;text-align:right}
+.grow .sc .unit{font-family:'F1Text','Exo 2',sans-serif;font-size:12px;color:var(--txt-3)}
+/* игра «реакция»: гоночный светофор — пять огней, гаснут → жми */
+.react{position:relative;overflow:hidden;background:var(--s2);padding:34px 40px 38px;margin-bottom:60px}
+.react h2{margin:0 0 8px;font-family:'F1Display','Russo One',sans-serif;font-size:26px;text-transform:uppercase}
+.react .hint{margin:0 0 26px;font-size:15px;color:var(--txt-2)}
+.lights{display:flex;gap:14px;justify-content:center;margin:0 auto 26px;max-width:520px}
+.lights i{flex:1;aspect-ratio:1/1;max-width:84px;border-radius:50%;background:#1D1D24;
+  border:2px solid rgba(255,255,255,.08);transition:background .12s,box-shadow .12s}
+.lights i.on{background:var(--red);border-color:transparent;box-shadow:0 0 26px rgba(225,6,0,.75)}
+.react .stage{display:flex;flex-direction:column;align-items:center;gap:18px}
+.react .big{font-family:'F1Display','Russo One',sans-serif;font-size:44px;line-height:1;min-height:46px}
+.react .big.ok{color:#31D07A}
+.react .big.no{color:#FF6B63}
+.react .sub{font-size:15px;color:var(--txt-2);min-height:22px;text-align:center}
+.react .zone{width:100%;max-width:520px;aspect-ratio:16/5;border:1px dashed rgba(255,255,255,.12);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;
+  font-size:15px;color:var(--txt-2);transition:background .15s}
+.react .zone:hover{background:rgba(255,255,255,.03)}
+.react .zone.armed{background:rgba(49,208,122,.10);border-color:rgba(49,208,122,.45);color:#31D07A}
+@media (max-width:980px){ .quiz-wrap{grid-template-columns:1fr;gap:32px} .quiz{padding:28px 24px} .react{padding:26px 22px} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Игры</div>
+    <h1 class="display">Игры</h1>
+    <p class="sub">Викторина по Формуле-1: вопросы о трассах, командах, пилотах и истории чемпионата.</p>
+  </div>
+
+  <section class="react" id="react">
+    <h2>Реакция на старте</h2>
+    <p class="hint">Пять огней загораются одно за другим. Как только они погаснут — жмите. Фальстарт засчитывается, как в гонке.</p>
+    <div class="lights" id="lights"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="stage">
+      <div class="big" id="rTime">—</div>
+      <div class="sub" id="rHint">Нажмите «Старт», чтобы начать</div>
+      <div class="zone" id="rZone">Зона нажатия</div>
+      <button class="btn btn-red" id="rStart" style="padding:15px 30px">Старт</button>
+    </div>
+  </section>
+
+  <div class="quiz-wrap">
+    <section class="quiz" id="quiz"><div class="empty">Загружаем вопрос…</div></section>
+    <aside>
+      <div class="score" id="score"></div>
+      <div class="sec-hd" style="margin-bottom:6px"><h2 style="font-size:22px">Рекорды реакции</h2></div>
+      <p style="margin:0 0 18px;font-size:13.5px;color:var(--txt-3)">Время в миллисекундах — чем меньше, тем лучше</p>
+      <div class="gboard" id="board"></div>
+    </aside>
+  </div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, plural} = F1;
+  const LETTERS = ['A','B','C','D','E'];
+  let asked = 0, right = 0, streak = 0, best = 0;
+
+  const paintScore = () => {
+    document.getElementById('score').innerHTML =
+      '<div><span>Вопросов</span><b>' + asked + '</b></div>' +
+      '<div><span>Верных</span><b>' + right + '</b></div>' +
+      '<div><span>Серия</span><b>' + streak + '</b></div>';
+  };
+
+  const board = await j('/api/games/leaderboard');
+  const rows = board?.leaderboard || [];
+  document.getElementById('board').innerHTML = rows.length ? rows.slice(0,10).map(u =>
+    '<div class="grow"><span class="p">' + String(u.rank ?? '').padStart(2,'0') + '</span>' +
+    (u.photo_url ? '<img src="' + esc(u.photo_url) + '" alt="" onerror="F1.imgFail(this)">' : '<span></span>') +
+    '<span class="nm">' + esc([u.first_name, u.last_name].filter(Boolean).join(' ') || 'Игрок') +
+      '<span>' + (u.attempts ? u.attempts + ' ' + plural(u.attempts,'попытка','попытки','попыток') : '') + '</span></span>' +
+    '<span class="sc">' + (u.best_score ?? 0) + '<span class="unit"> мс</span></span></div>').join('')
+    : '<div class="empty">Пока никто не играл</div>';
+
+  const ask = async () => {
+    const box = document.getElementById('quiz');
+    box.innerHTML = '<div class="empty">Загружаем вопрос…</div>';
+    const q = await j('/api/quiz/question');
+    if (!q?.question) { box.innerHTML = '<div class="empty">Вопросы закончились — зайдите позже</div>'; return; }
+
+    box.innerHTML =
+      '<div class="cat">' + esc(q.category || 'Викторина') + ' · вопрос ' + (asked + 1) + '</div>' +
+      '<h2>' + esc(q.question) + '</h2>' +
+      '<div class="opts">' + (q.options || []).map((o,i) =>
+        '<button class="opt" data-i="' + i + '"><span class="l">' + LETTERS[i] + '</span>' + esc(o) + '</button>').join('') +
+      '</div><div class="after" id="after"></div>';
+
+    box.querySelectorAll('.opt').forEach(btn => btn.onclick = async () => {
+      const pickedIdx = +btn.dataset.i;
+      box.querySelectorAll('.opt').forEach(b => b.disabled = true);
+      const res = await fetch('/api/quiz/answer', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question_id: q.question_id, answer: pickedIdx})
+      }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+      const correctIdx = res?.correct_answer;          // индекс верного варианта
+      const isRight = !!res?.correct;
+      asked++; if (isRight) { right++; streak++; best = Math.max(best, streak); } else streak = 0;
+      paintScore();
+
+      box.querySelectorAll('.opt').forEach(b => {
+        if (correctIdx != null && +b.dataset.i === correctIdx) b.classList.add('right');
+        else if (b === btn && !isRight) b.classList.add('wrong');
+      });
+      document.getElementById('after').innerHTML =
+        '<span class="verdict ' + (isRight ? 'ok' : 'no') + '">' + (isRight ? 'Верно' : 'Мимо') + '</span>' +
+        '<button class="btn btn-red" id="next" style="padding:14px 26px">Следующий вопрос</button>';
+      document.getElementById('next').onclick = ask;
+    });
+  };
+
+  paintScore();
+  ask();
+
+  /* ——— игра «реакция»: замер и отправка рекорда ——— */
+  const lights = [...document.querySelectorAll('#lights i')];
+  const rTime = document.getElementById('rTime'), rHint = document.getElementById('rHint');
+  const rZone = document.getElementById('rZone'), rStart = document.getElementById('rStart');
+  let state = 'idle', t0 = 0, timers = [];
+
+  const reset = () => {
+    timers.forEach(clearTimeout); timers = [];
+    lights.forEach(l => l.classList.remove('on'));
+    rZone.classList.remove('armed');
+    state = 'idle';
+  };
+  const finish = async (ms) => {
+    rTime.textContent = ms + ' мс';
+    rTime.className = 'big ' + (ms < 250 ? 'ok' : '');
+    rHint.textContent = ms < 200 ? 'Уровень пилота Формулы-1' : ms < 300 ? 'Хорошая реакция' : 'Ещё есть куда ускоряться';
+    rStart.textContent = 'Ещё раз';
+    // рекорд сохраняем только у вошедших — иначе игра остаётся локальной
+    let token = null; try { token = localStorage.getItem('f1hub_auth_token'); } catch (e) {}
+    if (!token) { rHint.textContent += ' · войдите, чтобы результат попал в таблицу'; return; }
+    const res = await fetch('/api/games/result', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'TgLogin ' + token},
+      body: JSON.stringify({game_type: 'reaction', score: ms})
+    }).then(r => r.json().then(d => ({ok: r.ok, d}))).catch(() => null);
+    if (res?.ok) rHint.textContent += ' · результат записан';
+    else if (res?.d?.detail?.startsWith?.('Cooldown')) rHint.textContent += ' · следующая попытка позже';
+  };
+
+  rStart.onclick = () => {
+    reset();
+    state = 'lighting';
+    rTime.textContent = '—'; rTime.className = 'big';
+    rHint.textContent = 'Ждите, пока погаснут огни';
+    rStart.textContent = 'Заново';
+    lights.forEach((l, i) => timers.push(setTimeout(() => l.classList.add('on'), 700 * (i + 1))));
+    const wait = 700 * 5 + 900 + Math.random() * 2600;      // как на реальном старте: пауза непредсказуема
+    timers.push(setTimeout(() => {
+      lights.forEach(l => l.classList.remove('on'));
+      rZone.classList.add('armed');
+      rHint.textContent = 'Жми!';
+      state = 'go'; t0 = performance.now();
+    }, wait));
+  };
+
+  rZone.onclick = () => {
+    if (state === 'idle') { rHint.textContent = 'Сначала нажмите «Старт»'; return; }
+    if (state === 'lighting') {                 // фальстарт
+      reset();
+      rTime.textContent = 'Фальстарт'; rTime.className = 'big no';
+      rHint.textContent = 'Огни ещё горели — как и в гонке, это штраф';
+      rStart.textContent = 'Ещё раз';
+      return;
+    }
+    if (state === 'go') { const ms = Math.round(performance.now() - t0); reset(); finish(ms); }
+  };
+})();
+</script>
+</body>
+</html>

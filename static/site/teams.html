@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Команды · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+/* карточка команды на всю ширину: болид крупно, пилоты рядом */
+.tbig{position:relative;overflow:hidden;background:var(--s2);display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:0;margin-bottom:18px}
+.tbig::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--tc,#666);z-index:3}
+.tbig::after{content:'';position:absolute;left:-10%;top:-60%;width:70%;height:220%;border-radius:50%;
+  background:radial-gradient(circle,var(--tc,#666),transparent 62%);opacity:.18;pointer-events:none}
+.tbig .info{padding:34px 36px;position:relative;z-index:2}
+.tbig .row1{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.tbig .logo{height:38px;width:auto;max-width:150px;object-fit:contain}
+.tbig .pos{font-family:'F1Display','Russo One',sans-serif;font-size:34px;color:var(--txt-3);line-height:1}
+.tbig h2{margin:18px 0 6px;font-family:'F1Display','Russo One',sans-serif;font-size:30px;text-transform:uppercase;line-height:1}
+.tbig .stat{display:flex;gap:34px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.tbig .stat div span{display:block;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:6px}
+.tbig .stat div b{font-family:'F1Display','Russo One',sans-serif;font-size:26px;font-weight:400}
+.tbig .pilots{display:flex;gap:12px;margin-top:26px}
+.tbig .pilot{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);padding:12px 18px 12px 12px;flex:1;min-width:0}
+.tbig .pilot img{width:60px;height:60px;border-radius:6px;object-fit:cover;object-position:top center;background:var(--s3)}
+.tbig .pilot .nm{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbig .pilot .nn{font-size:12.5px;color:var(--txt-2)}
+.tbig .carbox{position:relative;display:flex;align-items:center;justify-content:center;padding:20px 0}
+.tbig .carbox img{width:112%;max-width:none;display:block;filter:drop-shadow(0 24px 26px rgba(0,0,0,.7))}
+@media (max-width:980px){ .tbig{grid-template-columns:1fr} .tbig .carbox{order:-1;padding:10px 0 0} .tbig .carbox img{width:100%} }
+@media (max-width:640px){ .tbig .info{padding:24px 22px} .tbig .pilots{flex-direction:column} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Команды</div>
+    <h1 class="display">Команды</h1>
+    <p class="sub" id="sub">Все конструкторы сезона: составы, болиды и очки в Кубке.</p>
+  </div>
+  <div id="list"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img} = F1;
+  const [teamsData, con] = await Promise.all([
+    j('/api/teams?season=2026'), j('/api/standings/constructors?season=2026')
+  ]);
+  const teams = teamsData?.teams || [];
+  const cList = con?.standings || con || [];
+  const byName = {}; cList.forEach((t,i) => byName[t.team] = {...t, pos: i+1});
+
+  const sorted = [...teams].sort((a,b) => (byName[a.name]?.pos ?? 99) - (byName[b.name]?.pos ?? 99));
+  document.getElementById('sub').textContent =
+    sorted.length + ' ' + F1.plural(sorted.length,'команда','команды','команд') + ' сезона 2026: составы, болиды и очки в Кубке конструкторов.';
+
+  const card = t => {
+    const s = byName[t.name] || {};
+    const pilots = (t.drivers || []).slice(0,2);
+    return '<article class="tbig" style="--tc:' + esc(t.color || '#666') + '">' +
+      '<div class="info">' +
+        '<div class="row1">' + img(t.logo_url, 'logo', t.name) +
+          '<span class="pos">' + (s.pos ? String(s.pos).padStart(2,'0') : '') + '</span></div>' +
+        '<h2>' + esc(t.name || '') + '</h2>' +
+        (F1.spoilerFree ? '' :
+          '<div class="stat">' +
+            '<div><span>Очки</span><b>' + Math.round(s.points ?? 0) + '</b></div>' +
+            '<div><span>Побед</span><b>' + (s.wins ?? 0) + '</b></div>' +
+            '<div><span>Место</span><b>' + (s.pos ?? '—') + '</b></div>' +
+          '</div>') +
+        '<div class="pilots">' + pilots.map(d =>
+          '<a class="pilot" href="/static/site/driver.html?number=' + esc(d.driver_number ?? '') + '">' +
+            img(d.photo_url || d.card_photo_url, '', d.name) +
+            '<div style="min-width:0"><div class="nm">' + esc(d.last_name || d.name || '') + '</div>' +
+            '<div class="nn">№' + esc(d.driver_number ?? '—') + '</div></div></a>').join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="carbox">' + img(t.car_url, '', t.name) + '</div>' +
+    '</article>';
+  };
+
+  const render = () => {
+    document.getElementById('list').innerHTML = sorted.length ? sorted.map(card).join('')
+      : '<div class="empty">Команды не загрузились</div>';
+  };
+  F1.onSpoiler(render);
+  render();
+})();
+</script>
+</body>
+</html>

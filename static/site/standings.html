@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Чемпионат · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Чемпионат</div>
+    <h1 class="display">Чемпионат 2026</h1>
+    <p class="sub" id="sub">Личный зачёт и Кубок конструкторов — очки после каждого этапа.</p>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-t="drivers" class="on">Пилоты</button>
+    <button data-t="teams">Конструкторы</button>
+  </div>
+
+  <div id="body"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img} = F1;
+  const [drv, con, teams] = await Promise.all([
+    j('/api/standings/drivers?season=2026'),
+    j('/api/standings/constructors?season=2026'),
+    j('/api/teams?season=2026')
+  ]);
+  const dList = drv?.standings || drv || [];
+  const cList = con?.standings || con || [];
+  const logoOf = {}; (teams?.teams || []).forEach(t => { if (t.name) logoOf[t.name] = t.logo_url; });
+  let tab = 'drivers';
+
+  const drivers = () =>
+    '<table class="tbl"><thead><tr><th>#</th><th>Пилот</th><th>Команда</th>' +
+    '<th class="num">Побед</th><th class="num">Подиумов</th><th class="num">Очки</th></tr></thead><tbody>' +
+    dList.map((s,i) =>
+      '<tr><td class="pos">' + String(i+1).padStart(2,'0') + '</td>' +
+      '<td><div class="who"><span class="face-wrap" style="--tc:' + esc(s.team_color || '#2A2A33') + '">' +
+        img(s.photo_url || s.card_photo_url, '', s.name) + '</span>' +
+        '<div><div class="nm">' + esc(s.name || s.last_name || '') + '</div>' +
+        '<div class="tm">' + (s.country ? esc(s.country) + ' · ' : '') + '№' + esc(s.driver_number ?? '—') + '</div></div></div></td>' +
+      '<td><div class="who" style="gap:10px">' + img(logoOf[s.team], 'logo', s.team) + esc(s.team || '') + '</div></td>' +
+      '<td class="num">' + (s.wins ?? 0) + '</td>' +
+      '<td class="num">' + (s.podiums ?? '—') + '</td>' +
+      '<td class="pts">' + Math.round(s.points ?? 0) + '</td></tr>').join('') +
+    '</tbody></table>';
+
+  const constructors = () =>
+    '<table class="tbl"><thead><tr><th>#</th><th>Команда</th><th>Пилоты</th>' +
+    '<th class="num">Побед</th><th class="num">Очки</th></tr></thead><tbody>' +
+    cList.map((t,i) => {
+      let pilots = t.drivers;
+      if (typeof pilots === 'string') { try { pilots = JSON.parse(pilots.replace(/'/g,'"')); } catch(e) { pilots = []; } }
+      const names = Array.isArray(pilots) ? pilots.map(p => p.last_name || p.name).filter(Boolean).join(' · ') : '';
+      return '<tr><td class="pos">' + String(i+1).padStart(2,'0') + '</td>' +
+        '<td><div class="who" style="gap:12px">' + img(t.logo_url || logoOf[t.team], 'logo', t.team) +
+          '<span class="nm">' + esc(t.team || '') + '</span></div></td>' +
+        '<td class="gap">' + esc(names) + '</td>' +
+        '<td class="num">' + (t.wins ?? 0) + '</td>' +
+        '<td class="pts">' + Math.round(t.points ?? 0) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+
+  const render = () => {
+    const box = document.getElementById('body');
+    if (F1.spoilerFree) { box.innerHTML = F1.spoilerVeil('Таблица чемпионата раскрывает исход прошедших гонок.'); return; }
+    box.innerHTML = tab === 'drivers' ? drivers() : constructors();
+  };
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    tab = b.dataset.t; render();
+  });
+  F1.onSpoiler(render);
+  render();
+})();
+</script>
+</body>
+</html>

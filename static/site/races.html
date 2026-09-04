@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Гонки · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<section class="page-head--hero">
+  <div class="ph-media"><img id="phImg" src="/static/img/site/hero-race.jpg" alt=""></div>
+  <div class="ph-veil"></div>
+  <div class="wrap ph-in">
+    <div class="label label--red" style="margin-bottom:16px">Календарь 2026</div>
+    <h1 class="display">Гонки</h1>
+    <p class="sub" id="phSub">23 этапа сезона: расписание уикендов, победители и результаты каждого Гран-при.</p>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button data-f="all" class="on">Все этапы</button>
+    <button data-f="next">Ближайшие</button>
+    <button data-f="done">Прошедшие</button>
+  </div>
+  <div class="race-list" id="list"></div>
+  <div style="height:72px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img, cityOf, countryOf, dayRange, mskTime, flagOf, mapOf, kmOf} = F1;
+  const [sched, home] = await Promise.all([j('/api/schedule'), j('/api/home?season=2026')]);
+  const races = (sched?.races || []).filter(r => r.round);
+  const cur = home?.next_race?.round ?? 0;
+  if (home?.next_race?.circuit_image) {
+    const ph = document.getElementById('phImg');
+    ph.dataset.fb = '/static/img/site/hero-race.jpg';
+    ph.onerror = () => F1.imgFail(ph);
+    ph.src = home.next_race.circuit_image;
+  }
+  document.getElementById('phSub').textContent =
+    races.length + ' ' + F1.plural(races.length,'этап','этапа','этапов') +
+    ' сезона: расписание уикендов, победители и результаты каждого Гран-при.';
+
+  // победителей берём разом, чтобы не дёргать API по одному этапу
+  const winners = {};
+  const past = races.filter(r => r.round < cur);
+  await Promise.all(past.slice(-12).map(async r => {
+    const d = await j('/api/race/' + r.round + '/results');
+    const w = (d?.results || d)?.[0];
+    if (w) winners[r.round] = w;
+  }));
+
+  const TRACKLESS = new Set(['madring','sepang']);
+  const card = r => {
+    const state = r.round === cur ? 'next' : (r.round < cur ? 'done' : '');
+    const w = winners[r.round];
+    const km = kmOf(r);
+    return '<a class="rcard ' + state + '" href="/static/site/race.html?round=' + r.round + '">' +
+      '<div class="visual">' + (TRACKLESS.has(r.circuit_id)
+        ? '<div class="noimg"><b>' + String(r.round).padStart(2,'0') + '</b><span>' + esc(F1.countryOf(r)) + '</span></div>'
+        : img(mapOf(r.circuit_id), 'map', r.circuit, r.circuit_outline)) + '</div>' +
+      '<div class="body">' +
+        '<div class="rd">' + img(flagOf(r.country_code), '', countryOf(r)) +
+          (r.round === cur ? 'Следующий · раунд ' + r.round : 'Раунд ' + r.round) + '</div>' +
+        '<h3>' + esc(cityOf(r)) + '</h3>' +
+        '<div class="when">' + esc(r.name || '') + ' · ' + dayRange(r) +
+          (r.round === cur && mskTime(r) ? ' · ' + mskTime(r) : '') + '</div>' +
+        (w && !F1.spoilerFree
+          ? '<div class="win">Победитель: <b>' + esc(w.last_name || w.name || '') + '</b> · ' + esc(w.team || '') + '</div>'
+          : (r.round < cur ? '<div class="win">Результаты скрыты антиспойлером</div>'
+                           : '<div class="win">' + (km ? km + ' км · ' : '') + (r.laps ? r.laps + ' ' + F1.plural(r.laps,'круг','круга','кругов') : '') + '</div>')) +
+      '</div></a>';
+  };
+
+  let filter = 'all';
+  const render = () => {
+    const rows = races.filter(r => filter === 'all' ? true : filter === 'next' ? r.round >= cur : r.round < cur);
+    document.getElementById('list').innerHTML = rows.length ? rows.map(card).join('')
+      : '<div class="empty">Этапов не найдено</div>';
+  };
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    filter = b.dataset.f; render();
+  });
+  F1.onSpoiler(render);
+  render();
+})();
+</script>
+</body>
+</html>

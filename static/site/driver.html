@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пилот · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+/* портрет-постер: номер за фигурой, фамилия поверх */
+.dhero{position:relative;overflow:hidden;min-height:560px;display:flex;align-items:flex-end;
+  background:linear-gradient(160deg,var(--tc,#222) -30%,var(--bg) 62%)}
+.dhero .num{position:absolute;right:2vw;top:-2vh;font-family:'F1Display','Russo One',sans-serif;
+  font-size:min(34vw,440px);line-height:.8;color:rgba(255,255,255,.07);pointer-events:none;user-select:none}
+.dhero .shot{position:absolute;right:6%;bottom:0;height:104%;width:auto;object-fit:contain;
+  filter:drop-shadow(0 30px 50px rgba(0,0,0,.8))}
+.dhero .veil{position:absolute;inset:0;background:
+  linear-gradient(90deg,var(--bg) 8%,rgba(5,5,5,.86) 38%,rgba(5,5,5,.2) 72%),
+  linear-gradient(0deg,var(--bg) 1%,transparent 44%)}
+.dhero .in{position:relative;z-index:3;width:100%;max-width:var(--maxw);margin:0 auto;padding:0 var(--gut) 56px}
+.dhero .fn{font-size:19px;color:var(--txt-2);letter-spacing:.04em}
+.dhero h1{margin:6px 0 0;font-family:'F1Display','Russo One',sans-serif;text-transform:uppercase;
+  font-size:clamp(46px,7vw,104px);line-height:.94}
+.dhero .team{display:flex;align-items:center;gap:14px;margin-top:20px;font-size:17px;color:var(--txt-2)}
+.dhero .team img{height:24px;width:auto;max-width:110px;object-fit:contain}
+.dstats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);margin:-1px 0 52px}
+.dstats div{background:var(--bg);padding:24px 26px}
+.dstats span{display:block;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--txt-3);margin-bottom:9px}
+.dstats b{font-family:'F1Display','Russo One',sans-serif;font-size:30px;font-weight:400}
+@media (max-width:980px){
+  .dhero{min-height:420px}
+  .dhero .shot{right:-6%;height:86%;opacity:.55}
+  .dstats{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:640px){ .dstats{grid-template-columns:repeat(2,minmax(0,1fr))} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<section class="dhero" id="dhero">
+  <span class="num" id="dnum"></span>
+  <img class="shot" id="dshot" alt="">
+  <div class="veil"></div>
+  <div class="in">
+    <div class="crumb" style="margin-bottom:14px"><a href="/static/site/drivers.html">Пилоты</a> · <span id="crumb">—</span></div>
+    <div class="fn" id="fn"></div>
+    <h1 id="ln">—</h1>
+    <div class="team" id="team"></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="dstats" id="stats"></div>
+  <div class="sec-hd"><h2 style="font-size:26px">Результаты сезона</h2></div>
+  <div id="body"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img, cityOf} = F1;
+  const num = new URLSearchParams(location.search).get('number');
+  const [teamsData, drv, sched] = await Promise.all([
+    j('/api/teams?season=2026'), j('/api/standings/drivers?season=2026'), j('/api/schedule')
+  ]);
+  const teams = teamsData?.teams || [];
+  let d = null, team = null;
+  teams.forEach(t => (t.drivers || []).forEach(x => {
+    if (String(x.driver_number) === String(num)) { d = x; team = t; }
+  }));
+  if (!d) { document.getElementById('body').innerHTML = '<div class="empty">Пилот не найден</div>'; return; }
+
+  const st = (drv?.standings || drv || []);
+  const idx = st.findIndex(s => String(s.driver_number) === String(num));
+  const s = idx >= 0 ? st[idx] : {};
+
+  document.title = (d.name || d.last_name) + ' · F1 HUB';
+  document.getElementById('dhero').style.setProperty('--tc', d.team_color || team?.color || '#333');
+  document.getElementById('dnum').textContent = d.driver_number ?? '';
+  document.getElementById('crumb').textContent = d.last_name || d.name || '';
+  document.getElementById('fn').textContent = d.first_name || '';
+  document.getElementById('ln').textContent = d.last_name || d.name || '';
+  document.getElementById('team').innerHTML =
+    (team?.logo_url ? '<img src="' + esc(team.logo_url) + '" alt="">' : '') +
+    '<span>' + esc(d.team || team?.name || '') + '</span>' +
+    (d.country ? '<span>· ' + esc(d.country) + '</span>' : '');
+  const shot = document.getElementById('dshot');
+  shot.dataset.fb = d.card_photo_url || d.photo_url || '';
+  shot.onerror = () => F1.imgFail(shot);
+  shot.src = d.photo_url_large || d.card_photo_url || d.photo_url || '';
+
+  const render = () => {
+    document.getElementById('stats').innerHTML = F1.spoilerFree
+      ? '<div style="grid-column:1/-1;padding:0">' + F1.spoilerVeil('Статистика пилота раскрывает результаты сезона.') + '</div>'
+      : '<div><span>Место</span><b>' + (idx >= 0 ? idx + 1 : '—') + '</b></div>' +
+        '<div><span>Очки</span><b>' + Math.round(s.points ?? 0) + '</b></div>' +
+        '<div><span>Побед</span><b>' + (s.wins ?? 0) + '</b></div>' +
+        '<div><span>Подиумов</span><b>' + (s.podiums ?? '—') + '</b></div>' +
+        '<div><span>Номер</span><b>' + (d.driver_number ?? '—') + '</b></div>';
+  };
+
+  // результаты по этапам — берём завершённые гонки
+  const races = (sched?.races || []).filter(r => r.round && r.is_past);
+  const loadResults = async () => {
+    const box = document.getElementById('body');
+    if (F1.spoilerFree) { box.innerHTML = F1.spoilerVeil('Результаты по этапам скрыты.'); return; }
+    box.innerHTML = '<div class="empty">Загружаем…</div>';
+    const rows = [];
+    await Promise.all(races.slice(-10).map(async r => {
+      const res = await j('/api/race/' + r.round + '/results');
+      const me = (res?.results || []).find(x => String(x.driver_number) === String(num));
+      if (me) rows.push({r, me});
+    }));
+    rows.sort((a,b) => b.r.round - a.r.round);
+    box.innerHTML = rows.length
+      ? '<table class="tbl"><thead><tr><th>Этап</th><th>Гран-при</th><th class="num">Позиция</th>' +
+        '<th class="num">Старт</th><th class="num">Очки</th></tr></thead><tbody>' +
+        rows.map(({r, me}) => '<tr>' +
+          '<td class="pos">' + String(r.round).padStart(2,'0') + '</td>' +
+          '<td><a href="/static/site/race.html?round=' + r.round + '"><b>' + esc(cityOf(r)) + '</b>' +
+            '<div class="tm" style="color:var(--txt-2);font-size:13px">' + esc(r.name || '') + '</div></a></td>' +
+          '<td class="num">' + esc(me.position ?? me.status ?? '—') + '</td>' +
+          '<td class="num">' + esc(me.grid ?? '—') + '</td>' +
+          '<td class="pts">' + Math.round(me.points ?? 0) + '</td></tr>').join('') +
+        '</tbody></table>'
+      : '<div class="empty">Результатов пока нет</div>';
+  };
+
+  F1.onSpoiler(() => { render(); loadResults(); });
+  render(); loadResults();
+})();
+</script>
+</body>
+</html>

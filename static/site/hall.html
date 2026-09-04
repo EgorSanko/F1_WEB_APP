@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Зал славы · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+/* верх: самые титулованные */
+.legends{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-bottom:56px}
+.legend{position:relative;overflow:hidden;background:var(--s2);padding:30px 32px}
+.legend::after{content:'';position:absolute;right:-24%;top:-46%;width:78%;height:190%;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,184,0,.22),transparent 66%);pointer-events:none}
+.legend .t{font-family:'F1Display','Russo One',sans-serif;font-size:60px;line-height:1;color:#FFB800;position:relative;z-index:2}
+.legend .t span{font-size:15px;color:var(--txt-2);font-family:'F1Text','Exo 2',sans-serif;margin-left:10px}
+.legend h3{margin:16px 0 6px;font-family:'F1Display','Russo One',sans-serif;font-size:23px;
+  text-transform:uppercase;position:relative;z-index:2}
+.legend .y{font-size:14.5px;color:var(--txt-2);position:relative;z-index:2;line-height:1.55}
+/* лента чемпионов по годам */
+.years{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px}
+.yrow{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:18px;align-items:center;
+  padding:16px 0;border-bottom:1px solid var(--line);transition:padding-left .2s,background .2s}
+.yrow:hover{padding-left:8px;background:linear-gradient(90deg,rgba(255,255,255,.04),transparent)}
+.yrow .yy{font-family:'F1Display','Russo One',sans-serif;font-size:20px;color:var(--txt-3)}
+.yrow .dv{display:block;font-weight:700;font-size:16px}
+.yrow .cn{display:block;font-size:13.5px;color:var(--txt-2);margin-top:3px}
+.yrow .pt{text-align:right;font-size:14px;color:var(--txt-2);white-space:nowrap}
+.yrow .pt b{font-family:'F1Display','Russo One',sans-serif;font-size:17px;color:#fff;display:block}
+@media (max-width:1240px){ .legends{grid-template-columns:1fr} }
+@media (max-width:900px){ .years{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Зал славы</div>
+    <h1 class="display">Зал славы</h1>
+    <p class="sub" id="sub">Чемпионы мира Формулы-1 по годам.</p>
+  </div>
+
+  <div class="legends" id="legends"></div>
+
+  <div class="sec-hd"><h2 style="font-size:26px">Чемпионы по годам</h2></div>
+  <div class="years" id="years"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, plural} = F1;
+  const d = await j('/api/history/champions');
+  const list = (d?.champions || []).slice().sort((a,b) => b.season - a.season);
+  if (!list.length) { document.getElementById('years').innerHTML = '<div class="empty">Данные не загрузились</div>'; return; }
+
+  const years = list.map(c => c.season);
+  document.getElementById('sub').textContent =
+    list.length + ' ' + plural(list.length,'чемпионский титул','чемпионских титула','чемпионских титулов') +
+    ' с ' + Math.min(...years) + ' по ' + Math.max(...years) + ' года.';
+
+  // считаем титулы: кто чаще всех
+  const byDriver = {};
+  list.forEach(c => {
+    const k = c.driver;
+    (byDriver[k] = byDriver[k] || {driver: k, titles: [], team: c.constructor}).titles.push(c.season);
+  });
+  const top = Object.values(byDriver).sort((a,b) => b.titles.length - a.titles.length).slice(0,3);
+  document.getElementById('legends').innerHTML = top.map(x => {
+    const ys = x.titles.slice().sort((a,b) => a - b);
+    return '<article class="legend">' +
+      '<div class="t">' + x.titles.length + '<span>' + plural(x.titles.length,'титул','титула','титулов') + '</span></div>' +
+      '<h3>' + esc(x.driver) + '</h3>' +
+      '<div class="y">' + ys.join(' · ') + '</div></article>';
+  }).join('');
+
+  document.getElementById('years').innerHTML = list.map(c =>
+    '<div class="yrow">' +
+      '<span class="yy">' + esc(c.season) + '</span>' +
+      '<span><span class="dv">' + esc(c.driver) + '</span>' +
+      '<span class="cn">' + esc(c.constructor || '') + (c.nationality ? ' · ' + esc(c.nationality) : '') + '</span></span>' +
+      '<span class="pt"><b>' + esc(c.points ?? '—') + '</b>' + (c.wins != null ? esc(c.wins) + ' ' + plural(+c.wins,'победа','победы','побед') : '') + '</span>' +
+    '</div>').join('');
+})();
+</script>
+</body>
+</html>

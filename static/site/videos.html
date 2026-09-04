@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Видео · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+/* группа = один Гран-при, как в приложении */
+.gp-group{margin-bottom:52px}
+.gp-head{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.gp-head .bar{width:4px;align-self:stretch;min-height:52px;background:var(--red);flex-shrink:0}
+.gp-head .flag{width:34px;height:23px;object-fit:cover;border-radius:2px;flex-shrink:0}
+.gp-head .k{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--red)}
+.gp-head h2{margin:5px 0 4px;font-family:'F1Display','Russo One',sans-serif;font-size:26px;text-transform:uppercase;line-height:1}
+.gp-head .m{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
+.gp-head .map{margin-left:auto;height:56px;width:auto;max-width:120px;object-fit:contain;
+  filter:brightness(0) invert(1);opacity:.45;flex-shrink:0}
+/* на телефоне схема трассы в заголовке группы не нужна — она выдавливала страницу вбок */
+@media (max-width:640px){ .gp-head .map{display:none} .gp-head h2{font-size:21px} }
+.vcard .info .k.race{color:var(--red)}
+.vcard .info .k.review{color:#00C8AA}
+.vcard .info .k.sprint{color:#FFB800}
+.vcard .info .k.qualifying{color:#7AA7FF}
+.more-btn{margin-top:18px;background:transparent;border:1px solid var(--line);color:var(--txt-2);
+  border-radius:3px;padding:12px 22px;cursor:pointer;font-family:'F1Text','Exo 2',sans-serif;
+  font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:border-color .2s,color .2s}
+.more-btn:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Видео</div>
+    <h1 class="display">Видео</h1>
+    <p class="sub" id="sub">Записи по Гран-при: гонки, квалификации, спринты и обзоры.</p>
+  </div>
+  <div id="list"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img, cityOf, countryOf, flagOf, mapOf, dayRange, plural} = F1;
+  const SEASON = 2026;
+  const [bc, sched] = await Promise.all([j('/api/broadcasts'), j('/api/schedule')]);
+  const all = bc?.broadcasts || bc || [];
+  const raceBy = {}; (sched?.races || []).forEach(r => raceBy[r.round] = r);
+
+  // как в приложении: только текущий сезон
+  const items = all.filter(b => b.season === SEASON || !b.season);
+
+  // порядок сессий внутри этапа — тот же, что в приложении
+  const ORDER = {review:-1, race:0, sprint:1, qualifying:2, sprint_qualifying:3, fp3:4, fp2:5, fp1:6};
+  const LABEL = {review:'Обзор', race:'Гонка', sprint:'Спринт', qualifying:'Квалификация',
+                 sprint_qualifying:'Спринт-квалификация', fp1:'Свободная 1', fp2:'Свободная 2', fp3:'Свободная 3'};
+
+  const groups = {};
+  items.forEach(b => (groups[b.race_round] = groups[b.race_round] || []).push(b));
+  const rounds = Object.keys(groups).map(Number).sort((a,b) => b - a);
+
+  document.getElementById('sub').textContent =
+    items.length + ' ' + plural(items.length,'запись','записи','записей') + ' по ' +
+    rounds.length + ' ' + plural(rounds.length,'этапу','этапам','этапам') + ' сезона ' + SEASON + '.';
+
+  const open = new Set();
+  const LIMIT = 4;
+
+  const vcard = (b, r, i) => {
+    const poster = b.thumbnail_url || (r && r.circuit_image) || F1.stockAt(i);
+    return '<a class="vcard" href="/static/site/video.html?id=' + esc(b.id) + '">' +
+      '<div class="thumb">' + img(poster, '', b.title || LABEL[b.session_type], F1.stockAt(i)) +
+        (b.is_live ? '<span class="live"><i></i>В эфире</span>' : '') +
+        '<span class="play"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M9 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.05 5.97 9 6.55 9 7.5z"/></svg></span>' +
+      '</div>' +
+      '<div class="info"><div class="k ' + esc(b.session_type || '') + '">' + esc(LABEL[b.session_type] || b.session_type || '') + '</div>' +
+      '<h3>' + esc(b.title || ((r ? cityOf(r) : 'Раунд ' + b.race_round) + ' · ' + (LABEL[b.session_type] || ''))) + '</h3></div></a>';
+  };
+
+  const render = () => {
+    document.getElementById('list').innerHTML = rounds.length ? rounds.map(round => {
+      const r = raceBy[round];
+      const list = groups[round].slice().sort((a,b) =>
+        ((ORDER[a.session_type] ?? 9) - (ORDER[b.session_type] ?? 9)));
+      const shown = open.has(round) ? list : list.slice(0, LIMIT);
+      const hidden = list.length - shown.length;
+      return '<section class="gp-group">' +
+        '<div class="gp-head"><div class="bar"></div>' +
+          (r ? img(flagOf(r.country_code), 'flag', countryOf(r)) : '') +
+          '<div><div class="k">Гран-при</div>' +
+          '<h2>' + esc(r ? cityOf(r) : 'Раунд ' + round) + '</h2>' +
+          '<div class="m">Раунд ' + String(round).padStart(2,'0') + ' · ' + SEASON +
+            (r ? ' · ' + dayRange(r) : '') + ' · ' + list.length + ' ' +
+            plural(list.length,'запись','записи','записей') + '</div></div>' +
+          (r ? img(mapOf(r.circuit_id), 'map', r.circuit) : '') +
+        '</div>' +
+        '<div class="vid-grid">' + shown.map((b,i) => vcard(b, r, round + i)).join('') + '</div>' +
+        (hidden > 0 ? '<button class="more-btn" data-round="' + round + '">Ещё ' + hidden + ' ' +
+          plural(hidden,'запись','записи','записей') + '</button>' : '') +
+      '</section>';
+    }).join('') : '<div class="empty">Записей пока нет</div>';
+
+    document.querySelectorAll('.more-btn').forEach(b => b.onclick = () => {
+      open.add(+b.dataset.round); render();
+    });
+  };
+  render();
+})();
+</script>
+</body>
+</html>

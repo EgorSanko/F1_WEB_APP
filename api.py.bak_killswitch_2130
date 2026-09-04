@@ -960,10 +960,21 @@ async def get_last_race():
 
 @app.get("/api/home")
 async def get_home(request: Request, season: int = None):
-    # Старая нативка 1.0.x (UA okhttp/expo, зовёт /api/home БЕЗ ?season=) получает
-    # ОБЫЧНЫЕ данные. Жёсткую заглушку убрали: приложение её не разбирало и не
-    # открывалось вовсе, а обновиться было некуда — 2.0 ещё не в сторе.
-    # Призыв обновиться показываем мягко — баннером в ленте новостей (см. /api/news).
+    # Kill-switch старой нативки 1.0.x: она зовёт /api/home БЕЗ ?season=
+    # (новый мини-апп и сайт всегда с season), UA RN-Android = okhttp.
+    if season is None:
+        ua = (request.headers.get("user-agent") or "").lower()
+        if "okhttp" in ua or "expo/" in ua:
+            return {
+                "next_race": {
+                    "round": 0, "name": "Обновите приложение",
+                    "circuit_name": "Вышла версия 2.0 — скачайте в RuStore",
+                    "country": "Старая версия больше не поддерживается",
+                    "race_datetime": "2030-01-01T00:00:00Z",
+                },
+                "news": [{"title": "F1 Hub 2.0 уже в RuStore! Новый дизайн, 3D-трассы, Зал славы и прогнозы. Обновитесь — эта версия отключена.", "source": "F1 Hub"}],
+                "upgrade_required": True,
+            }
     season = season or CURRENT_SEASON
     """Combined endpoint: next race + last race + top standings. One call for home screen."""
     return await f1_data.get_home_data(season=season)
@@ -1677,38 +1688,15 @@ async def leaderboard(request: Request):
 
 # ============ NEWS (from championat.com + Telegram fallback) ============
 
-def _with_legacy_upgrade_banner(response, request):
-    """legacy_upgrade_banner: старому приложению из RuStore (UA okhttp/expo)
-    первым постом в ленте показываем призыв обновиться. Приложение при этом
-    полностью работоспособно — блокировать его нельзя, пока 2.0 не в сторе."""
-    try:
-        ua = (request.headers.get("user-agent") or "").lower() if request else ""
-        if "okhttp" not in ua and "expo/" not in ua:
-            return response
-        banner = {
-            "title": "Вышла F1 Hub 2.0 — обновитесь в RuStore",
-            "preview": "Новый дизайн, прогнозы, трансляции и Зал славы. "
-                       "Откройте RuStore, найдите F1 Hub и нажмите «Обновить».",
-            "url": "https://www.rustore.ru/catalog/app/ru.leadseek.f1hub",
-            "date_text": "",
-            "photo": "",
-        }
-        out = dict(response)
-        out["posts"] = [banner] + list(response.get("posts") or [])
-        return out
-    except Exception:
-        return response
-
-
 @app.get("/api/news")
-async def get_news(request: Request = None):
+async def get_news():
     """F1-новости. PRIMARY — Telegram-канал (t.me запинен в extra_hosts:
     провайдер режет TCP:443 к Telegram-адресам). FALLBACK — championat.com
     (датацентровым IP отдаёт заглушку «Авторизация SberID», но вдруг вернётся).
     При провале обоих — протухший кэш вместо пустоты."""
     cached = f1_data.cache_get("news")
     if cached:
-        return _with_legacy_upgrade_banner(cached, request)
+        return cached
 
     posts = []
     source = "@stanizlavsky"
@@ -1821,7 +1809,7 @@ async def get_news(request: Request = None):
     }
     if posts:
         f1_data.cache_set("news", response)
-    return _with_legacy_upgrade_banner(response, request)
+    return response
 
 
 @app.get("/api/news/article")

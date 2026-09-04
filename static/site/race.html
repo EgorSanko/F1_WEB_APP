@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Этап · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+<style>
+.race-top{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:44px;align-items:start;margin-bottom:52px}
+.facts-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.facts-grid div{background:var(--bg);padding:20px 22px}
+.facts-grid span{display:block;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--txt-3);margin-bottom:8px}
+.facts-grid b{font-family:'F1Display','Russo One',sans-serif;font-size:24px;font-weight:400}
+.track-art{background:var(--s2);padding:26px;text-align:center}
+.track-art img{width:100%;height:180px;object-fit:contain;filter:brightness(0) invert(1);opacity:.85}
+.track-art .cap{margin-top:14px;font-size:14px;color:var(--txt-2)}
+.sessions{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-top:22px}
+.sessions .s{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--line);font-size:15px}
+.sessions .s .k{color:var(--txt-2)}
+.sessions .s b{font-variant-numeric:tabular-nums}
+@media (max-width:980px){ .race-top{grid-template-columns:1fr;gap:28px} .facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<section class="page-head--hero">
+  <div class="ph-media"><img id="phImg" src="/static/img/site/hero-race.jpg" alt=""></div>
+  <div class="ph-veil"></div>
+  <div class="wrap ph-in">
+    <div class="crumb" style="margin-bottom:16px"><a href="/static/site/races.html">Гонки</a> · <span id="crumbName">Этап</span></div>
+    <div class="label label--red" id="rdLabel" style="margin-bottom:14px">Раунд</div>
+    <h1 class="display" id="city">—</h1>
+    <p class="sub" id="gpName"></p>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="race-top">
+    <div>
+      <div class="facts-grid" id="facts"></div>
+      <div class="sessions" id="sessions"></div>
+    </div>
+    <div class="track-art">
+      <img id="map" alt="Схема трассы">
+      <div class="cap" id="circuitName"></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-t="race" class="on">Гонка</button>
+    <button data-t="qualifying">Квалификация</button>
+    <button data-t="pitstops">Пит-стопы</button>
+  </div>
+  <div id="body"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img, cityOf, countryOf, kmOf, dayRange, fullDate, mskTime, mapOf} = F1;
+  const round = +(new URLSearchParams(location.search).get('round') || 0);
+  const [sched, home] = await Promise.all([j('/api/schedule'), j('/api/home?season=2026')]);
+  const races = (sched?.races || []).filter(r => r.round);
+  const r = races.find(x => x.round === round) || races.find(x => x.round === home?.next_race?.round) || races[0];
+  if (!r) { document.getElementById('body').innerHTML = '<div class="empty">Этап не найден</div>'; return; }
+
+  document.title = cityOf(r) + ' · F1 HUB';
+  document.getElementById('crumbName').textContent = cityOf(r);
+  document.getElementById('rdLabel').textContent = 'Раунд ' + r.round;
+  document.getElementById('city').textContent = cityOf(r);
+  document.getElementById('gpName').textContent = (r.name || '') + ' · ' + fullDate(r);
+  document.getElementById('circuitName').textContent = r.circuit || '';
+  const ph = document.getElementById('phImg');
+  if (r.circuit_image) { ph.dataset.fb = '/static/img/site/hero-race.jpg'; ph.onerror = () => F1.imgFail(ph); ph.src = r.circuit_image; }
+  const mp = document.getElementById('map');
+  mp.dataset.fb = r.circuit_outline || ''; mp.onerror = () => F1.imgFail(mp); mp.src = mapOf(r.circuit_id);
+
+  const km = kmOf(r);
+  document.getElementById('facts').innerHTML =
+    '<div><span>Страна</span><b>' + esc(countryOf(r)) + '</b></div>' +
+    '<div><span>Кругов</span><b>' + (r.laps ?? '—') + '</b></div>' +
+    '<div><span>Длина круга</span><b>' + (km ? km + ' км' : '—') + '</b></div>' +
+    '<div><span>Старт гонки</span><b>' + (mskTime(r) || '—') + '</b></div>';
+
+  const SES = {fp1:'Свободная 1', fp2:'Свободная 2', fp3:'Свободная 3',
+               sprint_qualifying:'Спринт-квалификация', sprint:'Спринт', qualifying:'Квалификация', race:'Гонка'};
+  const ses = r.sessions || {};
+  document.getElementById('sessions').innerHTML = Object.keys(SES)
+    .filter(k => ses[k]?.date)
+    .map(k => {
+      const d = new Date(ses[k].date + 'T' + (ses[k].time || '12:00:00Z').replace('Z','') + 'Z');
+      const t = isNaN(d) ? '' : d.toLocaleString('ru-RU', {day:'numeric', month:'long', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Moscow'});
+      return '<div class="s"><span class="k">' + SES[k] + '</span><b>' + esc(t) + ' МСК</b></div>';
+    }).join('');
+
+  let tab = 'race', cache = {};
+  const table = (rows, kind) => {
+    if (!rows || !rows.length) return '<div class="empty">Данных по этой сессии нет</div>';
+    if (kind === 'pitstops')
+      return '<table class="tbl"><thead><tr><th>#</th><th>Пилот</th><th class="num">Круг</th><th class="num">Время</th></tr></thead><tbody>' +
+        rows.map((x,i) => '<tr><td class="pos">' + (i+1) + '</td>' +
+          '<td><div class="who"><span class="nm">' + esc(x.name || x.driver || x.last_name || x.code || '') + '</span></div></td>' +
+          '<td class="num">' + esc(x.lap ?? '—') + '</td>' +
+          '<td class="num">' + esc(x.duration != null ? (+x.duration).toFixed(3) + ' с' : (x.time ?? '—')) + '</td></tr>').join('') + '</tbody></table>';
+    return '<table class="tbl"><thead><tr><th>#</th><th>Пилот</th><th>Команда</th>' +
+      (kind === 'race' ? '<th class="num">Время</th><th class="num">Очки</th>' : '<th class="num">Время круга</th>') +
+      '</tr></thead><tbody>' +
+      rows.map((x,i) => '<tr><td class="pos">' + (x.position || i+1) + '</td>' +
+        '<td><div class="who"><span class="face-wrap" style="--tc:' + esc(x.team_color || '#2A2A33') + '">' +
+          img(x.photo_url || x.card_photo_url, '', x.name) + '</span>' +
+          '<div><div class="nm">' + esc(x.name || x.last_name || '') + '</div>' +
+          '<div class="tm">№' + esc(x.driver_number ?? '—') + '</div></div></div></td>' +
+        '<td class="gap">' + esc(x.team || '') + '</td>' +
+        '<td class="num">' + esc(x.time || x.q3 || x.q2 || x.q1 || x.status || '—') + '</td>' +
+        (kind === 'race' ? '<td class="pts">' + Math.round(x.points ?? 0) + '</td>' : '') +
+        '</tr>').join('') + '</tbody></table>';
+  };
+
+  const load = async () => {
+    const box = document.getElementById('body');
+    if (F1.spoilerFree) { box.innerHTML = F1.spoilerVeil('Результаты этапа скрыты, чтобы не испортить просмотр.'); return; }
+    if (r.is_past === false || r.round > (home?.next_race?.round ?? 0)) {
+      box.innerHTML = '<div class="empty">Этап ещё не проехали — результаты появятся после гонки</div>'; return;
+    }
+    box.innerHTML = '<div class="empty">Загружаем…</div>';
+    if (!cache[tab]) {
+      const url = tab === 'race' ? '/api/race/' + r.round + '/results'
+                : tab === 'qualifying' ? '/api/race/' + r.round + '/qualifying'
+                : '/api/race/' + r.round + '/pitstops';
+      const d = await j(url);
+      cache[tab] = d?.results || d?.top || d?.qualifying || d?.pitstops || d?.pit_stops || (Array.isArray(d) ? d : []);
+    }
+    box.innerHTML = table(cache[tab], tab);
+  };
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    tab = b.dataset.t; load();
+  });
+  F1.onSpoiler(load);
+  load();
+})();
+</script>
+</body>
+</html>

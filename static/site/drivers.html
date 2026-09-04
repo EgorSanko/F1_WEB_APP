@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пилоты · F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<link rel="stylesheet" href="/static/site/app.css?v=28530c7e">
+</head>
+<body>
+
+<header><div class="wrap hd"></div></header>
+
+<div class="wrap">
+  <div class="page-head">
+    <div class="crumb"><a href="/static/site/index.html">Главное</a> · Пилоты</div>
+    <h1 class="display">Пилоты</h1>
+    <p class="sub" id="sub">Стартовый состав сезона 2026.</p>
+  </div>
+  <div class="grid-cards" id="grid"></div>
+  <div style="height:80px"></div>
+</div>
+
+<footer><div class="wrap"></div></footer>
+
+<script src="/static/site/site.js?v=28530c7e"></script>
+<script>
+(async () => {
+  const {j, esc, img} = F1;
+  const [teamsData, drv] = await Promise.all([
+    j('/api/teams?season=2026'),
+    j('/api/standings/drivers?season=2026')
+  ]);
+  const teams = teamsData?.teams || [];
+  const standings = drv?.standings || drv || [];
+  const ptsOf = {}, posOf = {};
+  standings.forEach((s,i) => { const k = s.driver_number ?? s.code; ptsOf[k] = Math.round(s.points ?? 0); posOf[k] = i+1; });
+
+  // список пилотов собираем из состава команд — так у каждого есть цвет и логотип
+  const rows = [];
+  teams.forEach(t => (t.drivers || []).forEach(d => rows.push({...d, team: d.team || t.name,
+    team_color: d.team_color || t.color, logo: t.logo_url})));
+  rows.sort((a,b) => (ptsOf[b.driver_number ?? b.code] ?? -1) - (ptsOf[a.driver_number ?? a.code] ?? -1));
+
+  document.getElementById('sub').textContent =
+    rows.length + ' ' + F1.plural(rows.length,'пилот','пилота','пилотов') + ' сезона 2026 — с местом в чемпионате и очками.';
+
+  const card = d => {
+    const k = d.driver_number ?? d.code;
+    const pts = ptsOf[k], pos = posOf[k];
+    return '<a class="dcard" href="/static/site/driver.html?number=' + esc(d.driver_number ?? '') + '"' +
+      ' style="--tc:' + esc(d.team_color || '#666') + '">' +
+      '<div class="top"><span class="n">' + esc(d.driver_number ?? '') + '</span>' +
+        img(d.logo, 'logo', d.team) + '</div>' +
+      img(d.card_photo_url || d.photo_url, 'face', d.name) +
+      '<div class="meta">' +
+        '<div class="fn">' + esc(d.first_name || '') + '</div>' +
+        '<div class="ln">' + esc(d.last_name || d.name || '') + '</div>' +
+        '<div class="pt">' + (pts != null ? '<b>' + pts + '</b> очков · ' + pos + '-е место' : esc(d.team || '')) + '</div>' +
+      '</div></a>';
+  };
+
+  const render = () => {
+    document.getElementById('grid').innerHTML = rows.length ? rows.map(card).join('')
+      : '<div class="empty">Состав пока не загружен</div>';
+  };
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+/* ═══════════════════════════════════════════════════════════════
+   Шрифтовая система как на formula1.com.
+   Латиница и цифры — оригинальный Formula1 (снят с их CDN).
+   Кириллица — Unbounded: тот же широкий геометрический скелет,
+   потому что в Formula1 кириллицы НЕТ ВООБЩЕ (0 глифов).
+   Браузер выбирает шрифт по символу через unicode-range.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ——— Дисплейный: заголовки ——— */
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('/static/fonts/f1/Formula1-Regular.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F, U+2100-214F, U+2190-21FF, U+2200-22FF;
+}
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:700; font-display:swap;
+  src:url('/static/fonts/f1/Formula1-Bold.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F, U+2100-214F, U+2190-21FF, U+2200-22FF;
+}
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:900; font-display:swap;
+  src:url('/static/fonts/f1/Formula1-Black.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F, U+2100-214F, U+2190-21FF, U+2200-22FF;
+}
+/* кириллица: size-adjust подгоняет высоту прописных под Formula1 */
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('/static/fonts/f1/Unbounded-500-cyr.woff2') format('woff2');
+  unicode-range:U+0400-04FF, U+0500-052F, U+2DE0-2DFF, U+A640-A69F;
+  size-adjust:94%;
+}
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:700; font-display:swap;
+  src:url('/static/fonts/f1/Unbounded-700-cyr.woff2') format('woff2');
+  unicode-range:U+0400-04FF, U+0500-052F, U+2DE0-2DFF, U+A640-A69F;
+  size-adjust:94%;
+}
+@font-face{
+  font-family:'F1Display'; font-style:normal; font-weight:900; font-display:swap;
+  src:url('/static/fonts/f1/Unbounded-800-cyr.woff2') format('woff2');
+  unicode-range:U+0400-04FF, U+0500-052F, U+2DE0-2DFF, U+A640-A69F;
+  size-adjust:94%;
+}
+
+/* ——— Широкое начертание: крупные числа и метки, как F1 Wide ——— */
+@font-face{
+  font-family:'F1Wide'; font-style:normal; font-weight:500; font-display:swap;
+  src:url('/static/fonts/f1/Formula1-Wide.woff2') format('woff2');
+  unicode-range:U+0000-03FF;
+}
+@font-face{
+  font-family:'F1Wide'; font-style:normal; font-weight:500; font-display:swap;
+  src:url('/static/fonts/f1/Unbounded-800-cyr.woff2') format('woff2');
+  unicode-range:U+0400-04FF; size-adjust:94%;
+}
+
+/* ——— Интерфейсный: Titillium Web (латиница) + Exo 2 (кириллица) ——— */
+@font-face{
+  font-family:'F1Text'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('/static/fonts/f1/Titillium-400.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F;
+}
+@font-face{
+  font-family:'F1Text'; font-style:normal; font-weight:600; font-display:swap;
+  src:url('/static/fonts/f1/Titillium-600.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F;
+}
+@font-face{
+  font-family:'F1Text'; font-style:normal; font-weight:700; font-display:swap;
+  src:url('/static/fonts/f1/Titillium-700.woff2') format('woff2');
+  unicode-range:U+0000-03FF, U+2000-206F;
+}
+@font-face{
+  font-family:'F1Text'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('/static/fonts/exo2-cyrillic.woff2') format('woff2');
+  unicode-range:U+0400-04FF, U+0500-052F;
+}

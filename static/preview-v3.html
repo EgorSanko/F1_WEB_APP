@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F1 HUB</title>
+<link rel="stylesheet" href="/static/fonts/racing.css">
+<link rel="stylesheet" href="/static/fonts/f1-fonts.css">
+<style>
+/* ══════════════════════════════════════════════════════════
+   F1 HUB — главная. Три уровня типографики, слоистый чёрный,
+   красный только там, где «это важно».
+   ══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#050505;          /* база */
+  --s1:#0A0A0D;          /* полосы секций */
+  --s2:#111116;          /* поверхности */
+  --s3:#17171D;          /* вторичное */
+  --line:rgba(255,255,255,.09);
+  --red:#E10600;
+  --txt:#F4F4F6;
+  --txt-2:#A6A6B0;       /* вторичный текст — светлее прежнего */
+  --txt-3:#6E6E78;
+  --maxw:1440px;
+  --gut:56px;
+}
+*{box-sizing:border-box}
+html{overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:'F1Text','Exo 2','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  font-size:16px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--red)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
+
+/* ——— ТИПОГРАФИКА: ровно три уровня ——— */
+.display{font-family:'F1Display','Russo One',sans-serif;font-weight:900;text-transform:uppercase;
+  letter-spacing:normal;line-height:.94}
+.heading{font-family:'F1Display','Russo One',sans-serif;font-weight:900;text-transform:uppercase;
+  letter-spacing:normal;font-size:clamp(20px,2vw,26px);line-height:1.1}
+.ui{font-size:15px;letter-spacing:.01em}
+.label{font-size:12.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-3)}
+.label--red{color:var(--red)}
+
+/* ——— СЛОТЫ ПОД МЕДИА (пропорции держатся жёстко) ——— */
+.slot{position:relative;overflow:hidden;background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.02) 0 12px,transparent 12px 24px),var(--s2);
+  display:flex;align-items:center;justify-content:center;text-align:center}
+.slot::after{content:attr(data-note);font-size:11.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--txt-3);padding:0 14px;line-height:1.6}
+.slot--21x9{aspect-ratio:21/9}
+.slot--16x9{aspect-ratio:16/9}
+.slot--3x2{aspect-ratio:3/2}
+.slot--4x5{aspect-ratio:4/5}
+.slot--1x1{aspect-ratio:1/1}
+.slot--fill{position:absolute;inset:0;aspect-ratio:auto}
+.slot--bare::after{content:''}
+/* слот с реальным фото: подпись не нужна, картинка кроется по кадру */
+.slot.has-photo::after{content:''}
+.slot.has-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.slot.has-photo{background:#0B0B0F}
+
+/* ——— официальные изображения из F1 API ——— */
+.nr-map{display:block;width:100%;max-width:200px;height:104px;object-fit:contain;object-position:left center;
+  margin:24px 0 14px;filter:brightness(0) invert(1) drop-shadow(0 0 14px rgba(0,0,0,.85));opacity:.9}
+.tlogo{width:30px;height:21px;object-fit:contain;flex-shrink:0;opacity:.95}
+.winner{display:flex;align-items:center;gap:20px}
+.winner .wtext{min-width:0}
+.wface{width:104px;height:104px;object-fit:cover;object-position:top center;border-radius:4px;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),transparent);flex-shrink:0}
+.st .num{display:flex;align-items:center;gap:16px}
+/* портрет на плашке цвета команды — как в официальных карточках */
+.st-face-wrap{position:relative;width:62px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;
+  background:linear-gradient(180deg,var(--tc,#2A2A33) -10%,rgba(0,0,0,.25) 96%)}
+.st-face{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
+.st:hover .st-face{transform:scale(1.06)}
+.st-face{transition:transform .25s}
+.cal .flag{width:24px;height:16px;object-fit:cover;border-radius:2px;background:#222;vertical-align:middle;margin-right:8px}
+
+/* ——— КНОПКИ ——— */
+.btn{font-family:'F1Text','Exo 2';cursor:pointer;border:none;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;transition:background .18s,transform .12s,color .18s,border-color .18s}
+.btn:active{transform:translateY(1px)}
+.btn-red{background:var(--red);color:#fff;padding:17px 34px;font-size:14px;border-radius:2px}
+.btn-red:hover{background:#FF1A0D}
+.arrow-link{display:inline-flex;align-items:center;gap:12px;font-size:14px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--txt);transition:gap .22s,color .18s}
+.arrow-link:hover{gap:18px}
+.arrow-link.muted{color:var(--txt-2)}
+.arrow-link.muted:hover{color:#fff}
+
+/* ══════ ШАПКА ══════ */
+header{position:sticky;top:0;z-index:90;height:80px;background:rgba(5,5,5,.88);
+  backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.hd{display:flex;align-items:center;height:80px;gap:48px}
+.logo{width:124px;height:34px;flex-shrink:0}
+.nav{display:flex;gap:34px;font-size:15px;font-weight:600;color:var(--txt-2)}
+.nav a{transition:color .18s}
+.nav a:hover{color:#fff}
+.nav a.on{color:#fff;font-weight:700}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:28px}
+.icon-btn{background:none;border:none;color:var(--txt-2);cursor:pointer;display:flex;padding:6px;transition:color .18s}
+.icon-btn:hover{color:#fff}
+.hd-right .enter{font-size:15px;font-weight:600;color:var(--txt-2)}
+.hd-right .enter:hover{color:#fff}
+.hd-right .btn-red{padding:13px 26px;font-size:13px}
+
+/* ══════ ГЕРОЙ ══════ */
+.hero{position:relative;min-height:min(94vh,900px);display:flex;align-items:center;padding-bottom:96px;overflow:hidden;background:var(--bg)}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-bg .slot{height:100%;align-items:flex-start;padding-top:120px;background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.014) 0 12px,transparent 12px 24px),#0B0B0F}
+.hero-bg .slot::after{color:#2E2E36}
+.hero-veil{position:absolute;inset:0;z-index:1;background:
+  linear-gradient(90deg,var(--bg) 4%,rgba(5,5,5,.92) 30%,rgba(5,5,5,.45) 56%,rgba(5,5,5,.72) 82%,rgba(5,5,5,.93) 100%),
+  linear-gradient(0deg,var(--bg) 0%,rgba(5,5,5,.55) 18%,rgba(5,5,5,.2) 38%,transparent 62%),
+  radial-gradient(58% 70% at 88% 62%,rgba(5,5,5,.85),transparent 70%)}
+/* линии скорости — очень тихие */
+.speed{position:absolute;z-index:1;right:0;top:0;bottom:0;width:62%;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(105deg,transparent 0 78px,rgba(255,255,255,.028) 78px 80px)}
+.hero-in{position:relative;z-index:4;width:100%;max-width:var(--maxw);margin:0 auto;padding:0 var(--gut);transform:translateY(-9%)}
+.hero-copy{max-width:min(46%,620px)}
+.hero-round{margin-bottom:26px}
+.hero-title{margin:0;font-size:clamp(56px,8.4vw,124px);text-shadow:0 22px 60px rgba(0,0,0,.75)}
+.hero-title .sm{display:block;font-size:.30em;letter-spacing:.02em;line-height:1.06;color:var(--txt);margin-bottom:.28em}
+.hero-when{margin:30px 0 0;font-size:19px;font-weight:600;color:var(--txt-2);letter-spacing:.04em}
+.hero-cta{display:flex;align-items:center;gap:34px;margin-top:40px;flex-wrap:wrap}
+
+/* болид: сцена, а не наклейка — тень на «асфальте» + смазанный шлейф */
+.car-shadow{position:absolute;left:6%;right:6%;bottom:-4%;height:52px;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.85),transparent 72%);filter:blur(14px)}
+.car-trail{position:absolute;right:0;left:-18%;top:52%;height:24%;
+  background:linear-gradient(90deg,transparent,rgba(225,6,0,.10) 40%,rgba(255,255,255,.05));
+  filter:blur(22px);transform:skewX(-12deg)}
+
+/* инфопанель — не карточка: вертикальная линия + текст */
+.nextrace{position:absolute;z-index:5;right:var(--gut);bottom:136px;width:264px;padding-left:26px}
+.nextrace::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--red)}
+.nextrace .gp{margin-top:12px;font-family:'F1Display','Russo One',sans-serif;font-size:26px;line-height:1.08;text-transform:uppercase}
+.nextrace .when{margin-top:12px;font-size:16px;font-weight:600;color:var(--txt-2)}
+.nextrace hr{border:none;border-top:1px solid var(--line);margin:22px 0}
+.nextrace .facts{display:flex;flex-direction:column;gap:7px;font-size:15px;color:var(--txt-2)}
+.nextrace .facts b{color:var(--txt);font-weight:700}
+.nextrace .arrow-link{margin-top:22px;font-size:13px}
+
+/* ══════ НАХЛЁСТ: последняя гонка + большая новость ══════ */
+.overlap{position:relative;z-index:20;margin-top:-96px}
+.duo{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:24px;align-items:stretch}
+.panel{background:var(--s2);padding:34px 32px 30px}
+.panel .heading{margin:0 0 4px}
+.winner{margin-top:26px}
+.winner .pos{font-family:'F1Display','Russo One',sans-serif;font-size:15px;color:var(--red);letter-spacing:.1em}
+.winner .who{font-family:'F1Display','Russo One',sans-serif;font-size:clamp(30px,3.2vw,42px);text-transform:uppercase;
+  line-height:1;margin:10px 0 8px}
+.winner .team{font-size:15px;color:var(--txt-2)}
+.rest{margin-top:28px;border-top:1px solid var(--line)}
+.rest .r{display:grid;grid-template-columns:22px 26px 1fr auto;gap:16px;align-items:center;
+  padding:13px 0;border-bottom:1px solid var(--line);font-size:16px}
+.rest .r .n{color:var(--txt-3);font-weight:700;font-variant-numeric:tabular-nums}
+.rest .r .d{font-weight:700;letter-spacing:.04em}
+.rest .r .g{color:var(--txt-2);font-variant-numeric:tabular-nums;font-size:15px}
+/* редакционная новость */
+.feature{position:relative;background:var(--s2);display:flex;flex-direction:column}
+.feature .slot{flex:1;min-height:300px}
+.feature .body{padding:32px 36px 34px}
+.feature .meta{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.feature .meta .dot{width:3px;height:3px;border-radius:50%;background:var(--txt-3)}
+.feature h2{margin:0 0 18px;font-family:'F1Display','Russo One',sans-serif;text-transform:uppercase;
+  font-size:clamp(26px,2.9vw,40px);line-height:1.06;letter-spacing:-.01em;max-width:22ch}
+.feature p{margin:0 0 22px;font-size:16.5px;line-height:1.6;color:var(--txt-2);max-width:62ch;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ══════ СЕКЦИИ ══════ */
+.section{padding:96px 0}
+.section--band{background:var(--s1)}
+.sec-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:40px}
+.sec-hd h2{margin:0;font-family:'F1Display','Russo One',sans-serif;text-transform:uppercase;
+  font-size:clamp(28px,3.4vw,46px);line-height:1;letter-spacing:normal}
+/* истории */
+.stories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.story .slot{margin-bottom:20px}
+.story h3{margin:0 0 10px;font-size:20px;font-weight:700;line-height:1.28;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.story .when{font-size:14px;color:var(--txt-3);letter-spacing:.06em;text-transform:uppercase}
+.story:hover h3{color:#fff}
+.story:hover .slot{opacity:.86}
+
+/* чемпионат — не таблица, а строки-плакаты */
+.stand{border-top:1px solid var(--line)}
+.st{display:grid;grid-template-columns:158px minmax(0,1fr) 200px auto;gap:28px;align-items:center;
+  padding:26px 0;border-bottom:1px solid var(--line);transition:padding-left .22s,background .22s}
+.st:hover{padding-left:14px;background:linear-gradient(90deg,rgba(255,255,255,.035),transparent 60%)}
+.st .num{font-family:'F1Display','Russo One',sans-serif;font-size:38px;color:var(--txt-3);font-variant-numeric:tabular-nums;line-height:1}
+.st:first-child .num{color:var(--red)}
+.st .name{font-family:'F1Display','Russo One',sans-serif;font-size:clamp(22px,2.3vw,32px);text-transform:uppercase;line-height:1}
+.st .team{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--txt-2)}
+.st .pts{text-align:right}
+.st .pts b{font-family:'F1Display','Russo One',sans-serif;font-size:32px;font-variant-numeric:tabular-nums;line-height:1}
+.st .pts span{display:block;font-size:12px;letter-spacing:.16em;color:var(--txt-3);margin-top:6px}
+
+/* команды: вырезанный болид на плашке цвета команды — его законное место */
+.teams{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.team-card{position:relative;overflow:hidden;background:var(--s2);padding:24px 26px 0;
+  display:flex;flex-direction:column;min-height:236px;transition:transform .25s cubic-bezier(.2,.7,.3,1)}
+.team-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tc,#666)}
+.team-card::after{content:'';position:absolute;right:-14%;top:-40%;width:70%;height:150%;border-radius:50%;
+  background:radial-gradient(circle,var(--tc,#666),transparent 66%);opacity:.20;pointer-events:none}
+.team-card:hover{transform:translateY(-4px)}
+.team-card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;position:relative;z-index:2}
+.team-card .tlogo-big{height:26px;width:auto;max-width:120px;object-fit:contain}
+.team-card .pos{font-family:'F1Display','Russo One',sans-serif;font-size:28px;color:var(--txt-3);line-height:1}
+.team-card h3{margin:14px 0 4px;font-family:'F1Display','Russo One',sans-serif;font-size:20px;
+  text-transform:uppercase;position:relative;z-index:2}
+.team-card .pts{font-size:15px;color:var(--txt-2);position:relative;z-index:2}
+.team-card .pts b{color:var(--txt);font-weight:700}
+.team-card .car{margin:auto -26px -6px;display:block;width:calc(100% + 52px);position:relative;z-index:2;
+  filter:drop-shadow(0 14px 18px rgba(0,0,0,.6))}
+
+/* сезон: следующий этап крупно + список остальных */
+.season{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:40px;align-items:start}
+.season-card{background:var(--s2)}
+.season-card .body{padding:28px 30px 32px}
+.season-card .slot img{object-position:center 62%}
+.season-card .rd{font-size:13px;font-weight:800;letter-spacing:.16em;color:var(--red);text-transform:uppercase}
+.season-card h3{margin:12px 0 8px;font-family:'F1Display','Russo One',sans-serif;font-size:34px;text-transform:uppercase;line-height:1}
+.season-card .sub{font-size:16px;color:var(--txt-2)}
+.calendar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px}
+.cal{display:grid;grid-template-columns:44px 1fr auto;gap:16px;align-items:baseline;
+  padding:15px 0;border-bottom:1px solid var(--line);transition:padding-left .2s,background .2s}
+.cal:hover{padding-left:8px;background:linear-gradient(90deg,rgba(255,255,255,.04),transparent)}
+.cal .n{font-family:'F1Display','Russo One',sans-serif;font-size:17px;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.cal .co{font-size:16.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.cal .ci{display:block;font-size:14px;color:var(--txt-2);margin-top:4px}
+.cal .co{display:block}
+.cal .dt{font-size:14px;color:var(--txt-3);white-space:nowrap;letter-spacing:.04em}
+.cal.now .n,.cal.now .co{color:var(--red)}
+.cal.done{opacity:.42}
+.cal.done:hover{opacity:.7}
+
+/* партнёры */
+.pgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:24px}
+
+footer{padding:72px 0 80px;border-top:1px solid var(--line)}
+.f-top{display:flex;justify-content:space-between;gap:48px;flex-wrap:wrap;margin-bottom:36px}
+.f-nav{display:flex;gap:36px;flex-wrap:wrap;font-size:15px;color:var(--txt-2)}
+.f-nav a:hover{color:#fff}
+.f-note{font-size:13.5px;line-height:1.75;color:var(--txt-3);max-width:86ch}
+
+@media (max-width:1240px){
+  :root{--gut:36px}
+  .hero-copy{max-width:56%}
+  .nextrace{position:static;width:auto;margin-top:44px;padding-left:22px}
+  .duo{grid-template-columns:1fr}
+  .season{grid-template-columns:1fr;gap:32px}
+  .stories{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .teams{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media (max-width:980px){
+  .nav,.hd-right .enter{display:none}
+  /* hero перестаём выкладывать флексом — иначе панель уезжает вбок */
+  .hero{display:block;min-height:auto;padding:56px 0 64px}
+  .hero-in{transform:none}
+  .hero-copy{max-width:none}
+  .nextrace{position:static;width:auto;margin:40px var(--gut) 0;padding-left:22px}
+  .car-trail{display:none}
+  .overlap{margin-top:-56px}
+  .st{grid-template-columns:56px minmax(0,1fr) auto;gap:18px}
+  .st .team{grid-column:2;font-size:14px;margin-top:4px}
+  .st .num{font-size:28px}
+  .calendar{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  :root{--gut:20px}
+  /* на узком экране шапка и длинные ссылки вылезали за край */
+  .hd{gap:16px}
+  .hd-right{gap:14px}
+  .hd-right .btn-red{padding:11px 16px;font-size:12px}
+  .arrow-link{font-size:12.5px;letter-spacing:.06em;flex-wrap:wrap}
+  .nextrace{margin-right:0;margin-left:var(--gut)}
+  .section{padding:64px 0}
+  .hero-title{font-size:46px}
+  .panel,.feature .body{padding:26px 22px}
+  .stories{grid-template-columns:1fr;gap:36px}
+  .teams{grid-template-columns:1fr}
+  .pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .overlap{margin-top:-32px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <div class="slot logo slot--bare" title="Логотип F1/HUB"></div>
+    <nav class="nav">
+      <a href="#" class="on">Главное</a>
+      <a href="#season">Гонки</a>
+      <a href="#champ">Чемпионат</a>
+      <a href="#">Пилоты</a>
+      <a href="#teams">Команды</a>
+      <a href="#stories">Видео</a>
+      <a href="#">Прогнозы</a>
+    </nav>
+    <div class="hd-right">
+      <button class="icon-btn" aria-label="Поиск">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      </button>
+      <a href="#" class="enter">Войти</a>
+      <button class="btn btn-red">Смотреть</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-bg"><div class="slot slot--fill has-photo"><img src="/static/img/site/hero-race.jpg" alt="Болид Формулы-1 на трассе"></div></div>
+  <div class="hero-veil"></div>
+  <div class="speed"></div>
+
+
+  <div class="hero-in">
+    <div class="hero-copy">
+      <div class="label label--red hero-round" id="kRound">Раунд 13</div>
+      <h1 class="display hero-title"><span class="sm">Следующий этап</span><span id="kCity">Монца</span></h1>
+      <div class="hero-when" id="kDates">4–6 сентября 2026</div>
+      <div class="hero-cta">
+        <button class="btn btn-red">Смотреть гонку</button>
+        <a class="arrow-link" href="#">Обзор этапа
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <aside class="nextrace">
+    <div class="label">Следующая гонка</div>
+    <div class="gp" id="nrName">Гран-при Италии</div>
+    <div class="when" id="nrWhen">6 сентября · 16:00 МСК</div>
+    <img class="nr-map" id="nrMap" alt="Схема трассы">
+    <hr>
+    <div class="facts">
+      <div id="nrCity">Монца</div>
+      <div><b id="nrKm">5.793 км</b></div>
+      <div><b id="nrLaps">53 круга</b></div>
+    </div>
+    <a class="arrow-link muted" href="#">Расписание уикенда
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+  </aside>
+</section>
+
+<div class="wrap overlap">
+  <div class="duo">
+    <section class="panel">
+      <div class="label">Последняя гонка</div>
+      <h2 class="heading" id="lrName" style="margin-top:10px">Гран-при Нидерландов</h2>
+      <div class="winner">
+        <div class="pos">P1</div>
+        <div class="who" id="w1">—</div>
+        <div class="team" id="w1team"></div>
+      </div>
+      <div class="rest" id="rest"></div>
+      <a class="arrow-link muted" href="#" style="margin-top:24px">Все результаты
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </a>
+    </section>
+
+    <article class="feature" id="feature">
+      <div class="slot has-photo"><img src="/static/img/site/news-lead.jpg" alt="Гонка Формулы-1"></div>
+      <div class="body">
+        <div class="meta">
+          <span class="label label--red">Главное</span>
+          <span class="dot"></span>
+          <span class="label" id="fWhen"></span>
+        </div>
+        <h2 id="fTitle">—</h2>
+        <p id="fText"></p>
+        <a class="arrow-link" href="#" id="fLink" target="_blank" rel="noopener">Читать
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </article>
+  </div>
+</div>
+
+<section class="section wrap" id="stories">
+  <div class="sec-hd">
+    <h2>Материалы</h2>
+    <a class="arrow-link muted" href="#">Все материалы
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+  <div class="stories" id="stories"></div>
+</section>
+
+<section class="section wrap" id="teams">
+  <div class="sec-hd">
+    <h2>Команды</h2>
+    <a class="arrow-link muted" href="#">Все команды
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+  <div class="teams" id="teamsGrid"></div>
+</section>
+
+<section class="section section--band" id="champ">
+  <div class="wrap">
+    <div class="sec-hd">
+      <h2>Чемпионат 2026</h2>
+      <a class="arrow-link muted" href="#">Вся таблица
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="stand" id="stand"></div>
+  </div>
+</section>
+
+<section class="section wrap" id="season">
+  <div class="sec-hd">
+    <h2>Сезон 2026</h2>
+    <a class="arrow-link muted" href="#">Весь календарь
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+  <div class="season">
+    <div class="season-card">
+      <div class="slot slot--3x2 has-photo"><img src="/static/img/site/monza-track.jpg" alt="Автодром Монца"></div>
+      <div class="body">
+        <div class="rd" id="scRound">Раунд 13</div>
+        <h3 id="scCity">Монца</h3>
+        <div class="sub" id="scSub">Гран-при Италии · 4–6 сентября</div>
+        <a class="arrow-link" href="#" style="margin-top:22px">Открыть этап
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="calendar" id="calendar"></div>
+  </div>
+</section>
+
+<section class="section section--band">
+  <div class="wrap">
+    <div class="sec-hd"><h2 style="font-size:26px">Партнёры</h2></div>
+    <div class="pgrid">
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+      <div class="slot slot--3x2" data-note="Логотип"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="f-top">
+      <div class="slot slot--bare" style="width:112px;height:32px"></div>
+      <nav class="f-nav">
+        <a href="#">Гонки</a><a href="#">Результаты</a><a href="#">Чемпионат</a><a href="#">Пилоты</a>
+        <a href="#">Команды</a><a href="#">Видео</a><a href="#">Прогнозы</a><a href="#">Приложение</a>
+      </nav>
+    </div>
+    <p class="f-note">Фотографии: Steffen Prößdorf (CC BY-SA 4.0), Gian Luca Sgaggero (CC BY 2.0), Anthony Alessio Tralongo (CC BY-SA 4.0) — Wikimedia Commons.<br>F1 HUB — независимый фанатский проект о Формуле-1. Не связан с Formula One World Championship
+    Limited и не является официальным ресурсом чемпионата. Данные о гонках — из открытых источников.</p>
+  </div>
+</footer>
+
+<script>
+const API='https://f1.lead-seek.ru';
+const M=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+const j=p=>fetch(API+p).then(r=>r.ok?r.json():null).catch(()=>null);
+const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const CITY={albert_park:'Мельбурн',shanghai:'Шанхай',suzuka:'Судзука',miami:'Майами',villeneuve:'Монреаль',
+  monaco:'Монако',catalunya:'Барселона',red_bull_ring:'Шпильберг',silverstone:'Сильверстоун',spa:'Спа',
+  hungaroring:'Будапешт',zandvoort:'Зандвоорт',monza:'Монца',madring:'Мадрид',baku:'Баку',
+  sepang:'Куала-Лумпур',marina_bay:'Сингапур',americas:'Остин',rodriguez:'Мехико',interlagos:'Сан-Паулу',
+  vegas:'Лас-Вегас',losail:'Лусаил',yas_marina:'Абу-Даби',bahrain:'Сахир',jeddah:'Джидда',imola:'Имола'};
+const COUNTRY={Italy:'Италия',Spain:'Испания',Netherlands:'Нидерланды',Belgium:'Бельгия',Hungary:'Венгрия',
+  Azerbaijan:'Азербайджан',Singapore:'Сингапур',USA:'США',Mexico:'Мексика',Brazil:'Бразилия',Japan:'Япония',
+  UK:'Великобритания',Monaco:'Монако',Canada:'Канада',Austria:'Австрия',Qatar:'Катар',UAE:'ОАЭ',
+  Australia:'Австралия',China:'Китай',Bahrain:'Бахрейн',Malaysia:'Малайзия','Saudi Arabia':'Саудовская Аравия'};
+const KM={monza:'5.793',zandvoort:'4.259',spa:'7.004',silverstone:'5.891',monaco:'3.337',baku:'6.003',
+  suzuka:'5.807',interlagos:'4.309',americas:'5.513',rodriguez:'4.304',vegas:'6.201',losail:'5.419',
+  yas_marina:'5.281',hungaroring:'4.381',catalunya:'4.657',villeneuve:'4.361',red_bull_ring:'4.318',
+  bahrain:'5.412',jeddah:'6.174',albert_park:'5.278',shanghai:'5.451',miami:'5.412',imola:'4.909',
+  madring:'5.474',sepang:'5.543',marina_bay:'4.940'};
+const cityOf=r=>CITY[(r?.circuit_id||'').toLowerCase()]||r?.locality||'';
+const plural=(n,a,b,c)=>{const x=n%100,y=n%10;return x>4&&x<20?c:y===1?a:y>1&&y<5?b:c;};
+const clean=t=>String(t||'').replace(/https?:\/\/\S+/g,'').replace(/#[\wА-Яа-яЁё]+/g,'')
+  .replace(/(YouTube|ВКонтакте|Rutube|Telegram|Дзен)\s*:?/gi,'').replace(/\s{2,}/g,' ').trim();
+const dayRange=(r)=>{
+  const d=new Date(r.date+'T00:00:00Z'); if(isNaN(d)) return '';
+  const f=r.sessions?.fp1?.date?new Date(r.sessions.fp1.date+'T00:00:00Z'):null;
+  return f? f.getUTCDate()+'–'+d.getUTCDate()+' '+MS[d.getUTCMonth()] : d.getUTCDate()+' '+MS[d.getUTCMonth()];
+};
+
+(async () => {
+  const [home, sched, drv, news] = await Promise.all([
+    j('/api/home?season=2026'), j('/api/schedule'), j('/api/standings/drivers?season=2026'), j('/api/news')
+  ]);
+  const races = (sched?.races || []).filter(r => r.round);
+  const nr = home?.next_race;
+  const race = races.find(r => r.round === nr?.round) || nr;
+
+  // официальные изображения F1: логотипы и рендеры болидов по командам
+  const teamsData = (await j('/api/teams?season=2026'))?.teams || [];
+  const logoOf = {}, carOf = {};
+  teamsData.forEach(t => { if (t.name) { logoOf[t.name] = t.logo_url; carOf[t.name] = t.car_url; } });
+  // если ссылка отвалится — элемент просто скрывается, вёрстка не едет
+  const img = (src, cls, alt) => src
+    ? '<img class="' + cls + '" src="' + esc(src) + '" alt="' + esc(alt || '') + '" loading="lazy" onerror="this.style.visibility=&quot;hidden&quot;">'
+    : '<span class="' + cls + '"></span>';
+  const swap = (el, src, fallback) => {
+    if (!el || !src) return;
+    el.onerror = () => { if (fallback && el.src !== fallback) el.src = fallback; };
+    el.src = src;
+  };
+
+  /* ——— ГЕРОЙ ——— */
+  if (nr) {
+    document.getElementById('kRound').textContent = 'Раунд ' + nr.round;
+    document.getElementById('kCity').textContent = cityOf(nr);
+    document.getElementById('nrName').textContent = nr.name || '';
+    document.getElementById('nrCity').textContent = cityOf(nr) + ', ' + (COUNTRY[nr.country] || nr.country || '');
+    const d = new Date(nr.date + 'T' + (nr.time || '12:00:00Z').replace('Z','') + 'Z');
+    if (!isNaN(d)) {
+      const f = race?.sessions?.fp1?.date ? new Date(race.sessions.fp1.date + 'T00:00:00Z') : null;
+      document.getElementById('kDates').textContent = (f ? f.getUTCDate() + '–' : '') +
+        d.getUTCDate() + ' ' + M[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+      const msk = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Moscow'});
+      document.getElementById('nrWhen').textContent = d.getUTCDate() + ' ' + M[d.getUTCMonth()] + ' · ' + msk + ' МСК';
+    }
+    const laps = race?.laps;
+    if (laps) document.getElementById('nrLaps').textContent = laps + ' ' + plural(laps,'круг','круга','кругов');
+    const km = KM[(nr.circuit_id || '').toLowerCase()];
+    document.getElementById('nrKm').textContent = km ? km + ' км' : '';
+    swap(document.querySelector('.hero-bg img'), nr.circuit_image, '/static/img/site/hero-race.jpg');
+    swap(document.getElementById('nrMap'), '/static/img/tracks/' + (nr.circuit_id || '') + '.png', nr.circuit_outline);
+    // карточка сезона
+    document.getElementById('scRound').textContent = 'Раунд ' + nr.round;
+    document.getElementById('scCity').textContent = cityOf(nr);
+    document.getElementById('scSub').textContent = (nr.name || '') + (race ? ' · ' + dayRange(race) : '');
+    swap(document.querySelector('.season-card .slot img'), nr.circuit_image, '/static/img/site/monza-track.jpg');
+  }
+
+  // болид команды лидера чемпионата — официальный рендер на прозрачном фоне
+  const stAll = drv?.standings || drv?.drivers || (Array.isArray(drv) ? drv : []);
+  swap(document.getElementById('carImg'), carOf[stAll[0]?.team] || Object.values(carOf)[0], null);
+
+  /* ——— ПОСЛЕДНЯЯ ГОНКА: победитель крупно, остальные строкой ——— */
+  const lr = home?.last_race, res = lr?.results || [];
+  if (lr) {
+    const lrRace = races.find(r => r.round === lr.round);
+    document.getElementById('lrName').textContent = lrRace?.name || lr.name || '';
+  }
+  if (res[0]) {
+    document.getElementById('w1').textContent = res[0].last_name || res[0].name || '';
+    document.getElementById('w1team').textContent = res[0].team || '';
+    const box = document.querySelector('.winner');
+    box.innerHTML = img(res[0].photo_url_large || res[0].card_photo_url, 'wface', res[0].name)
+      + '<div class="wtext">' + box.innerHTML + '</div>';
+  }
+  document.getElementById('rest').innerHTML = res.slice(1,5).map((r,i) =>
+    '<div class="r"><span class="n">' + (i+2) + '</span>' +
+    img(logoOf[r.team], 'tlogo', r.team) +
+    '<span class="d">' + esc(r.last_name || r.code || '') + '</span>' +
+    '<span class="g">' + esc(r.time || (r.status === 'Lapped' ? '+1 круг' : r.status || '')) + '</span></div>'
+  ).join('');
+
+  /* ——— ГЛАВНАЯ НОВОСТЬ + МАТЕРИАЛЫ ——— */
+  const posts = (news?.posts || []).filter(p => p.title);
+  const when = p => { const d = new Date(p.date_text); if (isNaN(d)) return '';
+    const h = Math.round((Date.now() - d) / 36e5);
+    return h < 24 ? h + ' ' + plural(h,'час','часа','часов') + ' назад' : d.getDate() + ' ' + M[d.getMonth()]; };
+  if (posts[0]) {
+    const p = posts[0], body = clean(p.preview);
+    // в ленте часто попадаются скриншоты таблиц — в большой блок ставим только «живое» фото
+    const looksLikeTable = /итог|зачёт|зачет|результат|таблиц/i.test(p.title || '');
+    const leadImg = document.querySelector('.feature .slot img');
+    if (leadImg) {
+      if (p.photo && !looksLikeTable) swap(leadImg, p.photo, '/static/img/site/news-lead.jpg');
+      else leadImg.src = '/static/img/site/news-lead.jpg';
+    }
+    document.getElementById('fTitle').textContent = p.title;
+    document.getElementById('fWhen').textContent = when(p);
+    document.getElementById('fLink').href = p.url || '#';
+    const el = document.getElementById('fText');
+    if (body) el.textContent = body; else el.remove();
+  }
+  document.querySelector('.stories').innerHTML = posts.slice(1,4).map((p,i) =>
+    '<a class="story" href="' + esc(p.url) + '" target="_blank" rel="noopener">' +
+      '<div class="slot slot--16x9 has-photo"><img src="' + (p.photo || ('/static/img/site/story-' + ((i%3)+1) + '.jpg')) +
+      '" alt="" loading="lazy" data-fb="/static/img/site/story-' + ((i%3)+1) + '.jpg"></div>' +
+      '<h3>' + esc(p.title) + '</h3>' +
+      '<div class="when">' + when(p) + '</div></a>'
+  ).join('');
+
+  /* ——— ЧЕМПИОНАТ ——— */
+  const st = drv?.standings || drv?.drivers || (Array.isArray(drv) ? drv : []);
+  document.getElementById('stand').innerHTML = st.slice(0,5).map((s,i) =>
+    '<div class="st"><div class="num">' + String(i+1).padStart(2,'0') +
+      '<span class="st-face-wrap" style="--tc:' + esc(s.team_color || '#2A2A33') + '">' +
+      img(s.photo_url || s.card_photo_url, 'st-face', s.name) + '</span></div>' +
+    '<div><div class="name">' + esc(s.last_name || s.name || '') + '</div></div>' +
+    '<div class="team">' + img(logoOf[s.team], 'tlogo', s.team) + esc(s.team || '') + '</div>' +
+    '<div class="pts"><b>' + Math.round(s.points ?? 0) + '</b><span>ОЧКОВ</span></div></div>'
+  ).join('');
+
+  /* ——— КОМАНДЫ ——— */
+  const cons = (await j('/api/standings/constructors?season=2026'));
+  const consList = cons?.standings || cons || [];
+  document.getElementById('teamsGrid').innerHTML = consList.slice(0,6).map((t,i) => {
+    const logo = t.logo_url || logoOf[t.team], car = t.car_url || carOf[t.team];
+    return '<article class="team-card" style="--tc:' + esc(t.team_color || '#666') + '">' +
+      '<div class="top">' + img(logo, 'tlogo-big', t.team) +
+      '<span class="pos">' + String(i+1).padStart(2,'0') + '</span></div>' +
+      '<h3>' + esc(t.team || '') + '</h3>' +
+      '<div class="pts"><b>' + Math.round(t.points ?? 0) + '</b> очков · побед: ' + (t.wins ?? 0) + '</div>' +
+      img(car, 'car', t.team) + '</article>';
+  }).join('');
+
+  /* ——— КАЛЕНДАРЬ СПИСКОМ ——— */
+  const cur = nr?.round ?? 0;
+  setTimeout(() => document.querySelectorAll('img[data-fb]').forEach(im => {
+    im.onerror = () => { if (im.src !== im.dataset.fb) im.src = im.dataset.fb; };
+    if (im.complete && im.naturalWidth === 0) im.src = im.dataset.fb;
+  }), 0);
+
+  document.getElementById('calendar').innerHTML = races.map(r =>
+    '<a class="cal ' + (r.round === cur ? 'now' : (r.round < cur ? 'done' : '')) + '" href="#">' +
+      '<span class="n">' + String(r.round).padStart(2,'0') + '</span>' +
+      '<span><span class="co">' +
+      (r.country_code ? '<img class="flag" src="/static/img/flags/' + r.country_code.toLowerCase() + '.png" alt="" loading="lazy" onerror="this.style.display=&quot;none&quot;">' : '') +
+      esc(COUNTRY[r.country] || r.country || '') + '</span>' +
+      '<span class="ci">' + esc(cityOf(r)) + '</span></span>' +
+      '<span class="dt">' + dayRange(r) + '</span></a>'
+  ).join('');
+})();
+</script>
+</body>
+</html>
