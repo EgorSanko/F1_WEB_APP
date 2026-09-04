@@ -958,62 +958,6 @@ async def get_last_race():
 
 # ============ COMBINED ENDPOINTS (fewer requests from frontend) ============
 
-RUSTORE_URL = "https://www.rustore.ru/catalog/app/ru.leadseek.f1hub"
-UPDATE_TITLE = "ОБНОВИТЕ ПРИЛОЖЕНИЕ"
-UPDATE_TEXT = "Вышла версия 2.0 — откройте RuStore и нажмите «Обновить»"
-
-
-def _is_legacy_app(request) -> bool:
-    """LEGACY_WALL: старая нативка 1.0.x из RuStore. У неё UA okhttp/expo,
-    у новой оболочки 2.0 — F1HubApp/2.0 (её не трогаем)."""
-    try:
-        ua = (request.headers.get("user-agent") or "").lower() if request else ""
-    except Exception:
-        return False
-    if "f1hubapp" in ua:
-        return False
-    return "okhttp" in ua or "expo/" in ua
-
-
-def _wall_home(data):
-    """Подменяем ТОЛЬКО строки, схему оставляем как есть — иначе приложение падает."""
-    try:
-        out = dict(data)
-        nr = dict(out.get("next_race") or {})
-        if nr:
-            nr["name"] = UPDATE_TITLE
-            nr["circuit"] = UPDATE_TEXT
-            nr["circuit_name"] = UPDATE_TEXT
-            nr["country"] = "RuStore → F1 Hub → Обновить"
-            nr["locality"] = "Версия 2.0"
-            out["next_race"] = nr
-        lr = dict(out.get("last_race") or {})
-        if lr:
-            lr["name"] = UPDATE_TITLE
-            lr["results"] = []
-            out["last_race"] = lr
-        st = out.get("standings_top3")
-        if isinstance(st, dict):
-            out["standings_top3"] = {**st, "standings": []}
-        out["upgrade_required"] = True
-        out["upgrade_url"] = RUSTORE_URL
-        return out
-    except Exception:
-        return data
-
-
-def _wall_list(data, key, item):
-    """Первым элементом списка кладём призыв со ссылкой — по нему открывается RuStore."""
-    try:
-        if isinstance(data, dict) and isinstance(data.get(key), list):
-            return {**data, key: [item] + data[key]}
-        if isinstance(data, list):
-            return [item] + data
-        return data
-    except Exception:
-        return data
-
-
 @app.get("/api/home")
 async def get_home(request: Request, season: int = None):
     # Старая нативка 1.0.x (UA okhttp/expo, зовёт /api/home БЕЗ ?season=) получает
@@ -1022,10 +966,7 @@ async def get_home(request: Request, season: int = None):
     # Призыв обновиться показываем мягко — баннером в ленте новостей (см. /api/news).
     season = season or CURRENT_SEASON
     """Combined endpoint: next race + last race + top standings. One call for home screen."""
-    data = await f1_data.get_home_data(season=season)
-    if _is_legacy_app(request):
-        return _wall_home(data)
-    return data
+    return await f1_data.get_home_data(season=season)
 
 
 @app.get("/api/live/dashboard")
@@ -2400,21 +2341,10 @@ async def get_position_chart(round_num: int, season: int = CURRENT_SEASON):
 # ============ BROADCASTS ============
 
 @app.get("/api/broadcasts")
-async def list_broadcasts(request: Request, race_round: Optional[int] = None, season: Optional[int] = None, is_live: Optional[bool] = None):
+async def list_broadcasts(race_round: Optional[int] = None, season: Optional[int] = None, is_live: Optional[bool] = None):
     db.auto_end_stale_broadcasts()
     rows = db.get_broadcasts(race_round=race_round, season=season, is_live=1 if is_live else None if is_live is None else 0)
-    data = {"broadcasts": _use_mirrored_thumbs(rows)}
-    if _is_legacy_app(request):
-        # LEGACY_WALL_BROADCASTS: первой записью — переход в RuStore.
-        # Поля те же, что у обычной трансляции, чтобы приложение её отрисовало.
-        return _wall_list(data, "broadcasts", {
-            "id": 0, "race_round": 0, "season": CURRENT_SEASON, "session_type": "review",
-            "title": UPDATE_TITLE + " — " + UPDATE_TEXT,
-            "video_url": RUSTORE_URL, "embed_url": RUSTORE_URL,
-            "is_live": 0, "started_at": None, "ended_at": None,
-            "created_by": 0, "created_at": None, "thumbnail_url": None,
-        })
-    return data
+    return {"broadcasts": _use_mirrored_thumbs(rows)}
 
 
 @app.get("/api/broadcasts/live")
