@@ -2515,6 +2515,12 @@ async def resolve_vk_embed(video_url: str) -> str:
     """Construct embed URL from VK, YouTube, or Rutube video URL."""
     import re as _re
 
+    # Вставили готовый код вставки из ВК (iframe) или прямую ссылку video_ext —
+    # берём как есть: там уже есть hash, без которого закрытые видео не играют.
+    if "video_ext.php" in video_url:
+        m = _re.search(r"""src=["']([^"']*video_ext\.php[^"']*)["']""", video_url)
+        return (m.group(1) if m else video_url.strip()).replace("&amp;", "&")
+
     # YouTube — return embed URL
     yt = _re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]+)', video_url)
     if yt:
