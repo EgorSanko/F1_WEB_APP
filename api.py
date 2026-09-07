@@ -2525,17 +2525,20 @@ async def resolve_vk_embed(video_url: str) -> str:
     if rt:
         return f"https://rutube.ru/play/embed/{rt.group(1)}"
 
-    # VK video — extract oid and id
-    match = _re.search(r'video(-?\d+)_(\d+)', video_url)
+    # VK — поддерживаем vk.com, vk.ru, vkvideo.ru, vksport.vkvideo.ru
+    # и оба типа: video-… (запись) и live-… (трансляция).
+    match = _re.search(r'(?:video|live|clip)(-?\d+)_(\d+)', video_url)
     if not match:
         return None
     oid, vid = match.group(1), match.group(2)
 
-    # Fetch the VK video page to extract embed hash
+    # Страницу VK с сервера не получить (отдаёт 302 на авторизацию), но для
+    # публичных видео hash в embed не обязателен — video_ext играет и без него.
+    # Пытаемся один раз с коротким таймаутом и не расстраиваемся при неудаче.
     vk_page_url = f"https://vk.com/video{oid}_{vid}"
     try:
         import httpx as _httpx  # was referenced without being imported in this scope
-        async with _httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with _httpx.AsyncClient(timeout=4, follow_redirects=True) as client:
             resp = await client.get(vk_page_url, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             })

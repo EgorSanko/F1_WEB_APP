@@ -4153,7 +4153,7 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
     }
 
     // VK: встраиваем штатный плеер video_ext — раньше просто открывали ВК наружу
-    const vkMatch = directUrl.match(/video(-?\d+)_(\d+)/);
+    const vkMatch = directUrl.match(/(?:video|live|clip)(-?\d+)_(\d+)/);
     const isVkHost = /vk\.com|vkvideo\.ru|vk\.ru|vksport/.test(directUrl);
     if (isVkHost && vkMatch) {
         const vkSrc = 'https://vk.com/video_ext.php?oid=' + vkMatch[1] + '&id=' + vkMatch[2] +
