@@ -2735,14 +2735,6 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
                 // Rutube — НАШ плеер (Plyr/HLS: работает лучше в TG, свой фулскрин).
                 // YouTube — нативный embed. Остальное — iframe c CSS-фулскрином.
                 const u = b.video_url || b.embed_url || '';
-                const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
-                if (rt) {
-                    return (
-                        <div style={{borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)'}}>
-                            <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type} poster={b.thumbnail_url}/>
-                        </div>
-                    );
-                }
                 // VK: сразу грузить iframe нельзя — ВК требует пройти проверку
                 // «вы не робот» и анониму видео не отдаёт (особенно vksport).
                 // Показываем обложку и выбор: попробовать здесь или открыть в ВК.
@@ -2769,11 +2761,17 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
                     );
                 }
                 const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
-                const src2 = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1') : (b.embed_url || u);
-                const provName = yt ? 'YouTube' : 'источнике';
+                const rt = u.match(/rutube\.ru\/(?:video|play\/embed)\/([a-f0-9]+)/);
+                const src2 = yt ? ('https://www.youtube.com/embed/'+yt[1]+'?rel=0&playsinline=1')
+                          : rt ? ('https://rutube.ru/play/embed/'+rt[1])
+                          : (b.embed_url || u);
+                const provName = yt ? 'YouTube' : rt ? 'Rutube' : 'источнике';
                 const wrapStyle = playerFs
-                    ? {position:'fixed',inset:0,zIndex:9999,background:'#000',display:'flex',alignItems:'center',justifyContent:'center'}
+                    ? {position:'fixed',inset:0,zIndex:9999,background:'#000',display:'flex',alignItems:'center',justifyContent:'center',
+                       paddingBottom:'max(env(safe-area-inset-bottom, 0px), 14px)',paddingTop:'env(safe-area-inset-top, 0px)',boxSizing:'border-box'}
                     : {position:'relative',borderRadius:18,overflow:'hidden',marginBottom:10,border:'1px solid var(--f1-border)',background:'#000',paddingTop:'56.25%'};
+                // на телефоне полноэкранный режим у Rutube/YouTube — их собственный,
+                // поэтому наш оверлей не мешает системным кнопкам
                 return (
                     <>
                         <div style={wrapStyle}>
