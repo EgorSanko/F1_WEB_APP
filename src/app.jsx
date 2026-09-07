@@ -2690,6 +2690,7 @@ const _relTime = (iso) => {
 };
 
 const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => {
+    const [vkPlay, setVkPlay] = useState(false);
     const b = broadcast;
     const [social, setSocial] = useState(null);
     const [comments, setComments] = useState(null);
@@ -2738,8 +2739,33 @@ const BroadcastViewPage = ({broadcast, raceName, onBack, user, spoilerFree}) => 
                 if (rt) {
                     return (
                         <div style={{borderRadius:18,overflow:'hidden',marginBottom:14,border:'1px solid var(--f1-border)'}}>
-                            <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type}/>
+                            <VideoPlayer embedUrl={b.embed_url} videoUrl={b.video_url} title={title} sessionType={b.session_type} poster={b.thumbnail_url}/>
                         </div>
+                    );
+                }
+                // VK: сразу грузить iframe нельзя — ВК требует пройти проверку
+                // «вы не робот» и анониму видео не отдаёт (особенно vksport).
+                // Показываем обложку и выбор: попробовать здесь или открыть в ВК.
+                const vk = /vk\.com|vkvideo\.ru|vk\.ru|vksport/.test(u);
+                if (vk && !vkPlay) {
+                    return (
+                        <>
+                            <div style={{position:'relative',borderRadius:18,overflow:'hidden',marginBottom:10,border:'1px solid var(--f1-border)',background:'#111',paddingTop:'56.25%'}}>
+                                {b.thumbnail_url
+                                    ? <img src={b.thumbnail_url} alt="" loading="lazy" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:0.9}}/>
+                                    : <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#0077FF,#0055BB)'}}/>}
+                                <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 45%,rgba(0,0,0,0.78))'}}/>
+                                <div onClick={()=>setVkPlay(true)} style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(0,0,0,0.5)',cursor:'pointer'}}>
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M9.2 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.25 5.97 9.2 6.55 9.2 7.5z"/></svg>
+                                </div>
+                                <div style={{position:'absolute',bottom:10,left:14,fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.85)'}}>VK Видео</div>
+                            </div>
+                            <div style={{display:'flex',gap:8,marginBottom:8}}>
+                                <button onClick={()=>setVkPlay(true)} style={{flex:1,padding:'10px 0',borderRadius:12,border:'1px solid var(--f1-border)',background:'var(--f1-card-solid)',color:'var(--f1-text)',fontFamily:'inherit',fontWeight:700,fontSize:12,cursor:'pointer'}}>{'\u25b6'} Смотреть здесь</button>
+                                <button onClick={()=>openLink(b.video_url || u)} style={{flex:1,padding:'10px 0',borderRadius:12,border:'none',background:'linear-gradient(135deg,#0077FF,#0055BB)',color:'#fff',fontFamily:'inherit',fontWeight:700,fontSize:12,cursor:'pointer'}}>{'\u2197'} Открыть в ВК</button>
+                            </div>
+                            <div style={{fontSize:11,color:'var(--f1-text-muted)',textAlign:'center',marginBottom:14}}>ВКонтакте не всегда пускает свои записи в чужой плеер — тогда открывайте в ВК</div>
+                        </>
                     );
                 }
                 const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/);
@@ -4075,7 +4101,7 @@ const F1VideoPlayer = ({src, title, poster, streamType}) => {
     );
 };
 
-const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
+const VideoPlayer = ({embedUrl, videoUrl, title, sessionType, poster}) => {
     const url = embedUrl || videoUrl || '';
     const directUrl = videoUrl || embedUrl || '';
     const isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -4113,6 +4139,7 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
         );
     }
 
+    const [vkPlay, setVkPlay] = useState(false);
     // Rutube: Plyr + HLS.js via API
     const [streamData, setStreamData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -4152,13 +4179,35 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
         return <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}><div style={{fontSize:14,fontWeight:700,color:'white'}}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043d\u0430 Rutube \u2197</div></div>;
     }
 
-    // VK: встраиваем штатный плеер video_ext — раньше просто открывали ВК наружу
+    // VK: часть роликов (особенно трансляции VK Спорт) не отдаётся анониму
+    // во встроенном плеере — ВК показывает свою заглушку. Поэтому сначала
+    // обложка и выбор: попробовать здесь или сразу открыть в ВК, где человек авторизован.
     const vkMatch = directUrl.match(/(?:video|live|clip)(-?\d+)_(\d+)/);
     const isVkHost = /vk\.com|vkvideo\.ru|vk\.ru|vksport/.test(directUrl);
     if (isVkHost && vkMatch) {
-        const vkSrc = 'https://vk.com/video_ext.php?oid=' + vkMatch[1] + '&id=' + vkMatch[2] +
-                      '&hd=2&autoplay=0&js_api=1';
-        return <IframeFullscreenPlayer src={vkSrc} title={title} isMobile={isMob}/>;
+        const vkSrc = embedUrl && embedUrl.indexOf('video_ext') !== -1
+            ? embedUrl
+            : 'https://vk.com/video_ext.php?oid=' + vkMatch[1] + '&id=' + vkMatch[2] + '&hd=2&js_api=1';
+        if (vkPlay) return <IframeFullscreenPlayer src={vkSrc} title={title} isMobile={isMob}/>;
+        return (
+            <div style={{marginBottom:12}}>
+                <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#111'}}>
+                    {poster
+                        ? <img src={poster} alt="" loading="lazy" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',opacity:0.9}}/>
+                        : <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#0077FF,#0055BB)'}}/>}
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 45%,rgba(0,0,0,0.75))'}}/>
+                    <div onClick={() => setVkPlay(true)} style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:64,height:64,borderRadius:'50%',background:'rgba(225,6,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 24px rgba(0,0,0,0.5)',cursor:'pointer'}}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M9.2 7.5v9c0 .95 1.05 1.53 1.86 1.03l7.1-4.5c.75-.47.75-1.59 0-2.06l-7.1-4.5C10.25 5.97 9.2 6.55 9.2 7.5z"/></svg>
+                    </div>
+                    <div style={{position:'absolute',bottom:10,left:12,fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.85)'}}>VK Видео</div>
+                </div>
+                <div style={{display:'flex',gap:8,marginTop:8}}>
+                    <div onClick={() => setVkPlay(true)} style={{flex:1,textAlign:'center',padding:'11px 12px',borderRadius:10,background:'rgba(255,255,255,0.07)',border:'1px solid var(--f1-border)',fontSize:13,fontWeight:700,cursor:'pointer'}}>Смотреть здесь</div>
+                    <div onClick={() => openLink(directUrl)} style={{flex:1,textAlign:'center',padding:'11px 12px',borderRadius:10,background:'linear-gradient(135deg,#0077FF,#0055BB)',fontSize:13,fontWeight:700,color:'#fff',cursor:'pointer'}}>Открыть в ВК</div>
+                </div>
+                <div style={{marginTop:6,fontSize:11,color:'var(--f1-text-muted)',textAlign:'center'}}>Если запись не проигрывается здесь — она откроется в ВК</div>
+            </div>
+        );
     }
 
     // прочие ссылки — открываем во внешнем приложении
