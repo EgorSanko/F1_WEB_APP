@@ -3951,9 +3951,10 @@ const IframeFullscreenPlayer = ({src, title}) => {
     }, [isFS, exitFS]);
 
     const fsOverlay = isFS ? ReactDOM.createPortal(
-        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,width:'100vw',height:'100vh',zIndex:2147483647,background:'#000'}}>
-            <iframe src={src} style={{width:'100%',height:'100%',border:'none'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
-            <div onClick={exitFS} style={{position:'fixed',top:'max(12px, env(safe-area-inset-top, 12px))',left:12,padding:'8px 16px',borderRadius:12,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',fontSize:14,fontWeight:700,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',zIndex:2147483647}}>{'← Назад'}</div>
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,width:'100vw',height:'100dvh',zIndex:2147483647,background:'#000',
+                     paddingBottom:'env(safe-area-inset-bottom, 0px)',boxSizing:'border-box'}}>
+            <iframe src={src} style={{width:'100%',height:'100%',border:'none',display:'block'}} allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope" allowFullScreen title={title||'Video'}/>
+            <div onClick={exitFS} style={{position:'fixed',top:'max(12px, env(safe-area-inset-top, 12px))',left:'max(12px, env(safe-area-inset-left, 12px))',padding:'8px 16px',borderRadius:12,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',fontSize:14,fontWeight:700,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',zIndex:2147483647}}>{'← Назад'}</div>
         </div>,
         portalRef.current
     ) : null;
@@ -3963,7 +3964,7 @@ const IframeFullscreenPlayer = ({src, title}) => {
             {fsOverlay}
             {!isFS && <div style={{position:'relative',width:'100%',paddingTop:'56.25%',borderRadius:12,overflow:'hidden',background:'#000',marginBottom:12}}>
                 <iframe src={src} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',border:'none'}} allow="autoplay; encrypted-media; picture-in-picture" title={title||'Video'}/>
-                <div onClick={() => setIsFS(true)} style={{position:'absolute',bottom:12,right:12,padding:'6px 12px',borderRadius:8,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',fontSize:12,fontWeight:600,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',display:'flex',alignItems:'center',gap:4,zIndex:10}}>
+                <div onClick={() => setIsFS(true)} style={{position:'absolute',bottom:'max(12px, env(safe-area-inset-bottom, 12px))',right:12,padding:'6px 12px',borderRadius:8,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',fontSize:12,fontWeight:600,color:'#fff',border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',display:'flex',alignItems:'center',gap:4,zIndex:10}}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
                     {'На весь экран'}
                 </div>
@@ -4151,8 +4152,17 @@ const VideoPlayer = ({embedUrl, videoUrl, title, sessionType}) => {
         return <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,background:'linear-gradient(135deg,#00C8AA,#009977)',padding:'18px 20px'}}><div style={{fontSize:14,fontWeight:700,color:'white'}}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043d\u0430 Rutube \u2197</div></div>;
     }
 
-    // VK / other
-    const isVk = /vk\.com|vkvideo\.ru|vksport/.test(directUrl);
+    // VK: встраиваем штатный плеер video_ext — раньше просто открывали ВК наружу
+    const vkMatch = directUrl.match(/video(-?\d+)_(\d+)/);
+    const isVkHost = /vk\.com|vkvideo\.ru|vk\.ru|vksport/.test(directUrl);
+    if (isVkHost && vkMatch) {
+        const vkSrc = 'https://vk.com/video_ext.php?oid=' + vkMatch[1] + '&id=' + vkMatch[2] +
+                      '&hd=2&autoplay=0&js_api=1';
+        return <IframeFullscreenPlayer src={vkSrc} title={title} isMobile={isMob}/>;
+    }
+
+    // прочие ссылки — открываем во внешнем приложении
+    const isVk = isVkHost;
     return (
         <div onClick={() => openLink(directUrl)} style={{cursor:'pointer',marginBottom:12,borderRadius:14,overflow:'hidden',background:isVk?'linear-gradient(135deg,#0077FF,#0055BB)':'linear-gradient(135deg,#333,#222)'}}>
             <div style={{padding:'18px 20px',display:'flex',alignItems:'center',gap:14}}>

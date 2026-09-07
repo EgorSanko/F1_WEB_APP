@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
-    Application, CommandHandler, ContextTypes, JobQueue
+    Application, CommandHandler, ContextTypes, JobQueue, MessageHandler, filters
 )
 from telegram.constants import ParseMode
 
@@ -195,6 +195,55 @@ async def cmd_notify_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ============ NOTIFICATION HELPERS ============
+
+
+async def cmd_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обычное сообщение боту (не команда): раньше такие терялись молча.
+    Сохраняем, отвечаем человеку и пересылаем владельцу."""
+    msg = update.effective_message
+    user = update.effective_user
+    if not msg or not user:
+        return
+    text = (msg.text or msg.caption or "").strip()
+    if not text:
+        return
+
+    # 1) сохраняем — чтобы не пропало, даже если пересылка не дойдёт
+    try:
+        db.execute_write(
+            "CREATE TABLE IF NOT EXISTS bot_messages ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, "
+            "first_name TEXT, text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)", ())
+        db.execute_write(
+            "INSERT INTO bot_messages (user_id, username, first_name, text) VALUES (?,?,?,?)",
+            (user.id, user.username or "", user.first_name or "", text[:2000]))
+    except Exception as e:
+        logger.warning("не сохранил сообщение боту: %r", e)
+
+    # 2) отвечаем, чтобы человек не думал, что пишет в пустоту
+    try:
+        await msg.reply_text(
+            "Спасибо, сообщение получено — передам создателю приложения.\n\n"
+            "Если что-то не работает или нужен доступ, опишите подробнее. "
+            "А пока можно открыть приложение:",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🏁 Открыть F1 Hub", url=WEBAPP_URL)
+            ]]))
+    except Exception as e:
+        logger.warning("не ответил пользователю: %r", e)
+
+    # 3) пересылаем владельцу
+    who = user.first_name or "без имени"
+    if user.username:
+        who = who + " (@" + user.username + ")"
+    note = ("✉️ <b>Сообщение боту</b>\n"
+            "От: " + who + " · id " + str(user.id) + "\n\n" + text[:1500])
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(admin_id, note, parse_mode=ParseMode.HTML)
+        except Exception as e:
+            logger.warning("не переслал админу %s: %r", admin_id, e)
+
 
 async def send_notification(app: Application, user_id: int, text: str,
                             keyboard=None):
@@ -487,6 +536,9 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_get_code, pattern="^get_code$"))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CommandHandler("notify_test", cmd_notify_test))
+
+    # любые текстовые сообщения, кроме команд
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cmd_inbox))
 
     app.add_error_handler(on_error)
 
